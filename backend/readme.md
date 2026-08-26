@@ -102,7 +102,7 @@ sequenceDiagram
     H->>S: CreateSession(user.ID)
     S->>R: CreateSession(token, userID, expiry)
     R->>DB: INSERT INTO sessions
-    H->>C: 200 + Set-Cookie: session=token; HttpOnly; SameSite=Lax
+    H->>C: 200 + Set-Cookie: session=token, HttpOnly, SameSite=Lax
 ```
 
 ### file upload + thumbnail generation
