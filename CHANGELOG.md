@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+
+- **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
+- **Image dimension validation** — images exceeding 8000x8000 pixels are rejected with `ErrInvalidImage` before full decode, preventing memory exhaustion from small compressed files with extreme dimensions
+
+---
+
 ## [1.0.0] - 2026-08-26
 
 ### Added

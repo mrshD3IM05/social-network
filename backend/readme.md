@@ -44,6 +44,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | GET | /fs/{id}/thumb | - | serves the pre-generated thumbnail (max 300x300) with long lived cache headers, 404 if you can't see the file or no thumbnail exists |
 
 thumbnails are generated once during upload and stored next to the originals under uploads/thumbnails/, never resized per request
+images are validated for dimensions (max 8000x8000) before full decode to prevent memory exhaustion; the existing 10 MB upload size limit is unchanged
 animated gifs get a static first frame thumbnail; images smaller than 300x300 are kept as-is; uploads made before thumbnails existed return 404
 
 ### websocket
