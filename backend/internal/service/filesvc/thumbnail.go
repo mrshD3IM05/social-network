@@ -18,6 +18,8 @@ const (
 	jpegThumbQuality = 82
 	thumbFileMode    = 0o640
 	thumbDirMode     = 0o750
+	maxImageWidth    = 8000
+	maxImageHeight   = 8000
 )
 
 var (
@@ -58,6 +60,13 @@ func generateThumbnail(sourcePath, destinationPath string) error {
 		return err
 	}
 
+	if err := validateImageDimensions(source); err != nil {
+		return err
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
 	decoded, err := decodeImage(contentType, source)
 	if err != nil {
 		return err
@@ -90,6 +99,17 @@ func detectFileType(source *os.File) (string, error) {
 		return "", ErrInvalidImage
 	}
 	return contentType, nil
+}
+
+func validateImageDimensions(source *os.File) error {
+	config, _, err := image.DecodeConfig(source)
+	if err != nil {
+		return ErrInvalidImage
+	}
+	if config.Width > maxImageWidth || config.Height > maxImageHeight {
+		return ErrInvalidImage
+	}
+	return nil
 }
 
 func decodeImage(contentType string, source *os.File) (image.Image, error) {
