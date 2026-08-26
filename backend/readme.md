@@ -157,6 +157,8 @@ sequenceDiagram
 
 ### login
 
+Client authenticates with email/password. The middleware checks rate limits, the handler looks up the user, the service verifies the bcrypt hash, and a session cookie is set on success.
+
 ```mermaid
 sequenceDiagram
     participant C as client
@@ -183,6 +185,8 @@ sequenceDiagram
 ```
 
 ### file upload + thumbnail generation
+
+Client uploads up to 5 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, generates a 300x300 thumbnail using an area-average downscaler, and stores both on disk. File metadata is written to the database after the thumbnail is saved; if thumbnail generation fails the original is rolled back.
 
 ```mermaid
 sequenceDiagram
@@ -211,6 +215,8 @@ sequenceDiagram
 ```
 
 ### follow request flow
+
+A user follows another user. If the target's profile is public, the follow is accepted immediately. If private, a pending follow request is created and the target user receives a real-time WebSocket notification.
 
 ```mermaid
 sequenceDiagram
@@ -241,6 +247,8 @@ sequenceDiagram
 
 ### accept / decline follow request
 
+The target user reviews a pending follow request and accepts or declines it. The repository updates the status in the `follow_requests` table.
+
 ```mermaid
 sequenceDiagram
     participant C as target user
@@ -258,6 +266,8 @@ sequenceDiagram
 ```
 
 ### websocket messaging
+
+Clients connect via WebSocket with a session cookie. The hub registers each session and routes messages directly through the repository, bypassing the handler/service layers. Messages are persisted and delivered to both the sender and recipient in real time.
 
 ```mermaid
 sequenceDiagram
@@ -283,6 +293,8 @@ sequenceDiagram
 ```
 
 ### avatar upload
+
+Client uploads a single image for their avatar. The service follows the same pipeline as post image uploads — writing the original, validating dimensions, generating a thumbnail — then updates the `users.avatar` field to point to the new file. Thumbnails are served via `GET /fs/{id}/thumb`.
 
 ```mermaid
 sequenceDiagram
