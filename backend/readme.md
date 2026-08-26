@@ -75,3 +75,157 @@ we are using a layered architecture
 
 request flow: middleware -> handler -> service -> repository -> sqlite
 the websocket hub sits next to that stack and talks to the repository directly
+
+## sequence diagrams
+
+### login
+
+```mermaid
+sequenceDiagram
+    participant C as client
+    participant MW as middleware
+    participant H as handler
+    participant S as service
+    participant R as repository
+    participant DB as sqlite
+
+    C->>MW: POST /login (email, password)
+    MW->>MW: rate limit check (per IP)
+    MW->>H: forward request
+    H->>S: FindUserByEmail(email)
+    S->>R: FindUserByEmail(email)
+    R->>DB: SELECT * FROM users WHERE email = ?
+    DB-->>R: user row
+    R-->>S: user
+    S->>S: bcrypt.CompareHashAndPassword
+    S-->>H: user, err (auth success)
+    H->>S: CreateSession(user.ID)
+    S->>R: CreateSession(token, userID, expiry)
+    R->>DB: INSERT INTO sessions
+    H->>C: 200 + Set-Cookie: session=token; HttpOnly; SameSite=Lax
+```
+
+### file upload + thumbnail generation
+
+```mermaid
+sequenceDiagram
+    participant C as client
+    participant H as filehandler
+    participant S as filesvc
+    participant F as file system
+    participant R as repository
+    participant DB as sqlite
+
+    C->>H: POST /files (multipart, up to 5 images)
+    loop for each file
+        H->>H: parse multipart, validate size (10 MB) + type (jpeg/png/gif)
+        H->>S: Upload(file, postID)
+        S->>F: write original to uploads/<id>
+        S->>S: detectContentType (512 byte header read)
+        S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
+        S->>S: jpeg/png/gif.Decode — full decode
+        S->>S: fitThumbnail (scale down to ≤300×300, never upscale)
+        S->>S: encode thumbnail (JPEG q82 / PNG / GIF first frame)
+        S->>F: write thumbnail to uploads/thumbnails/<id>
+        S->>R: store file metadata
+        R->>DB: INSERT INTO files
+    end
+    H-->>C: 201 + stored file JSON
+```
+
+### follow request flow
+
+```mermaid
+sequenceDiagram
+    participant C1 as follower
+    participant H as handler
+    participant S as service
+    participant R as repository
+    participant DB as sqlite
+    participant WS as websocket hub
+    participant C2 as target user
+
+    C1->>H: POST /users/{id}/follow
+    H->>S: Follow(userID, targetID)
+    S->>R: FindUserByID(targetID)
+    S->>S: if target profile is private?
+    alt public profile
+        S->>R: CreateFollow(followerID, targetID)
+        R->>DB: INSERT INTO follow_requests (status=accepted)
+    else private profile
+        S->>R: CreateFollow(followerID, targetID, status=pending)
+        R->>DB: INSERT INTO follow_requests (status=pending)
+    end
+    S-->>H: follow created
+    H->>WS: notify(targetID, follow event)
+    WS->>C2: {"type":"notification", "event":"follow_request", ...}
+    H-->>C1: 201
+```
+
+### accept / decline follow request
+
+```mermaid
+sequenceDiagram
+    participant C as target user
+    participant H as handler
+    participant S as service
+    participant R as repository
+    participant DB as sqlite
+
+    C->>H: POST /follow-requests/{id}/accept
+    H->>S: AcceptFollowRequest(requestID)
+    S->>R: FindFollowRequest(requestID)
+    S->>R: UpdateFollowRequestStatus(requestID, accepted)
+    R->>DB: UPDATE follow_requests SET status = 'accepted'
+    H-->>C: 204
+```
+
+### websocket messaging
+
+```mermaid
+sequenceDiagram
+    participant C1 as sender
+    participant WS as websocket hub
+    participant H as handler
+    participant R as repository
+    participant DB as sqlite
+    participant C2 as recipient
+
+    C1->>WS: connect GET /ws (session cookie)
+    WS->>WS: register session in hub
+    loop chat
+        C1->>WS: {"type":"message","to_user_id":2,"content":"hi"}
+        WS->>H: handleMessage(senderID, payload)
+        H->>R: CreateMessage(from, to, content)
+        R->>DB: INSERT INTO messages
+        H-->>WS: message stored
+        WS->>WS: find recipient session in hub
+        WS->>C2: {"type":"message","from_user_id":1,"content":"hi"}
+        WS->>C1: {"type":"message","from_user_id":1,"content":"hi"}
+    end
+```
+
+### avatar upload
+
+```mermaid
+sequenceDiagram
+    participant C as client
+    participant H as filehandler
+    participant S as filesvc
+    participant F as file system
+    participant R as repository
+    participant DB as sqlite
+
+    C->>H: POST /avatar (single image)
+    H->>H: parse multipart, validate size + type
+    H->>S: Upload(avatar file, no postID)
+    S->>F: write original to uploads/<id>
+    S->>S: detectContentType → DecodeConfig (dimensions) → Decode
+    S->>S: fitThumbnail → encode → write thumbnail
+    S->>R: store file metadata
+    R->>DB: INSERT INTO files
+    H->>S: SetAvatar(userID, fileID)
+    S->>R: UpdateUserAvatar(userID, fileID)
+    R->>DB: UPDATE users SET avatar = fileID
+    H-->>C: 200 + updated private user JSON
+```
