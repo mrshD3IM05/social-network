@@ -39,7 +39,12 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | method | path | request | response |
 |---|---|---|---|
 | POST | /files | multipart: files[] or file (max 5 files, 10 MB each, jpeg/png/gif only), optional post_id to attach them to a post | 201 + stored file json |
-| GET | /fs/{id} | - | serves the file after a per user visibility check, 404 if you can't see it |
+| POST | /avatar | multipart: avatar (single image, same type/size limits) | 200 + private user json, sets your avatar |
+| GET | /fs/{id} | - | serves the original file after a per user visibility check, 404 if you can't see it |
+| GET | /fs/{id}/thumb | - | serves the pre-generated thumbnail (max 300x300) with long lived cache headers, 404 if you can't see the file or no thumbnail exists |
+
+thumbnails are generated once during upload and stored next to the originals under uploads/thumbnails/, never resized per request
+animated gifs get a static first frame thumbnail; images smaller than 300x300 are kept as-is; uploads made before thumbnails existed return 404
 
 ### websocket
 | method | path | request | response |
@@ -60,7 +65,7 @@ every request goes through a per ip limiter: 100 requests per minute (sliding wi
 
 ## database
 sqlite (WAL mode, foreign keys on)
-migrations are embedded with go:embed and run at startup using golang-migrate (internals/db/migrations/sqlite)
+migrations are embedded with go:embed and run at startup using golang-migrate (internal/db/migrations/sqlite)
 tables: users, sessions, posts, follow_requests, groups, group_members, group_invitations, group_join_requests, group events, notifications, messages (private + group), reactions, files
 
 ## architecture

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social Network API Console</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">LOCAL API CONSOLE</p>
+        <h1>Social Network</h1>
+      </div>
+      <div class="server-state"><span class="status-dot"></span><span id="api-status">API /api/v1</span></div>
+    </header>
+
+    <section id="auth-view" class="auth-layout">
+      <div class="intro-panel">
+        <p class="eyebrow">MVP WORKBENCH</p>
+        <h2>Put the social graph through its paces.</h2>
+        <p>Register two accounts, test private profiles and follows, then publish posts with visibility rules.</p>
+        <div class="endpoint-note"><span>Backend target</span><strong>/api/v1 via caddy :80</strong></div>
+      </div>
+      <div class="auth-panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-auth-tab="login" type="button">Log in</button>
+          <button class="tab" data-auth-tab="register" type="button">Register</button>
+        </div>
+        <form id="login-form" class="form-stack">
+          <label>Email<input name="email" type="email" autocomplete="email" required></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary-button" type="submit">Enter workspace</button>
+        </form>
+        <form id="register-form" class="form-stack hidden">
+          <div class="two-col"><label>First name<input name="first_name" required></label><label>Last name<input name="last_name" required></label></div>
+          <label>Email<input name="email" type="email" required></label>
+          <label>Password<input name="password" type="password" minlength="8" required></label>
+          <label>Date of birth<input name="date_of_birth" type="date" required></label>
+          <div class="two-col"><label>Nickname<input name="nickname"></label><label>Avatar URL<input name="avatar"></label></div>
+          <label>About me<textarea name="about_me" rows="2"></textarea></label>
+          <button class="primary-button" type="submit">Create account</button>
+        </form>
+        <p id="auth-message" class="message" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="app-view" class="hidden">
+      <div class="workspace-head">
+        <div><p class="eyebrow">AUTHENTICATED SESSION</p><h2 id="welcome">Workspace</h2></div>
+        <button id="logout-button" class="ghost-button" type="button">Log out</button>
+      </div>
+      <div class="dashboard-grid">
+        <aside class="side-column">
+          <section class="panel profile-panel"><div class="panel-heading"><h3>My profile</h3><span class="badge" id="privacy-badge">PUBLIC</span></div><div id="me-card" class="profile-card"></div><div class="profile-actions"><label class="small-button" for="avatar-input">Change avatar</label><input id="avatar-input" name="avatar" type="file" accept="image/jpeg,image/png,image/gif" hidden></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Find a profile</h3></div><form id="profile-form" class="inline-form"><input name="id" type="number" min="1" placeholder="User ID" required><button class="icon-button" title="Load profile" type="submit">→</button></form><div id="profile-result" class="profile-result"></div></section>
+        </aside>
+        <section class="content-column">
+          <section class="panel composer"><div class="panel-heading"><h3>New post</h3><span class="muted">up to 5 images: JPEG, PNG, GIF</span></div><form id="post-form" class="form-stack"><textarea name="content" rows="3" placeholder="What is happening?" required></textarea><label class="file-picker">Attach images<input name="files" type="file" accept="image/jpeg,image/png,image/gif" multiple></label><div class="composer-row"><select name="privacy"><option value="public">Public</option><option value="almost_private">Followers only</option><option value="private">Selected users</option></select><button class="primary-button" type="submit">Publish post</button></div></form></section>
+          <section class="feed-section"><div class="feed-heading"><div><p class="eyebrow">LIVE FEED</p><h2>Posts</h2></div><button id="refresh-button" class="ghost-button" type="button">Refresh</button></div><div id="feed" class="feed"></div></section>
+        </section>
+      </div>
+    </section>
+    <div id="lightbox" class="lightbox hidden"><img id="lightbox-image" alt="Image preview"></div>
+    <div id="toast" class="toast" role="status"></div>
+  </main>
+</body>
+</html>

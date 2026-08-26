@@ -7,9 +7,12 @@
 *.dll
 *.so
 *.dylib
+*.db
+*.db*
 
 # Test binary, built with `go test -c`
 *.test
+*_test.go
 
 # Code coverage profiles and other test artifacts
 *.out
@@ -24,9 +27,16 @@ profile.cov
 go.work
 go.work.sum
 
+
 # env file
 .env
+.enc.local
 
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# folders
+backend/uploads/
+instructions.md
+
