@@ -76,6 +76,83 @@ we are using a layered architecture
 request flow: middleware -> handler -> service -> repository -> sqlite
 the websocket hub sits next to that stack and talks to the repository directly
 
+```mermaid
+block-beta
+    columns 1
+
+    block:layers
+        columns 5
+        MW["middleware\nrate limit + auth"]
+        H["handler\nrequest parsing + response"]
+        S["service\nbusiness logic"]
+        R["repository\nquery building"]
+        DB["sqlite\nWAL mode + migrations"]
+    end
+
+    block:ws
+        columns 3
+        space
+        WS["websocket hub\nchat + notifications"]
+        space
+    end
+
+    MW --> H --> S --> R --> DB
+    WS --> R
+```
+
+```mermaid
+sequenceDiagram
+    participant C as client
+    participant MW as middleware
+    participant H as handler
+    participant S as service
+    participant R as repository
+    participant DB as sqlite
+
+    C->>MW: HTTP request
+    MW->>MW: rate limit check (per IP, 100/min)
+    MW->>MW: session cookie lookup
+    alt guest route
+        MW->>H: forward (guest allowed)
+    else authorized route
+        MW->>MW: reject if no session
+        MW->>H: forward (userID injected)
+    end
+    H->>H: parse request body / params
+    H->>S: call service method
+    S->>S: business logic + validation
+    S->>R: call repository method
+    R->>R: build SQL query
+    R->>DB: execute query
+    DB-->>R: rows / result
+    R-->>S: model structs
+    S-->>H: response data
+    H-->>C: JSON + status code
+```
+
+```mermaid
+sequenceDiagram
+    participant C as client
+    participant WS as websocket hub
+    participant R as repository
+    participant DB as sqlite
+    participant R2 as repository
+    participant H as handler (via hub)
+
+    C->>WS: upgrade GET /ws (session cookie)
+    WS->>WS: register session in hub
+    loop realtime chat
+        C->>WS: {"type":"message","to_user_id":2,"content":"hi"}
+        WS->>WS: validate sender session
+        WS->>R: CreateMessage(from, to, content)
+        R->>DB: INSERT INTO messages
+        WS->>WS: find recipient session
+        WS->>C: {"type":"message",...} (echo to sender)
+        WS->>C: {"type":"message",...} (deliver to recipient)
+    end
+    Note over WS,R: hub talks directly to repository, bypassing handler/service layers
+```
+
 ## sequence diagrams
 
 ### login
