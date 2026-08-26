@@ -218,14 +218,21 @@ sequenceDiagram
 
     C->>H: POST /avatar (single image)
     H->>H: parse multipart, validate size + type
-    H->>S: Upload(avatar file, no postID)
+    H->>S: SetAvatar(userID, header)
+    S->>S: Upload(ownerID, header, nil)
     S->>F: write original to uploads/<id>
-    S->>S: detectContentType → DecodeConfig (dimensions) → Decode
-    S->>S: fitThumbnail → encode → write thumbnail
+    S->>S: detectContentType (512 byte header read)
+    S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
+    S->>S: jpeg/png/gif.Decode — full decode
+    S->>S: fitThumbnail (scale down to ≤300×300, never upscale)
+    S->>S: encode thumbnail (JPEG q82 / PNG / GIF first frame)
+    S->>F: write thumbnail to uploads/thumbnails/<id>
     S->>R: store file metadata
     R->>DB: INSERT INTO files
-    H->>S: SetAvatar(userID, fileID)
-    S->>R: UpdateUserAvatar(userID, fileID)
+    S->>R: GetUserByID(ownerID)
+    R->>DB: SELECT * FROM users WHERE id = ?
+    S->>S: user.Avatar = file.ID
+    S->>R: UpdateUser(user)
     R->>DB: UPDATE users SET avatar = fileID
     H-->>C: 200 + updated private user JSON
 ```
