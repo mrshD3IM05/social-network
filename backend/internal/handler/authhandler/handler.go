@@ -18,6 +18,7 @@ type Handler struct {
 func New(service *authsvc.Service, session *sessionsvc.Service, webSocket *ws.Hub) *Handler {
 	return &Handler{Service: service, Session: session, WebSocket: webSocket}
 }
+
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -40,6 +41,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	h.Session.SetCookie(w, session)
 	common.WriteJSON(w, http.StatusCreated, common.PrivateUser(user))
 }
+
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -58,6 +60,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	h.Session.SetCookie(w, session)
 	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
+
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(sessionsvc.CookieName); err == nil {
 		_ = h.Session.Delete(cookie.Value)
@@ -68,6 +71,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	h.Session.ClearCookie(w)
 	common.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

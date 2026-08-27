@@ -45,13 +45,13 @@ func RateLimit(next http.Handler) http.Handler {
 		rateLimitState.Unlock()
 
 		w.Header().Set("X-RateLimit-Limit", "100")
-		w.Header().Set("X-RateLimit-Remaining", formatRateLimitValue(remaining))
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		if !allowed {
 			retryAfter := int(time.Until(state.windowStart.Add(rateLimitWindow)).Seconds())
 			if retryAfter < 1 {
 				retryAfter = 1
 			}
-			w.Header().Set("Retry-After", formatRateLimitValue(retryAfter))
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
@@ -69,8 +69,4 @@ func clientIP(r *http.Request) string {
 		return "unknown"
 	}
 	return r.RemoteAddr
-}
-
-func formatRateLimitValue(value int) string {
-	return strconv.Itoa(value)
 }
