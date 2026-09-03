@@ -97,6 +97,7 @@ function renderPosts() {
       <div class="post-header"><div class="post-author">${authorAvatar ? `<img class="avatar feed-avatar previewable" ${authorAvatarFile ? `data-file-id="${escapeHtml(authorAvatarFile)}"` : ''} src="${escapeHtml(authorAvatar)}" alt="">` : ''}<div><strong>${escapeHtml(authorLabel(post))}</strong><div class="post-meta">${escapeHtml(post.privacy)} · ${formatDate(post.created_at)}</div></div></div>${post.author_id === state.me.id ? `<div class="post-actions"><button class="small-button" data-edit-post="${post.id}">Edit</button><button class="small-button" data-delete-post="${post.id}">Delete</button></div>` : ''}</div>
       <div class="post-content">${escapeHtml(post.content)}</div>
       ${post.images?.length ? `<div class="post-images">${post.images.map((fileID) => `<img class="previewable" data-file-id="${escapeHtml(fileID)}" src="${fileURL(fileID)}/thumb" alt="Attached image" loading="lazy">`).join('')}</div>` : ''}
+      <div class="post-reactions"><button class="reaction${post.my_reaction === 'like' ? ' active' : ''}" data-react-post="${post.id}" data-reaction="like">&#128077; ${post.likes}</button><button class="reaction${post.my_reaction === 'dislike' ? ' active' : ''}" data-react-post="${post.id}" data-reaction="dislike">&#128078; ${post.dislikes}</button></div>
     </article>`;
   }).join('');
 }
@@ -196,6 +197,16 @@ elements.profileResult.addEventListener('click', async (event) => {
 });
 
 elements.feed.addEventListener('click', async (event) => {
+  const reactID = event.target.dataset.reactPost;
+  if (reactID) {
+    // the API toggles: sending the reaction already on the post removes it
+    try {
+      const summary = await api(`/posts/${reactID}/reactions`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ reaction: event.target.dataset.reaction }) });
+      const post = state.posts.find((item) => String(item.id) === reactID);
+      if (post) { post.likes = summary.likes; post.dislikes = summary.dislikes; post.my_reaction = summary.my_reaction; renderPosts(); }
+    } catch (error) { showToast(error.message); }
+    return;
+  }
   const postID = event.target.dataset.deletePost;
   if (postID) {
     try { await api(`/posts/${postID}`, { method: 'DELETE' }); state.posts = await api('/posts'); renderPosts(); showToast('Post deleted'); } catch (error) { showToast(error.message); }

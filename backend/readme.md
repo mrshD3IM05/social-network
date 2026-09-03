@@ -35,6 +35,16 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | PUT | /posts/{id} | form: content, privacy | 200 + post json, only the owner can update |
 | DELETE | /posts/{id} | - | 204, only the owner can delete |
 
+each post carries `likes`, `dislikes` and `my_reaction` (`like`, `dislike` or `""` when you have not reacted)
+
+### reactions
+| method | path | request | response |
+|---|---|---|---|
+| POST | /posts/{id}/reactions | form: reaction = like \| dislike | 200 + {likes, dislikes, my_reaction}. sending the reaction you already have removes it, so the same call toggles a button off; sending the other one switches sides |
+| DELETE | /posts/{id}/reactions | - | 200 + the same summary, removes your reaction (no-op if you had none) |
+
+a post you are not allowed to see answers 404 rather than 403, so reactions cannot be used to probe for private posts
+
 ### files
 | method | path | request | response |
 |---|---|---|---|
