@@ -7,6 +7,22 @@ services:
     restart: unless-stopped
     expose:
       - "8080"
+    volumes:
+      - backend-data:/app
+      - backend-uploads:/app/uploads
+    networks:
+      - social-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: social-network-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - "5500"
     networks:
       - social-network
 
@@ -16,6 +32,7 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+      - frontend
     ports:
       - "8000:80"
       - "8443:443"
@@ -30,5 +47,7 @@ networks:
   social-network:
 
 volumes:
+  backend-data:
+  backend-uploads:
   caddy_data:
   caddy_config:
