@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	rateLimitRequests = 100
+	// made it 1000 to not limit images reading and keep it global
+	rateLimitRequests = 1000
 	rateLimitWindow   = time.Minute
 )
 
