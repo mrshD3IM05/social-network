@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: social-network-backend
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - social-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: social-network-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8000:80"
+      - "8443:443"
+    volumes:
+      - ./caddy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - social-network
+
+networks:
+  social-network:
+
+volumes:
+  caddy_data:
+  caddy_config:
