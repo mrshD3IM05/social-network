@@ -51,6 +51,59 @@ func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusOK, posts)
 }
+
+func (h *Handler) ReactionPost(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	id, err := parseID(r)
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	summary, err := h.Service.React(userID, id, r.FormValue("reaction"))
+	if err != nil {
+		writeReactionError(w, err, "could not react to post")
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, summary)
+}
+func (h *Handler) DeleteReaction(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	id, err := parseID(r)
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	summary, err := h.Service.Unreact(userID, id)
+	if err != nil {
+		writeReactionError(w, err, "could not remove reaction")
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, summary)
+}
+
+// a post the viewer may not see is reported as missing, so reactions cannot be
+// used to probe for private posts
+func writeReactionError(w http.ResponseWriter, err error, fallback string) {
+	if err == postsvc.ErrInvalidReaction {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	} else if err == postsvc.ErrNotFound {
+		http.Error(w, "post not found", http.StatusNotFound)
+	} else {
+		http.Error(w, fallback, http.StatusInternalServerError)
+	}
+}
 func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

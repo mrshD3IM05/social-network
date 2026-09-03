@@ -20,5 +20,8 @@ type Post struct {
 	GroupID         *int64    `json:"group_id,omitempty"`
 	Type            string    `json:"type"`
 	Images          []string  `json:"images"`
+	Likes           int       `json:"likes"`
+	Dislikes        int       `json:"dislikes"`
+	MyReaction      string    `json:"my_reaction"`
 	CreatedAt       time.Time `json:"created_at"`
 }

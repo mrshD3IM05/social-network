@@ -30,6 +30,10 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("PUT /posts/{id}", auth.Authorized(http.HandlerFunc(h.Post.UpdatePost)))
 	mux.Handle("DELETE /posts/{id}", auth.Authorized(http.HandlerFunc(h.Post.DeletePost)))
 
+	// reaction routes
+	mux.Handle("POST /posts/{id}/reactions", auth.Authorized(http.HandlerFunc(h.Post.ReactionPost)))
+	mux.Handle("DELETE /posts/{id}/reactions", auth.Authorized(http.HandlerFunc(h.Post.DeleteReaction)))
+
 	// file routes
 	mux.Handle("POST /files", auth.Authorized(http.HandlerFunc(h.File.Upload)))
 	mux.Handle("POST /avatar", auth.Authorized(http.HandlerFunc(h.File.SetAvatar)))

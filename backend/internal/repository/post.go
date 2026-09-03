@@ -102,25 +102,36 @@ func (r *Repository) DeletePostOwned(postID, ownerID int64) error {
 	return nil
 }
 
+// postVisibleCondition is the "may this viewer see post p" predicate, shared by
+// the feed and by the single-post check. It takes the arguments returned by
+// postVisibleArgs, in that order.
+const postVisibleCondition = `(
+	p.author_id = ? OR p.privacy = ? OR
+	(p.privacy = ? AND EXISTS (
+		SELECT 1 FROM follow_requests f
+		WHERE f.from_user_id = ? AND f.to_user_id = p.author_id AND f.status = ?
+	)) OR
+	(p.privacy = ? AND EXISTS (
+		SELECT 1 FROM post_visibility v
+		WHERE v.post_id = p.id AND v.user_id = ?
+	))
+)`
+
+func postVisibleArgs(viewerID int64) []any {
+	return []any{
+		viewerID, model.PostPublic, model.PostFollowersOnly, viewerID, model.FollowAccepted,
+		model.PostSelected, viewerID,
+	}
+}
+
 func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
-		WHERE p.group_id IS NULL AND (
-			p.author_id = ? OR p.privacy = ? OR
-			(p.privacy = ? AND EXISTS (
-				SELECT 1 FROM follow_requests f
-				WHERE f.from_user_id = ? AND f.to_user_id = p.author_id AND f.status = ?
-			)) OR
-			(p.privacy = ? AND EXISTS (
-				SELECT 1 FROM post_visibility v
-				WHERE v.post_id = p.id AND v.user_id = ?
-			))
-		)
+		WHERE p.group_id IS NULL AND `+postVisibleCondition+`
 		ORDER BY p.created_at DESC, p.id DESC`,
-		viewerID, model.PostPublic, model.PostFollowersOnly, viewerID, model.FollowAccepted,
-		model.PostSelected, viewerID,
+		postVisibleArgs(viewerID)...,
 	)
 	if err != nil {
 		return nil, err
@@ -137,10 +148,38 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := r.LoadPostReactions(post, viewerID); err != nil {
+			return nil, err
+		}
 		posts = append(posts, post)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return posts, nil
+}
+
+// CanViewPost reports whether viewerID is allowed to see the post, using the
+// same rules as the feed.
+func (r *Repository) CanViewPost(viewerID, postID int64) (bool, error) {
+	var visible bool
+	args := append([]any{postID}, postVisibleArgs(viewerID)...)
+	err := r.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM posts p WHERE p.id = ? AND `+postVisibleCondition+`)`,
+		args...,
+	).Scan(&visible)
+	return visible, err
+}
+
+// LoadPostReactions fills in the post's like/dislike totals and the viewer's
+// own reaction.
+func (r *Repository) LoadPostReactions(post *model.Post, viewerID int64) error {
+	summary, err := r.GetReactionSummary(model.ReactionTargetPost, post.ID, viewerID)
+	if err != nil {
+		return err
+	}
+	post.Likes = summary.Likes
+	post.Dislikes = summary.Dislikes
+	post.MyReaction = summary.MyReaction
+	return nil
 }

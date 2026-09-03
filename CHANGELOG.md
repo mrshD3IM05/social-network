@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Post reactions** (`POST`/`DELETE /posts/{id}/reactions`) — like and dislike backed by the existing `reactions` table; posting the reaction you already hold removes it, posting the other one switches. Responds with `{likes, dislikes, my_reaction}`, and the same three fields are now on every post in the feed. A post the viewer cannot see answers 404, so reactions cannot probe for private posts
+- **`Repository.CanViewPost`** — single-post visibility check sharing one `postVisibleCondition` predicate with the feed query, so the two cannot drift apart
 - **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
 - **Image dimension validation** — images exceeding 8000x8000 pixels are rejected with `ErrInvalidImage` before full decode, preventing memory exhaustion from small compressed files with extreme dimensions
 
