@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Single-process serving** — `cmd/server` now serves the static frontend alongside the API on `:8080`; the API keeps the `/api/v1` prefix, stripped before the mux, so route registration is unchanged. New `-addr` and `-frontend` flags
+
+### Removed
+
+- **Caddy reverse proxy** (`caddy/`) and the **standalone frontend server** (`servefrontend.go`) — no longer needed now that one Go process serves both
+- **`run.ps1` / `stop.ps1`** — with a single process there is nothing to orchestrate; the app starts with `go run ./cmd/server` from `backend/`
+
 ### Added
 
 - **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
