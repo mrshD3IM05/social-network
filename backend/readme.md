@@ -6,7 +6,7 @@ go run ./cmd/server
 the server listens on :8080
 it creates a sqlite database (sn.db) in the working directory and runs the embedded sql migrations automatically
 
-## endpoints (/api/v*/ prefix shall be added using caddy)
+## endpoints (served under the /api/v1 prefix)
 /register and /login are guest only (logged in users get rejected), everything else needs a session cookie
 
 ### auth

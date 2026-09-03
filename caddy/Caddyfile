@@ -1,9 +1,0 @@
-:80 {
-    handle_path /api/v1/* {
-        reverse_proxy 127.0.0.1:8080
-    }
-
-    handle {
-        reverse_proxy 127.0.0.1:5500
-    }
-}
