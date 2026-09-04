@@ -1,4 +1,0 @@
-{"timestamp":"00:00:00.415","source":"Server","level":"LOG","message":""}
-{"timestamp":"00:00:02.369","source":"Browser","level":"INFO","message":"Download the React DevTools for a better development experience: https://react.dev/link/react-devtools"}
-{"timestamp":"00:00:04.362","source":"Browser","level":"LOG","message":"OK: {\"about_me\":\"\",\"avatar\":\"\",\"created_at\":\"2026-09-04T18:18:56Z\",\"date_of_birth\":\"2005-09-08\",\"email\":\"a@a.com\",\"first_name\":\"Aymane\",\"id\":1,\"last_name\":\"Chent\",\"nickname\":\"aym1e\",\"private\":false}"}
-{"timestamp":"00:00:08.025","source":"Browser","level":"LOG","message":"OK: {\"about_me\":\"\",\"avatar\":\"\",\"created_at\":\"2026-09-04T18:18:56Z\",\"date_of_birth\":\"2005-09-08\",\"email\":\"a@a.com\",\"first_name\":\"Aymane\",\"id\":1,\"last_name\":\"Chent\",\"nickname\":\"aym1e\",\"private\":false}"}

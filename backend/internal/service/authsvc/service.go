@@ -26,7 +26,9 @@ type Repository interface {
 	GetUserByID(int64) (*model.User, error)
 }
 
-type Service struct{ users Repository }
+type Service struct{ 
+	users Repository
+ }
 
 func New(users Repository) *Service { return &Service{users: users} }
 
