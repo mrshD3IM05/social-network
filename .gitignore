@@ -40,3 +40,7 @@ go.work.sum
 backend/uploads/
 instructions.md
 
+
+node_modules
+.next
+.env*.local
