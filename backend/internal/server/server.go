@@ -34,7 +34,6 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /files", auth.Authorized(http.HandlerFunc(h.File.Upload)))
 	mux.Handle("POST /avatar", auth.Authorized(http.HandlerFunc(h.File.SetAvatar)))
 	mux.Handle("GET /fs/{id}", auth.Authorized(http.HandlerFunc(h.File.Download)))
-	mux.Handle("GET /fs/{id}/thumb", auth.Authorized(http.HandlerFunc(h.File.Thumbnail)))
 
 	// websocket routes
 	mux.Handle("GET /ws", auth.Authorized(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -213,7 +213,7 @@ CREATE INDEX idx_messages_to ON messages(to_user_id);
 CREATE INDEX idx_messages_group ON messages(group_id);
 
 -- -----------------------------------------------------------------------------
--- Stored files (originals on disk under uploads/, thumbnails derived from path)
+-- Stored files (originals on disk under uploads/)
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE files (

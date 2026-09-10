@@ -40,12 +40,9 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 |---|---|---|---|
 | POST | /files | multipart: files[] or file (max 5 files, 10 MB each, jpeg/png/gif only), optional post_id to attach them to a post | 201 + stored file json |
 | POST | /avatar | multipart: avatar (single image, same type/size limits) | 200 + private user json, sets your avatar |
-| GET | /fs/{id} | - | serves the original file after a per user visibility check, 404 if you can't see it |
-| GET | /fs/{id}/thumb | - | serves the pre-generated thumbnail (max 300x300) with long lived cache headers, 404 if you can't see the file or no thumbnail exists |
+| GET | /fs/{id} | - | serves the original file after a per user visibility check, 404 if you can't see it; `Cache-Control: private, max-age=31536000, immutable` (files are immutable content-addressed IDs, so browsers may cache privately) |
 
-thumbnails are generated once during upload and stored next to the originals under uploads/thumbnails/, never resized per request
 images are validated for dimensions (max 8000x8000) before full decode to prevent memory exhaustion; the existing 10 MB upload size limit is unchanged
-animated gifs get a static first frame thumbnail; images smaller than 300x300 are kept as-is; uploads made before thumbnails existed return 404
 
 ### websocket
 | method | path | request | response |
@@ -184,9 +181,9 @@ sequenceDiagram
     H->>C: 200 + Set-Cookie: session=token, HttpOnly, SameSite=Lax
 ```
 
-### file upload + thumbnail generation
+### file upload
 
-Client uploads up to 5 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, generates a 300x300 thumbnail using an area-average downscaler, and stores both on disk. File metadata is written to the database after the thumbnail is saved; if thumbnail generation fails the original is rolled back.
+Client uploads up to 5 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, and stores the file metadata in the database.
 
 ```mermaid
 sequenceDiagram
@@ -204,10 +201,6 @@ sequenceDiagram
         S->>F: write original to uploads/<id>
         S->>S: detectContentType (512 byte header read)
         S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
-        S->>S: jpeg/png/gif.Decode — full decode
-        S->>S: fitThumbnail (scale down to ≤300×300, never upscale)
-        S->>S: encode thumbnail (JPEG q82 / PNG / GIF first frame)
-        S->>F: write thumbnail to uploads/thumbnails/<id>
         S->>R: store file metadata
         R->>DB: INSERT INTO files
     end
@@ -294,7 +287,7 @@ sequenceDiagram
 
 ### avatar upload
 
-Client uploads a single image for their avatar. The service follows the same pipeline as post image uploads — writing the original, validating dimensions, generating a thumbnail — then updates the `users.avatar` field to point to the new file. Thumbnails are served via `GET /fs/{id}/thumb`.
+Client uploads a single image for their avatar. The service follows the same pipeline as post image uploads — writing the original and validating dimensions — then updates the `users.avatar` field to point to the new file.
 
 ```mermaid
 sequenceDiagram
@@ -312,10 +305,6 @@ sequenceDiagram
     S->>F: write original to uploads/<id>
     S->>S: detectContentType (512 byte header read)
     S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
-    S->>S: jpeg/png/gif.Decode — full decode
-    S->>S: fitThumbnail (scale down to ≤300×300, never upscale)
-    S->>S: encode thumbnail (JPEG q82 / PNG / GIF first frame)
-    S->>F: write thumbnail to uploads/thumbnails/<id>
     S->>R: store file metadata
     R->>DB: INSERT INTO files
     S->>R: GetUserByID(ownerID)

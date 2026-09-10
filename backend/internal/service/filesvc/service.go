@@ -32,6 +32,7 @@ type Repository interface {
 	GetUserByID(int64) (*model.User, error)
 	UpdateUser(*model.User) error
 }
+
 type Service struct {
 	repo        Repository
 	storagePath string
@@ -40,6 +41,7 @@ type Service struct {
 func New(repo Repository, storagePath string) *Service {
 	return &Service{repo: repo, storagePath: storagePath}
 }
+
 func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID *int64) (*model.File, error) {
 	if header == nil || header.Size > MaxImageSize {
 		return nil, ErrFileTooLarge
@@ -89,10 +91,6 @@ func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID *in
 		_ = os.Remove(path)
 		return nil, err
 	}
-	if err := generateThumbnail(path, s.ThumbnailPath(id)); err != nil {
-		_ = os.Remove(path)
-		return nil, err
-	}
 	file := &model.File{ID: id, StoragePath: path, OriginalName: filepath.Base(header.Filename), MIMEType: contentType, Size: header.Size, OwnerUserID: ownerID, PostID: postID}
 	if err := s.repo.CreateFile(file); err != nil {
 		_ = os.Remove(path)
@@ -100,6 +98,7 @@ func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID *in
 	}
 	return file, nil
 }
+
 func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, postID *int64) ([]*model.File, error) {
 	if len(headers) == 0 {
 		return nil, errors.New("file: at least one image is required")
@@ -117,10 +116,13 @@ func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, pos
 	}
 	return files, nil
 }
+
 func (s *Service) Get(id string) (*model.File, error) { return s.repo.GetFile(id) }
+
 func (s *Service) CanView(viewerID int64, id string) (bool, error) {
 	return s.repo.CanViewFile(viewerID, id)
 }
+
 func (s *Service) SetAvatar(ownerID int64, header *multipart.FileHeader) (*model.User, error) {
 	file, err := s.Upload(ownerID, header, nil)
 	if err != nil {
@@ -136,6 +138,7 @@ func (s *Service) SetAvatar(ownerID int64, header *multipart.FileHeader) (*model
 	}
 	return user, nil
 }
+
 func detectImageType(source multipart.File) (string, error) {
 	buffer := make([]byte, 512)
 	count, err := source.Read(buffer)
@@ -144,9 +147,11 @@ func detectImageType(source multipart.File) (string, error) {
 	}
 	return http.DetectContentType(buffer[:count]), nil
 }
+
 func allowedImageType(contentType string) bool {
 	return contentType == "image/jpeg" || contentType == "image/png" || contentType == "image/gif"
 }
+
 func randomID() (string, error) {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {

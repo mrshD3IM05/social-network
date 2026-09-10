@@ -2,7 +2,6 @@ package filehandler
 
 import (
 	"net/http"
-	"os"
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/sessionsvc"
@@ -87,33 +86,6 @@ func (h *Handler) SetAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
-func (h *Handler) Thumbnail(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	id := r.PathValue("id")
-	file, err := h.Service.Get(id)
-	if err != nil {
-		http.Error(w, "file not found", http.StatusNotFound)
-		return
-	}
-	visible, err := h.Service.CanView(userID, id)
-	if err != nil || !visible {
-		http.Error(w, "file not found", http.StatusNotFound)
-		return
-	}
-	path := h.Service.ThumbnailPath(id)
-	if _, err := os.Stat(path); err != nil {
-		http.Error(w, "thumbnail not found", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", file.MIMEType)
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	http.ServeFile(w, r, path)
-}
-
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	ownerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
@@ -132,5 +104,6 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", file.MIMEType)
+	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	http.ServeFile(w, r, file.StoragePath)
 }

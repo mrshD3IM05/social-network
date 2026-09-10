@@ -4,8 +4,8 @@
 
 $ErrorActionPreference = "Stop"
 
-$caddy = "C:\Users\ELECTRO MARSLI\Desktop\git\social-network\caddy\caddy.exe"
-$config = "C:\Users\ELECTRO MARSLI\Desktop\git\social-network\caddy\Caddyfile"
+$caddy = ".\caddy.exe"
+$config = ".\Caddyfile"
 
 if (!(Test-Path $caddy)) { Write-Error "caddy.exe not found at $caddy"; exit 1 }
 

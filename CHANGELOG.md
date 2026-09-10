@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
 - **Image dimension validation** — images exceeding 8000x8000 pixels are rejected with `ErrInvalidImage` before full decode, preventing memory exhaustion from small compressed files with extreme dimensions
 
+### Removed
+
+- **Thumbnail feature** — removed pre-generated 300x300 thumbnail generation, the `GET /fs/{id}/thumb` route, and the `Thumbnail` handler. Uploads now store and serve the original image only (`GET /fs/{id}`).
+
+### Changed
+
+- **Image serving is now cacheable** — `GET /fs/{id}` sets `Cache-Control: private, max-age=31536000, immutable`, so browsers cache images privately (shared caches never store them).
+
 ---
 
 ## [1.0.0] - 2026-08-26
@@ -18,8 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **Avatar upload** (`POST /avatar`) — authorized endpoint accepting a single image file, stored via the existing file pipeline, sets `users.avatar` to the file ID
-- **Thumbnail generation** — pre-generated on every upload using a stdlib-only area-average downscaler (JPEG q82, PNG, static GIF first-frame), capped at 300x300, never upscaled, mandatory with full rollback on failure
-- **Thumbnail serving** (`GET /fs/{id}/thumb`) — serves the pre-generated thumbnail with `Cache-Control: public, max-age=31536000, immutable` headers; returns 404 if missing
 - **Lightbox image preview** — clicking any image (post attachment or avatar) opens a fullscreen overlay displaying the original full-resolution version
 - **Frontend avatar UI** — profile card shows avatar image with a "Change avatar" file picker; uploads POST to `/avatar` and refresh the view
 - **Feed author info** — posts now include `author_first_name`, `author_last_name`, `author_nickname`, and `author_avatar`; feed renders real names and round author avatars
