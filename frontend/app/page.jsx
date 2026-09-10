@@ -1,21 +1,6 @@
-'use client'
-import { apiCall } from "../lib/api"
+import { redirect } from 'next/navigation'
 
-export default function Page() {
-
-  async function testApi() {
-    try {
-      const res = await apiCall('/me')
-      console.log('OK:', res)
-    } catch (err) {
-      console.log('Erreur:', err.message)
-    }
-  }
-
-  return (
-    <div>
-      <h1>Hello, Next.js!</h1>
-      <button onClick={testApi}>Tester /me</button>
-    </div>
-  )
+// "/" sends you to the feed (the (main) layout sends you to /login if you are not logged in)
+export default function Index() {
+  redirect('/home')
 }
