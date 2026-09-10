@@ -38,7 +38,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 ### files
 | method | path | request | response |
 |---|---|---|---|
-| POST | /files | multipart: files[] or file (max 5 files, 10 MB each, jpeg/png/gif only), optional post_id to attach them to a post | 201 + stored file json |
+| POST | /files | multipart: files[] or file (max 3 files, 10 MB each, jpeg/png/gif only), optional post_id or message_id to attach them to a post or chat message | 201 + stored file json |
 | POST | /avatar | multipart: avatar (single image, same type/size limits) | 200 + private user json, sets your avatar |
 | GET | /fs/{id} | - | serves the original file after a per user visibility check, 404 if you can't see it; `Cache-Control: private, max-age=31536000, immutable` (files are immutable content-addressed IDs, so browsers may cache privately) |
 
@@ -183,7 +183,7 @@ sequenceDiagram
 
 ### file upload
 
-Client uploads up to 5 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, and stores the file metadata in the database.
+Client uploads up to 3 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, and stores the file metadata in the database.
 
 ```mermaid
 sequenceDiagram
@@ -194,7 +194,7 @@ sequenceDiagram
     participant R as repository
     participant DB as sqlite
 
-    C->>H: POST /files (multipart, up to 5 images)
+    C->>H: POST /files (multipart, up to 3 images)
     loop for each file
         H->>H: parse multipart, validate size (10 MB) + type (jpeg/png/gif)
         H->>S: Upload(file, postID)

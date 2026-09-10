@@ -47,7 +47,7 @@ Logic:
 - Private: find all users where a message exists between current user and that user
 - Groups: find all groups where current user is a member
 - `last_message`: most recent message in that conversation
-- No read/unread state is returned by the server — unread badges are tracked client-side
+- No read/unread state is tracked for messages
 
 ---
 
@@ -212,7 +212,6 @@ Logic:
 | POST | /login | Sign in |
 | POST | /logout | Sign out (revokes WS connections) |
 | GET | /me | Current user info |
-| GET | /users | List users (501 — not implemented) |
 | GET | /user/{id} | Get user profile |
 | POST | /users/{id}/follow | Send follow request |
 | DELETE | /users/{id}/follow | Unfollow |
@@ -222,7 +221,7 @@ Logic:
 | POST | /posts | Create post |
 | PUT | /posts/{id} | Update post |
 | DELETE | /posts/{id} | Delete post |
-| POST | /files | Upload file(s) |
+| POST | /files | Upload image(s) — multipart `files[]` (max 3, jpeg/png/gif), optional `post_id` **or** `message_id` to attach |
 | POST /avatar | Set avatar |
 | GET | /fs/{id} | Download file (private cacheable) |
 | GET | /ws | WebSocket connection |

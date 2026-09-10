@@ -35,29 +35,6 @@ Rules:
 - `content` must be non-empty
 - Server validates permissions via `CanMessage()` before persisting
 
-### Typing indicator
-
-```json
-{
-  "type": "typing",
-  "to_user_id": 5
-}
-```
-
-or
-
-```json
-{
-  "type": "typing",
-  "group_id": 12
-}
-```
-
-Rules:
-- Same permission check as messages
-- NOT persisted to DB — broadcast only
-- Frontend shows "X is typing..." for ~3 seconds then hides
-
 ---
 
 ## Server → Client
@@ -81,22 +58,6 @@ Rules:
 Delivery:
 - Private message → sent to both sender and recipient
 - Group message → sent to all group members
-
-### Typing indicator
-
-```json
-{
-  "type": "typing",
-  "user_id": 3,
-  "user_name": "Alice",
-  "to_user_id": 5,
-  "group_id": null
-}
-```
-
-Delivery:
-- Private → sent to recipient only (not back to sender)
-- Group → sent to all other members
 
 ### Notification
 

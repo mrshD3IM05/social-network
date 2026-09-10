@@ -113,17 +113,13 @@ Owns notification system, comments, reactions, and WebSocket extensions. Depends
    - `GET /messages/{userId}` — private message history with ?before= and ?limit=
    - `GET /messages/group/{groupId}` — group message history
 
-7. **WebSocket hub extension** (`internal/websocket/hub.go` — extend)
-   - Extend `Repository` interface: add `GetUserByID`
-   - Add `"typing"` handler in readPump: validate permissions, broadcast to recipient/group (no DB)
-
-8. **Session tracking fix** (`internal/websocket/hub.go` — fix)
+7. **Session tracking fix** (`internal/websocket/hub.go` — fix)
    - In `ServeHTTP`: call `trackClient(cookie.Value, client)` after creating client
    - In `readPump` defer: call `untrackClient(c)` before `remove`
 
-9. **Route registration** — add message + notification routes to `internal/server/server.go`
+8. **Route registration** — add message + notification routes to `internal/server/server.go`
 
-10. **Wire notifications into follow flow** (`internal/service/followsvc/service.go` — modify)
+9. **Wire notifications into follow flow** (`internal/service/followsvc/service.go` — modify)
     - When follow request created for private profile → `notifSvc.CreateAndPublish(targetUserID, "follow_request", ...)`
     - When follow request accepted → `notifSvc.CreateAndPublish(fromUserID, "follow_accepted", ...)`
 
@@ -152,19 +148,19 @@ Owns all page-level UI. Can start with mock data, connect to real APIs once Pers
 
 1. **App providers** (`src/app/providers/` — new folder)
    - `WebSocketProvider.js` — single shared WS connection, reconnect logic, send/subscribe API
-   - `UnreadProvider.js` — client-side per-conversation unread tracking + notification counts, listens to WS events
+   - `UnreadProvider.js` — client-side notification unread count, listens to WS events
    - `AppProviders.js` — client wrapper combining both providers (needed if layout.js is server component)
 
 2. **Conversation list** (`src/app/components/ChatLayout.js` — new)
    - Fetches `GET /messages/conversations`
-   - Sidebar with search, conversation items (avatar, name, last message preview, timestamp, unread badge)
-   - Unread badges tracked client-side (per conversation, reset on open — no backend read tracking)
+   - Sidebar with search, conversation items (avatar, name, last message preview, timestamp)
    - Real-time: new messages move conversations to top
 
 3. **Message thread** (`src/app/components/MessageThread.js` — new)
    - Fetches `GET /messages/{userId}` or `GET /messages/group/{groupId}`
    - Message bubbles (sent vs received), timestamps
-   - Typing indicator, auto-scroll, infinite scroll upward for older messages
+   - Auto-scroll, infinite scroll upward for older messages
+   - Image attachments (up to 3): create the message first, then `POST /files` with `message_id`; render attachments in the bubble
 
 4. **Emoji picker** (`src/app/components/EmojiPicker.js` — new)
    - Grid of common emojis in categories, search input, click to insert
@@ -181,14 +177,13 @@ Owns all page-level UI. Can start with mock data, connect to real APIs once Pers
 
 7. **Update SocialShell** (`src/app/components/SocialShell.js` — modify)
    - Add notification bell icon with unread count badge in topbar
-   - Add messages icon with unread count badge in nav
 
 8. **Update layout** (`src/app/layout.js` — modify)
    - Wrap children with `AppProviders` (WebSocketProvider + UnreadProvider)
 
 9. **CSS additions** (`src/app/page.module.css` — extend)
-   - Chat layout grid, conversation sidebar, message bubbles, typing dots animation
-   - Emoji picker grid, notification cards, unread badges, responsive breakpoints
+   - Chat layout grid, conversation sidebar, message bubbles
+   - Emoji picker grid, notification cards, responsive breakpoints
 
 ### Files to create/modify
 

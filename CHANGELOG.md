@@ -10,14 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
 - **Image dimension validation** — images exceeding 8000x8000 pixels are rejected with `ErrInvalidImage` before full decode, preventing memory exhaustion from small compressed files with extreme dimensions
+- **Chat image attachments** (`message_id` on `POST /files`) — images can be attached to a chat message; upload is only allowed for the message sender, the private recipient, or a group member (`CanAttachToMessage`); existing `files.message_id` column is now used
 
 ### Removed
 
 - **Thumbnail feature** — removed pre-generated 300x300 thumbnail generation, the `GET /fs/{id}/thumb` route, and the `Thumbnail` handler. Uploads now store and serve the original image only (`GET /fs/{id}`).
+- **Dead `GET /users` endpoint** — removed the registered route and `ListUsers` handler (returned `501 Not Implemented`); users are found by profile ID via `GET /user/{id}`.
 
 ### Changed
 
 - **Image serving is now cacheable** — `GET /fs/{id}` sets `Cache-Control: private, max-age=31536000, immutable`, so browsers cache images privately (shared caches never store them).
+- **Image upload cap lowered to 3** — `POST /files` accepts at most 3 images per request instead of 5 (posts and chat messages); frontend composer mirrors the cap.
 
 ---
 

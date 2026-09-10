@@ -116,9 +116,6 @@ func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "user listing is not implemented", http.StatusNotImplemented)
-}
 func parseID(r *http.Request, name string) (int64, error) {
 	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id < 1 {

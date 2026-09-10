@@ -112,13 +112,13 @@ useEffect(() => {
 
 **New file:** `frontend/social-network-fn/src/app/providers/UnreadProvider.js`
 
-Manages notification unread count and per-conversation unread badges (client-side),
-updated via WebSocket events.
+Tracks the notification unread count (client-side) and updates it via WebSocket events.
+Per-conversation message unread badges are intentionally not tracked.
 
 ```jsx
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useWebSocket } from "./WebSocketProvider";
 import { api } from "../components/SocialShell";
 
@@ -130,7 +130,6 @@ export function useUnread() {
 
 export function UnreadProvider({ children }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadConversations, setUnreadConversations] = useState({}); // key: "user:5" | "group:12" → count
   const { subscribe } = useWebSocket();
 
   // Fetch initial notification count on mount
@@ -139,20 +138,6 @@ export function UnreadProvider({ children }) {
       .then((data) => setUnreadNotifications(data.unread_count || 0))
       .catch(() => {});
   }, []);
-
-  // Listen for incoming messages — increment the right conversation's unread count
-  useEffect(() => {
-    return subscribe("message", (payload) => {
-      const msg = payload.message;
-      const key = msg.group_id != null
-        ? `group:${msg.group_id}`
-        : `user:${msg.from_user_id}`;
-      setUnreadConversations((prev) => ({
-        ...prev,
-        [key]: (prev[key] || 0) + 1,
-      }));
-    });
-  }, [subscribe]);
 
   // Listen for new notifications
   useEffect(() => {
@@ -166,29 +151,10 @@ export function UnreadProvider({ children }) {
     api("/notifications/read-all", { method: "POST" }).catch(() => {});
   }, []);
 
-  // Reset the unread count for a conversation once it is opened or a message is viewed.
-  // This is purely client-side — no backend persistence.
-  const markConversationRead = useCallback((key) => {
-    setUnreadConversations((prev) => {
-      if (!(key in prev)) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  }, []);
-
-  const totalUnreadMessages = useMemo(
-    () => Object.values(unreadConversations).reduce((a, b) => a + b, 0),
-    [unreadConversations]
-  );
-
   return (
     <UnreadContext.Provider value={{
       unreadNotifications,
-      unreadConversations,
-      totalUnreadMessages,
       markNotificationsRead,
-      markConversationRead,
     }}>
       {children}
     </UnreadContext.Provider>
@@ -202,20 +168,18 @@ export function UnreadProvider({ children }) {
 
 **New file:** `frontend/social-network-fn/src/app/components/ChatLayout.js`
 
-A sidebar that shows all conversations (private + group) with last message preview and unread badges.
+A sidebar that shows all conversations (private + group) with last message preview.
 
 ```jsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { api, displayName } from "./SocialShell";
-import { useUnread } from "../providers/UnreadProvider";
 import styles from "../page.module.css";
 
 export default function ChatLayout({ activeConversation, onSelect }) {
   const [conversations, setConversations] = useState({ private: [], groups: [] });
   const [search, setSearch] = useState("");
-  const { unreadConversations, markConversationRead } = useUnread();
 
   useEffect(() => {
     api("/messages/conversations").then(setConversations).catch(() => {});
@@ -231,8 +195,6 @@ export default function ChatLayout({ activeConversation, onSelect }) {
   };
 
   function select(conversation) {
-    const key = conversation.type === "group" ? `group:${conversation.id}` : `user:${conversation.id}`;
-    markConversationRead(key);
     onSelect(conversation);
   }
 
@@ -274,9 +236,6 @@ export default function ChatLayout({ activeConversation, onSelect }) {
                   ? new Date(conv.last_message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                   : ""}
               </span>
-              {unreadConversations[`user:${conv.user.id}`] > 0 && (
-                <span className={styles.unreadBadge}>{unreadConversations[`user:${conv.user.id}`]}</span>
-              )}
             </div>
           </button>
         ))}
@@ -305,9 +264,6 @@ export default function ChatLayout({ activeConversation, onSelect }) {
                   ? new Date(conv.last_message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                   : ""}
               </span>
-              {unreadConversations[`group:${conv.group.id}`] > 0 && (
-                <span className={styles.unreadBadge}>{unreadConversations[`group:${conv.group.id}`]}</span>
-              )}
             </div>
           </button>
         ))}
@@ -321,16 +277,15 @@ export default function ChatLayout({ activeConversation, onSelect }) {
 }
 ```
 
-Note: unread badges are tracked client-side (per device) via `UnreadProvider`.
-They reset when the conversation is opened and are not persisted on the server.
-
 ---
 
 ## Step 4 — MessageThread
 
 **New file:** `frontend/social-network-fn/src/app/components/MessageThread.js`
 
-Displays messages between two users or in a group, with input, typing indicator, and emoji picker.
+Displays messages between two users or in a group, with input and emoji picker.
+
+Image attachments: send images with the message by posting to `POST /files` with `message_id` after the message is created (max 3 images, jpeg/png/gif). Wire this through a shared `fileUrl(id)` helper and render attachments inside the bubble.
 
 ```jsx
 "use client";
@@ -346,11 +301,9 @@ export default function MessageThread({ conversation, me }) {
   const [draft, setDraft] = useState("");
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [typingUsers, setTypingUsers] = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
   const { send, subscribe } = useWebSocket();
 
   const isGroup = conversation.type === "group";
@@ -378,29 +331,6 @@ export default function MessageThread({ conversation, me }) {
           (msg.from_user_id === me.id && msg.to_user_id === conversation.id);
       if (isRelevant) {
         setMessages((prev) => [...prev, msg]);
-      }
-    });
-  }, [subscribe, conversation, me, isGroup]);
-
-  // Listen for typing indicators
-  useEffect(() => {
-    return subscribe("typing", (payload) => {
-      if (payload.user_id === me.id) return; // ignore own typing
-      const isRelevant = isGroup
-        ? payload.group_id === conversation.id
-        : payload.user_id === conversation.id;
-      if (isRelevant) {
-        setTypingUsers((prev) => {
-          if (!prev.find((u) => u.id === payload.user_id)) {
-            return [...prev, { id: payload.user_id, name: payload.user_name }];
-          }
-          return prev;
-        });
-        // Auto-clear after 3 seconds
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => {
-          setTypingUsers((prev) => prev.filter((u) => u.id !== payload.user_id));
-        }, 3000);
       }
     });
   }, [subscribe, conversation, me, isGroup]);
@@ -441,14 +371,6 @@ export default function MessageThread({ conversation, me }) {
     setDraft("");
   }
 
-  // Send typing indicator
-  function handleTyping() {
-    const payload = isGroup
-      ? { group_id: conversation.id }
-      : { to_user_id: conversation.id };
-    send("typing", payload);
-  }
-
   return (
     <section className={styles.messageThread}>
       <div className={styles.threadHeader}>
@@ -485,13 +407,6 @@ export default function MessageThread({ conversation, me }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {typingUsers.length > 0 && (
-        <div className={styles.typingIndicator}>
-          {typingUsers.map((u) => u.name).join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing
-          <span className={styles.typingDots}><span>.</span><span>.</span><span>.</span></span>
-        </div>
-      )}
-
       <form className={styles.chatInput} onSubmit={sendMessage}>
         <button type="button" className={styles.emojiButton} onClick={() => setShowEmoji(!showEmoji)}>
           😀
@@ -504,7 +419,7 @@ export default function MessageThread({ conversation, me }) {
         )}
         <input
           value={draft}
-          onChange={(e) => { setDraft(e.target.value); handleTyping(); }}
+          onChange={(e) => setDraft(e.target.value)}
           placeholder="Type a message..."
           aria-label="Message input"
         />
@@ -748,11 +663,11 @@ export default function NotificationsPage() {
 
 **File:** `frontend/social-network-fn/src/app/components/SocialShell.js`
 
-Add unread badges to the navigation.
+Add an unread count badge to the Notifications nav link (messages have no unread badges).
 
 Changes:
 1. Import `useUnread` from providers
-2. Add badge counts next to "Messages" and "Notifications" nav links
+2. Add a badge count next to the "Notifications" nav link
 
 ```jsx
 // In the nav links section, replace:
@@ -762,13 +677,13 @@ Changes:
 import { useUnread } from "../providers/UnreadProvider";
 
 // Inside the component:
-const { totalUnreadMessages, unreadNotifications } = useUnread();
+const { unreadNotifications } = useUnread();
 
 const links = [
   ["/feed", "Feed", "feed"],
   ["/profile/" + me.id, "Profile", "profile"],
   ["/groups", "Groups", "groups"],
-  ["/messages", "Messages", "messages", totalUnreadMessages],
+  ["/messages", "Messages", "messages"],
   ["/notifications", "Notifications", "notifications", unreadNotifications],
   ["/settings", "Settings", "settings"],
 ];
@@ -879,14 +794,6 @@ Add styles for all new components. Key additions:
   font-size: 0.75rem;
   color: var(--muted);
 }
-.unreadBadge {
-  background: var(--primary);
-  color: white;
-  border-radius: 999px;
-  padding: 0.1rem 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
 
 /* Message Thread */
 .messageThread {
@@ -935,25 +842,6 @@ Add styles for all new components. Key additions:
   opacity: 0.7;
   display: block;
   text-align: right;
-}
-
-/* Typing Indicator */
-.typingIndicator {
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-  font-style: italic;
-}
-.typingDots span {
-  animation: typingBounce 1.4s infinite;
-  display: inline-block;
-}
-.typingDots span:nth-child(2) { animation-delay: 0.2s; }
-.typingDots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typingBounce {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-4px); }
 }
 
 /* Chat Input */

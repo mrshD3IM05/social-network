@@ -15,15 +15,14 @@ Follow the order below; each doc builds on the previous.
 
 | Area | Before | After |
 |------|--------|-------|
-| WS endpoint | `/ws` — messages only, no typing events | `/ws` — messages + notifications + typing |
+| WS endpoint | `/ws` — messages only | `/ws` — messages + notifications |
 | Session tracking | `trackClient`/`untrackClient` never called — logout didn't close WS | Tracking called on connect/disconnect — logout revokes connections |
 | Chat history | None — chat started empty every time | `GET /messages/conversations`, `GET /messages/{userId}`, `GET /messages/group/{groupId}` |
 | Notification history | None — only real-time | `GET /notifications` with pagination + mark-read |
-| Unread counts | None | Per-conversation (client-side) + global notification count |
-| Typing indicators | None | WS event `type: "typing"` — broadcast to recipient/group |
+| Unread counts | None | Notification unread count only (no per-conversation message badges) |
 | Frontend WS | Separate connection per page | Single shared connection via React Context |
 | Reconnection | None — WS drop = dead page | Exponential backoff reconnect |
-| Chat UI | User ID input box | Conversation list sidebar, message threads, emoji picker, typing dots |
+| Chat UI | User ID input box | Conversation list sidebar, message threads, emoji picker |
 
 ## Dependency Graph
 
@@ -35,17 +34,16 @@ Fix session tracking              WebSocketProvider (connects to /ws)
   ├─ Message HTTP endpoints        ├─ UnreadProvider (fetches counts)
   │  (conversations, history)      │
   │                                 ├─ ChatLayout (conversation list)
-  ├─ Notification HTTP endpoints   │
+├─ Notification HTTP endpoints   │
   │  (list, mark-read)             ├─ MessageThread (message bubbles)
   │                                 │
-  ├─ Typing WS event               ├─ EmojiPicker (standalone)
-  │                                 │
-  ├─ Wire notifications into       ├─ Rewrite messages/page.js
+  ├─ Wire notifications into       ├─ EmojiPicker (standalone)
   │  existing flows                │
-  │                                 ├─ Rewrite notifications/page.js
-  └─ Register routes in            │
-     server.go                     ├─ Update SocialShell (badges)
-                                   └─ Update layout.js (providers)
+  │                                 ├─ Rewrite messages/page.js
+  ├─ Register routes in            │
+  │  server.go                     ├─ Rewrite notifications/page.js
+  └─                                ├─ Update SocialShell (badge)
+                                    └─ Update layout.js (providers)
 ```
 
 ## API Contract

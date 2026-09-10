@@ -15,13 +15,13 @@ import (
 
 const (
 	MaxImageSize int64 = 10 << 20
-	MaxImages          = 5
+	MaxImages          = 3
 )
 
 var (
 	ErrInvalidImage  = errors.New("file: only JPEG, PNG, and GIF images are allowed")
 	ErrFileTooLarge  = errors.New("file: image exceeds the 10 MB limit")
-	ErrTooManyImages = errors.New("file: a maximum of 5 images is allowed")
+	ErrTooManyImages = errors.New("file: a maximum of 3 images is allowed")
 )
 
 type Repository interface {
@@ -29,6 +29,7 @@ type Repository interface {
 	GetFile(string) (*model.File, error)
 	CanViewFile(int64, string) (bool, error)
 	GetPost(int64) (*model.Post, error)
+	CanAttachToMessage(int64, int64) (bool, error)
 	GetUserByID(int64) (*model.User, error)
 	UpdateUser(*model.User) error
 }
@@ -42,9 +43,18 @@ func New(repo Repository, storagePath string) *Service {
 	return &Service{repo: repo, storagePath: storagePath}
 }
 
-func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID *int64) (*model.File, error) {
+func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID, messageID *int64) (*model.File, error) {
 	if header == nil || header.Size > MaxImageSize {
 		return nil, ErrFileTooLarge
+	}
+	if postID == nil && messageID != nil {
+		allowed, err := s.repo.CanAttachToMessage(*messageID, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, repository.ErrNotFound
+		}
 	}
 	if postID != nil {
 		post, err := s.repo.GetPost(*postID)
@@ -91,15 +101,14 @@ func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID *in
 		_ = os.Remove(path)
 		return nil, err
 	}
-	file := &model.File{ID: id, StoragePath: path, OriginalName: filepath.Base(header.Filename), MIMEType: contentType, Size: header.Size, OwnerUserID: ownerID, PostID: postID}
-	if err := s.repo.CreateFile(file); err != nil {
+	file := &model.File{ID: id, StoragePath: path, OriginalName: filepath.Base(header.Filename), MIMEType: contentType, Size: header.Size, OwnerUserID: ownerID, PostID: postID, MessageID: messageID}
+if err := s.repo.CreateFile(file); err != nil {
 		_ = os.Remove(path)
 		return nil, err
 	}
 	return file, nil
 }
-
-func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, postID *int64) ([]*model.File, error) {
+func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, postID, messageID *int64) ([]*model.File, error) {
 	if len(headers) == 0 {
 		return nil, errors.New("file: at least one image is required")
 	}
@@ -108,7 +117,7 @@ func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, pos
 	}
 	files := make([]*model.File, 0, len(headers))
 	for _, header := range headers {
-		file, err := s.Upload(ownerID, header, postID)
+		file, err := s.Upload(ownerID, header, postID, messageID)
 		if err != nil {
 			return nil, err
 		}
@@ -124,7 +133,7 @@ func (s *Service) CanView(viewerID int64, id string) (bool, error) {
 }
 
 func (s *Service) SetAvatar(ownerID int64, header *multipart.FileHeader) (*model.User, error) {
-	file, err := s.Upload(ownerID, header, nil)
+	file, err := s.Upload(ownerID, header, nil, nil)
 	if err != nil {
 		return nil, err
 	}

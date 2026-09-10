@@ -282,93 +282,9 @@ func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request)
 
 ---
 
-## Step 6 — Typing event in WebSocket hub
-
-**File:** `backend/internal/websocket/hub.go`
-
-### Extend Repository interface
-```go
-type Repository interface {
-    CreateMessage(*model.Message) error
-    CanMessage(int64, *int64, *int64) (bool, error)
-    GroupMemberIDs(int64) ([]int64, error)
-    GetUserByID(int64) (*model.User, error)                     // ADD (for typing sender name)
-}
-```
-
-### Extend incomingMessage
-```go
-type incomingMessage struct {
-    Type    string `json:"type"`
-    ToUser  *int64 `json:"to_user_id,omitempty"`
-    GroupID *int64 `json:"group_id,omitempty"`
-    Content string `json:"content,omitempty"`
-}
-```
-
-### Extend readPump message handling
-```go
-func (c *Client) readPump() {
-    defer func() { untrackClient(c); c.hub.remove(c); c.connection.Close() }()
-    // ... existing setup ...
-
-    for {
-        var input incomingMessage
-        if err := c.connection.ReadJSON(&input); err != nil {
-            return
-        }
-
-        switch input.Type {
-        case "message":
-            // existing message logic (unchanged)
-
-        case "typing":
-            c.handleTyping(input)
-
-        default:
-            c.sendError(ErrInvalidMessage.Error())
-        }
-    }
-}
-```
-
-### New method: handleTyping
-```go
-func (c *Client) handleTyping(input incomingMessage) {
-    if (input.ToUser == nil) == (input.GroupID == nil) {
-        c.sendError(ErrInvalidMessage.Error())
-        return
-    }
-    allowed, err := c.hub.repo.CanMessage(c.userID, input.ToUser, input.GroupID)
-    if err != nil || !allowed {
-        return // silently drop, don't error
-    }
-    user, err := c.hub.repo.GetUserByID(c.userID)
-    if err != nil {
-        return
-    }
-    event := map[string]any{
-        "type":      "typing",
-        "user_id":   c.userID,
-        "user_name": user.FirstName,
-        "to_user_id": input.ToUser,
-        "group_id":  input.GroupID,
-    }
-    if input.ToUser != nil {
-        c.hub.publish(*input.ToUser, event)
-    } else if members, err := c.hub.repo.GroupMemberIDs(*input.GroupID); err == nil {
-        for _, memberID := range members {
-            if memberID != c.userID {
-                c.hub.publish(memberID, event)
-            }
-        }
-    }
-}
-```
-
 ---
 
-## Step 7 — Wire notifications into existing flows
+## Step 6 — Wire notifications into existing flows
 
 ### In `followsvc/service.go`
 When a follow request is created for a private profile:
@@ -395,7 +311,7 @@ This means `handlers.go` and service constructors need updating.
 
 ---
 
-## Step 8 — Register routes
+## Step 7 — Register routes
 
 **File:** `backend/internal/server/server.go`
 
@@ -431,7 +347,7 @@ Update `New()` to wire everything together.
 
 ---
 
-## Step 9 — Update schema.sql reference
+## Step 8 — Update schema.sql reference
 
 **File:** `backend/schema.sql`
 

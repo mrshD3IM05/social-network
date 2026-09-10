@@ -3,6 +3,7 @@ package filehandler
 import (
 	"net/http"
 	"sn-backend/internal/handler/common"
+	"sn-backend/internal/repository"
 	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/sessionsvc"
 	"strconv"
@@ -48,10 +49,25 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		postID = &parsed
 	}
-	stored, err := h.Service.UploadMany(ownerID, headers, postID)
+	var messageID *int64
+	if value := r.FormValue("message_id"); value != "" {
+		parsed, parseErr := strconv.ParseInt(value, 10, 64)
+		if parseErr != nil || parsed < 1 {
+			http.Error(w, "invalid message id", http.StatusBadRequest)
+			return
+		}
+		messageID = &parsed
+	}
+	if postID != nil && messageID != nil {
+		http.Error(w, "post_id and message_id cannot be combined", http.StatusBadRequest)
+		return
+	}
+	stored, err := h.Service.UploadMany(ownerID, headers, postID, messageID)
 	if err != nil {
 		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge || err == filesvc.ErrTooManyImages {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else if err == repository.ErrNotFound {
+			http.Error(w, "post or message not found", http.StatusNotFound)
 		} else {
 			http.Error(w, "could not store file", http.StatusInternalServerError)
 		}
