@@ -42,8 +42,6 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | POST | /avatar | multipart: avatar (single image, same type/size limits) | 200 + private user json, sets your avatar |
 | GET | /fs/{id} | - | serves the original file after a per user visibility check, 404 if you can't see it; `Cache-Control: private, max-age=31536000, immutable` (files are immutable content-addressed IDs, so browsers may cache privately) |
 
-images are validated for dimensions (max 8000x8000) before full decode to prevent memory exhaustion; the existing 10 MB upload size limit is unchanged
-
 ### websocket
 | method | path | request | response |
 |---|---|---|---|
@@ -183,7 +181,7 @@ sequenceDiagram
 
 ### file upload
 
-Client uploads up to 3 images (max 10 MB each). The service writes the original to disk, validates dimensions via `image.DecodeConfig` before full decode, and stores the file metadata in the database.
+Client uploads up to 3 images (max 10 MB each). The service sniffs the content type, writes the original to disk, and stores the file metadata in the database.
 
 ```mermaid
 sequenceDiagram
@@ -200,7 +198,6 @@ sequenceDiagram
         H->>S: Upload(file, postID)
         S->>F: write original to uploads/<id>
         S->>S: detectContentType (512 byte header read)
-        S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
         S->>R: store file metadata
         R->>DB: INSERT INTO files
     end
@@ -287,7 +284,7 @@ sequenceDiagram
 
 ### avatar upload
 
-Client uploads a single image for their avatar. The service follows the same pipeline as post image uploads — writing the original and validating dimensions — then updates the `users.avatar` field to point to the new file.
+Client uploads a single image for their avatar. The service follows the same pipeline as post image uploads — sniffing the content type and writing the original to disk — then updates the `users.avatar` field to point to the new file.
 
 ```mermaid
 sequenceDiagram
@@ -304,7 +301,6 @@ sequenceDiagram
     S->>S: Upload(ownerID, header, nil)
     S->>F: write original to uploads/<id>
     S->>S: detectContentType (512 byte header read)
-    S->>S: image.DecodeConfig — validate dimensions (≤8000×8000)
     S->>R: store file metadata
     R->>DB: INSERT INTO files
     S->>R: GetUserByID(ownerID)

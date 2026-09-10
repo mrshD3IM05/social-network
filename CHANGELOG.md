@@ -9,12 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
-- **Image dimension validation** — images exceeding 8000x8000 pixels are rejected with `ErrInvalidImage` before full decode, preventing memory exhaustion from small compressed files with extreme dimensions
 - **Chat image attachments** (`message_id` on `POST /files`) — images can be attached to a chat message; upload is only allowed for the message sender, the private recipient, or a group member (`CanAttachToMessage`); existing `files.message_id` column is now used
 
 ### Removed
 
 - **Thumbnail feature** — removed pre-generated 300x300 thumbnail generation, the `GET /fs/{id}/thumb` route, and the `Thumbnail` handler. Uploads now store and serve the original image only (`GET /fs/{id}`).
+- **Image dimension validation** — the 8000x8000 `DecodeConfig` check existed only to protect thumbnail decoding; with thumbnails gone the backend never decodes images, so the limit was removed with it (10 MB byte cap still applies)
 - **Dead `GET /users` endpoint** — removed the registered route and `ListUsers` handler (returned `501 Not Implemented`); users are found by profile ID via `GET /user/{id}`.
 
 ### Changed
