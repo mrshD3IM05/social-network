@@ -4,8 +4,8 @@ import "sn-backend/internal/model"
 
 func (r *Repository) CreatePost(post *model.Post) error {
 	result, err := r.db.Exec(
-		`INSERT INTO posts (author_id, content, privacy, group_id, type) VALUES (?, ?, ?, ?, ?)`,
-		post.AuthorID, post.Content, post.Privacy, post.GroupID, post.Type,
+		`INSERT INTO posts (author_id, content, privacy, group_id) VALUES (?, ?, ?, ?)`,
+		post.AuthorID, post.Content, post.Privacy, post.GroupID,
 	)
 	if err != nil {
 		return err
@@ -15,7 +15,7 @@ func (r *Repository) CreatePost(post *model.Post) error {
 }
 
 const postColumns = `
-	p.id, p.author_id, p.content, p.privacy, p.group_id, p.type, p.created_at,
+	p.id, p.author_id, p.content, p.privacy, p.group_id, p.created_at,
 	u.first_name, u.last_name, u.nickname, u.avatar`
 
 func scanPost(s scanner) (*model.Post, error) {
@@ -26,7 +26,6 @@ func scanPost(s scanner) (*model.Post, error) {
 		&post.Content,
 		&post.Privacy,
 		&post.GroupID,
-		&post.Type,
 		&post.CreatedAt,
 		&post.AuthorFirstName,
 		&post.AuthorLastName,

@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Thumbnail feature** — removed pre-generated 300x300 thumbnail generation, the `GET /fs/{id}/thumb` route, and the `Thumbnail` handler. Uploads now store and serve the original image only (`GET /fs/{id}`).
 - **Image dimension validation** — the 8000x8000 `DecodeConfig` check existed only to protect thumbnail decoding; with thumbnails gone the backend never decodes images, so the limit was removed with it (10 MB byte cap still applies)
 - **Dead `GET /users` endpoint** — removed the registered route and `ListUsers` handler (returned `501 Not Implemented`); users are found by profile ID via `GET /user/{id}`.
+- **Post `type` column** — removed the `type` column added in migration `000016` (dropped in `000018`). It only existed to distinguish auto-generated posts (e.g. an `avatar_update` post), which is not in the subject, so posts are now created solely through the post composer and setting an avatar does **not** create a post.
 
 ### Changed
 

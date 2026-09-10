@@ -28,7 +28,7 @@ func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, 
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
 	}
-	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy, Type: "post"}
+	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy}
 	if err := s.repo.CreatePost(post); err != nil {
 		return nil, err
 	}

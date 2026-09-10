@@ -57,7 +57,6 @@ CREATE TABLE posts (
     content    TEXT NOT NULL DEFAULT '',
     privacy    TEXT NOT NULL DEFAULT 'public',
     group_id   INTEGER,
-    type       TEXT NOT NULL DEFAULT 'post',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE

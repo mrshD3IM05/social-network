@@ -18,7 +18,6 @@ type Post struct {
 	Content         string    `json:"content"`
 	Privacy         string    `json:"privacy"`
 	GroupID         *int64    `json:"group_id,omitempty"`
-	Type            string    `json:"type"`
 	Images          []string  `json:"images"`
 	CreatedAt       time.Time `json:"created_at"`
 }
