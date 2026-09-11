@@ -8,11 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Standalone frontend server** (`servefrontend.go`) — simple Go file server for `frontend/` directory, listens on `:5500` by default, configurable via `-addr` flag; replaces Live Server dependency
+- **Post reactions** — authorized `POST /posts/{id}/reactions` and `DELETE /posts/{id}/reactions`; form field `reaction` is `like` or `dislike`, reacting with the same value removes it and the other switches; responses return a `{ likes, dislikes, my_reaction }` summary. Posts now carry `likes`, `dislikes`, and `my_reaction` fields.
+- **Next.js frontend** — the browser frontend is now a Next.js (App Router) app at `frontend/` (transplanted from `origin/aym1e`), with login/register pages, and a minimal runnable home feed: create posts, like/dislike, delete own posts. API calls go through `frontend/lib/api.js` with session cookies.
 - **Chat image attachments** (`message_id` on `POST /files`) — images can be attached to a chat message; upload is only allowed for the message sender, the private recipient, or a group member (`CanAttachToMessage`); existing `files.message_id` column is now used
 
 ### Removed
 
+- **Standalone frontend server** (`servefrontend.go`) — the Go static file server for the old vanilla frontend is gone; the Next.js app is served by `next start` in its own container instead
+- **Vanilla static frontend** — `frontend/index.html`, `frontend/app.js`, `frontend/styles.css`, `frontend/readme.md` removed with the switch to Next.js
+- **Unused next.js config** — the `/api/v1` rewrite in `next.config.js` targeted a prefixed backend; caddy strips the prefix, so it now targets the flat backend directly
 - **Thumbnail feature** — removed pre-generated 300x300 thumbnail generation, the `GET /fs/{id}/thumb` route, and the `Thumbnail` handler. Uploads now store and serve the original image only (`GET /fs/{id}`).
 - **Image dimension validation** — the 8000x8000 `DecodeConfig` check existed only to protect thumbnail decoding; with thumbnails gone the backend never decodes images, so the limit was removed with it (10 MB byte cap still applies)
 - **Dead `GET /users` endpoint** — removed the registered route and `ListUsers` handler (returned `501 Not Implemented`); users are found by profile ID via `GET /user/{id}`.
@@ -20,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Caddy frontend route** — `caddy/Caddyfile.docker` proxies `/` to `frontend:3000` instead of `:5500`; `compose.yml` exposes port `3000` for the frontend service
+- **Frontend Dockerfile** — `frontend/Dockerfile` now builds the Next.js app (`node:22-alpine`, `npm ci`, `npm run build`, `next start -p 3000`)
 - **Image serving is now cacheable** — `GET /fs/{id}` sets `Cache-Control: private, max-age=31536000, immutable`, so browsers cache images privately (shared caches never store them).
 - **Image upload cap lowered to 3** — `POST /files` accepts at most 3 images per request instead of 5 (posts and chat messages); frontend composer mirrors the cap.
 

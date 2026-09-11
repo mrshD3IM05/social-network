@@ -204,6 +204,35 @@ Logic:
 
 ---
 
+### React to a post
+
+```
+POST /posts/{id}/reactions
+Content-Type: application/x-www-form-urlencoded
+
+reaction=like
+```
+
+`reaction` must be `like` or `dislike` (400 otherwise). Toggle semantics: reacting with the same reaction removes it; reacting with the other one switches. Invisible (`public` post from a non-friend of a private user) → 404.
+
+Response `200`:
+```json
+{ "likes": 2, "dislikes": 1, "my_reaction": "like" }
+```
+
+### Remove a reaction
+
+```
+DELETE /posts/{id}/reactions
+```
+
+Response `200`:
+```json
+{ "likes": 1, "dislikes": 1, "my_reaction": "" }
+```
+
+---
+
 ## Existing Endpoints (unchanged, for reference)
 
 | Method | Path | Purpose |
@@ -221,6 +250,8 @@ Logic:
 | POST | /posts | Create post |
 | PUT | /posts/{id} | Update post |
 | DELETE | /posts/{id} | Delete post |
+| POST | /posts/{id}/reactions | React to a post (form field `reaction` = `like` or `dislike`) |
+| DELETE | /posts/{id}/reactions | Remove your reaction from a post |
 | POST | /files | Upload image(s) — multipart `files[]` (max 3, jpeg/png/gif), optional `post_id` **or** `message_id` to attach |
 | POST /avatar | Set avatar |
 | GET | /fs/{id} | Download file (private cacheable) |

@@ -8,7 +8,7 @@ Blocks: nothing (can start with WSProvider + standalone components)
 
 ## Step 1 — WebSocketProvider
 
-**New file:** `frontend/social-network-fn/src/app/providers/WebSocketProvider.js`
+**New file:** `frontend/app/providers/WebSocketProvider.js`
 
 A React Context that manages a single shared WebSocket connection for the entire app.
 
@@ -110,7 +110,7 @@ useEffect(() => {
 
 ## Step 2 — UnreadProvider
 
-**New file:** `frontend/social-network-fn/src/app/providers/UnreadProvider.js`
+**New file:** `frontend/app/providers/UnreadProvider.js`
 
 Tracks the notification unread count (client-side) and updates it via WebSocket events.
 Per-conversation message unread badges are intentionally not tracked.
@@ -166,7 +166,7 @@ export function UnreadProvider({ children }) {
 
 ## Step 3 — ChatLayout (conversation list sidebar)
 
-**New file:** `frontend/social-network-fn/src/app/components/ChatLayout.js`
+**New file:** `frontend/app/components/ChatLayout.js`
 
 A sidebar that shows all conversations (private + group) with last message preview.
 
@@ -281,7 +281,7 @@ export default function ChatLayout({ activeConversation, onSelect }) {
 
 ## Step 4 — MessageThread
 
-**New file:** `frontend/social-network-fn/src/app/components/MessageThread.js`
+**New file:** `frontend/app/components/MessageThread.js`
 
 Displays messages between two users or in a group, with input and emoji picker.
 
@@ -436,7 +436,7 @@ export default function MessageThread({ conversation, me }) {
 
 ## Step 5 — EmojiPicker
 
-**New file:** `frontend/social-network-fn/src/app/components/EmojiPicker.js`
+**New file:** `frontend/app/components/EmojiPicker.js`
 
 A standalone emoji picker component.
 
@@ -509,7 +509,7 @@ export default function EmojiPicker({ onSelect, onClose }) {
 
 ## Step 6 — Rewrite messages/page.js
 
-**File:** `frontend/social-network-fn/src/app/messages/page.js`
+**File:** `frontend/app/messages/page.js`
 
 Replace the current content entirely. The new page uses `ChatLayout` + `MessageThread`.
 
@@ -558,7 +558,7 @@ export default function MessagesPage() {
 
 ## Step 7 — Rewrite notifications/page.js
 
-**File:** `frontend/social-network-fn/src/app/notifications/page.js`
+**File:** `frontend/app/notifications/page.js`
 
 Replace with full notification history + real-time + action buttons.
 
@@ -661,7 +661,7 @@ export default function NotificationsPage() {
 
 ## Step 8 — Update SocialShell.js (badges)
 
-**File:** `frontend/social-network-fn/src/app/components/SocialShell.js`
+**File:** `frontend/app/components/SocialShell.js`
 
 Add an unread count badge to the Notifications nav link (messages have no unread badges).
 
@@ -701,7 +701,7 @@ const links = [
 
 ## Step 9 — Update layout.js (providers)
 
-**File:** `frontend/social-network-fn/src/app/layout.js`
+**File:** `frontend/app/layout.js`
 
 Wrap the app with WebSocketProvider and UnreadProvider.
 
@@ -723,7 +723,7 @@ Note: Since layout.js may be a server component, you may need a client-side wrap
 
 ## Step 10 — CSS additions
 
-**File:** `frontend/social-network-fn/src/app/page.module.css`
+**File:** `frontend/app/page.module.css`
 
 Add styles for all new components. Key additions:
 

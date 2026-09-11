@@ -22,7 +22,7 @@ services:
     depends_on:
       - backend
     expose:
-      - "5500"
+      - "3000"
     networks:
       - social-network
 

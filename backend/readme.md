@@ -34,6 +34,10 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | POST | /posts | form: content, privacy = public \| almost_private \| private | 201 + post json |
 | PUT | /posts/{id} | form: content, privacy | 200 + post json, only the owner can update |
 | DELETE | /posts/{id} | - | 204, only the owner can delete |
+| POST | /posts/{id}/reactions | form: reaction = like \| dislike | 200 + summary, toggles: same reaction removes it, other switches; invisible post = 404 |
+| DELETE | /posts/{id}/reactions | - | 200 + summary after removing your reaction |
+
+Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`like`, `dislike`, or empty) for the requesting user.
 
 ### files
 | method | path | request | response |

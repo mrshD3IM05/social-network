@@ -210,8 +210,8 @@ Owns infrastructure, shared frontend utilities, and end-to-end integration testi
 ### Tasks
 
 1. **Frontend Dockerfile** (new: `frontend/Dockerfile`)
-   - Multi-stage build: node:20-alpine builder, node:20-alpine runner
-   - `npm run build`, expose port 5500 (or 3000)
+   - Multi-stage build: node:22-alpine, `npm run build`, `next start -p 3000`
+   - `npm run build`, expose port 3000
    - Must work with the existing `compose.yml` service definition
 
 2. **Verify compose.yml**

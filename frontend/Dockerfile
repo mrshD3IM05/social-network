@@ -1,19 +1,13 @@
-FROM golang:1.25-alpine AS builder
+FROM node:22-alpine
 
 WORKDIR /app
 
-COPY servefrontend.go .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /frontend-server servefrontend.go
+COPY package.json package-lock.json ./
+RUN npm ci
 
-FROM alpine:3.22
+COPY . .
+RUN npm run build
 
-WORKDIR /srv
-
-RUN apk add --no-cache ca-certificates
-
-COPY --from=builder /frontend-server /frontend-server
-COPY frontend ./frontend
-
-EXPOSE 5500
-
-CMD ["/frontend-server", "-addr", ":5500", "-dir", "frontend"]
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "run", "start"]
