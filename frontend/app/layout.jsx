@@ -12,7 +12,7 @@ export default function RootLayout({ children }) {
         {/* the fonts used in globals.css */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Poppins:ital,wght@0,700;1,700&display=swap"
         />
       </head>
       <body>{children}</body>
