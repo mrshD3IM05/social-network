@@ -38,6 +38,20 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /avatar", auth.Authorized(http.HandlerFunc(h.File.SetAvatar)))
 	mux.Handle("GET /fs/{id}", auth.Authorized(http.HandlerFunc(h.File.Download)))
 
+	// group routes
+	mux.Handle("POST /groups", auth.Authorized(http.HandlerFunc(h.Group.CreateGroup)))
+	mux.Handle("GET /groups", auth.Authorized(http.HandlerFunc(h.Group.ListGroups)))
+	mux.Handle("GET /groups/{id}", auth.Authorized(http.HandlerFunc(h.Group.GetGroup)))
+	mux.Handle("GET /groups/{id}/members", auth.Authorized(http.HandlerFunc(h.Group.GetGroupMembers)))
+	mux.Handle("POST /groups/{id}/invitations", auth.Authorized(http.HandlerFunc(h.Group.InviteUser)))
+	mux.Handle("POST /group-invitations/{id}/accept", auth.Authorized(http.HandlerFunc(h.Group.RespondInvitation)))
+	mux.Handle("POST /group-invitations/{id}/decline", auth.Authorized(http.HandlerFunc(h.Group.RespondInvitation)))
+	mux.Handle("GET /group-invitations", auth.Authorized(http.HandlerFunc(h.Group.PendingInvitations)))
+	mux.Handle("POST /groups/{id}/join-requests", auth.Authorized(http.HandlerFunc(h.Group.RequestJoin)))
+	mux.Handle("POST /group-join-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.Group.RespondJoinRequest)))
+	mux.Handle("POST /group-join-requests/{id}/decline", auth.Authorized(http.HandlerFunc(h.Group.RespondJoinRequest)))
+	mux.Handle("GET /groups/{id}/join-requests", auth.Authorized(http.HandlerFunc(h.Group.PendingJoinRequests)))
+
 	// websocket routes
 	mux.Handle("GET /ws", auth.Authorized(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.WebSocket.ServeHTTP(w, r, h.Auth.Session)
