@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiGet, apiUpload } from '@/lib/api'
+import { IMAGE_ACCEPT, checkImage } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
@@ -18,6 +19,15 @@ export default function SettingsPage() {
     const file = e.target.files[0]
     if (!file) return
 
+    // format and size are checked here so a bad photo never leaves the browser
+    const problem = checkImage(file)
+    if (problem) {
+      setMessage(problem)
+      e.target.value = '' // let the user pick another one
+      return
+    }
+
+    setMessage('')
     const formData = new FormData()
     formData.append('avatar', file)
 
@@ -54,7 +64,7 @@ export default function SettingsPage() {
           <Avatar user={me} size={72} />
           <label className="btn btn-light">
             <Icon name="camera" size={16} /> Change photo
-            <input type="file" accept="image/jpeg,image/png,image/gif" hidden onChange={changeAvatar} />
+            <input type="file" accept={IMAGE_ACCEPT} hidden onChange={changeAvatar} />
           </label>
           {message && <span className="meta">{message}</span>}
         </div>

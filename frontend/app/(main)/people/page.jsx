@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiGet } from '@/lib/api'
+import { LIMITS } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
@@ -48,7 +49,12 @@ export default function PeoplePage() {
 
       <div className="search">
         <Icon name="search" />
-        <input placeholder="Search by name or nickname" value={search} onChange={e => setSearch(e.target.value)} />
+        <input
+          placeholder="Search by name or nickname"
+          value={search}
+          maxLength={LIMITS.search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
       {shown.length === 0 && (

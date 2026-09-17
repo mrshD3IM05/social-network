@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/api'
+import { LIMITS, firstError } from '@/lib/validate'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,12 +15,23 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault() // stop the browser from reloading the page
+
+    // the API answers "invalid credentials" anyway, so we only check what is missing
+    const problem = firstError([
+      email.trim() ? '' : 'Enter your email or nickname.',
+      password ? '' : 'Enter your password.',
+    ])
+    if (problem) {
+      setError(problem)
+      return
+    }
+
     setError('')
     setLoading(true)
 
     try {
       // the "email" field also accepts a nickname
-      await apiPost('/login', { email, password })
+      await apiPost('/login', { email: email.trim(), password })
       router.push('/home')
     } catch (err) {
       setError(err.message)
@@ -28,15 +40,25 @@ export default function LoginPage() {
   }
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
+    <form className="auth-form" onSubmit={handleSubmit} noValidate>
       <h1>Welcome back</h1>
       <p className="subtitle">Log in to continue to your feed.</p>
 
       <label>Email or nickname</label>
-      <input value={email} onChange={e => setEmail(e.target.value)} autoFocus required />
+      <input
+        value={email}
+        maxLength={LIMITS.email}
+        onChange={e => setEmail(e.target.value)}
+        autoFocus
+      />
 
       <label>Password</label>
-      <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+      <input
+        type="password"
+        value={password}
+        maxLength={LIMITS.password.max}
+        onChange={e => setPassword(e.target.value)}
+      />
 
       {error && <p className="error">{error}</p>}
 

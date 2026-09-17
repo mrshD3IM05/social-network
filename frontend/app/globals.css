@@ -66,6 +66,25 @@ img { display: block; }
 .meta { font-size: 13px; color: var(--muted); }
 .error { margin-top: 12px; font-size: 14px; color: var(--accent); }
 .notice { margin: 12px 0; font-size: 14px; color: var(--ink-soft); }
+.hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* message shown under the input it belongs to */
+.field-error { margin-top: 6px; font-size: 13px; color: var(--accent); }
+input.invalid, textarea.invalid { border-color: var(--accent); }
+input.invalid:focus, textarea.invalid:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* "120/1000" next to a text field */
+.counter {
+  flex: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.counter.over { color: var(--accent); }
 .loading { padding: 80px 0; text-align: center; color: var(--muted); }
 
 /* content fades in smoothly when a page opens */
@@ -258,6 +277,8 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .composer textarea { min-height: 72px; padding: 4px; border: 0; background: none; font-size: 16px; box-shadow: none; }
 .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .composer-bar .btn { margin-left: auto; }
+.composer-bar .counter { margin-left: auto; }
+.composer-bar .counter + .btn { margin-left: 8px; }
 
 .tool {
   display: inline-flex;
@@ -271,6 +292,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   border-radius: 10px;
   background: var(--surface);
   color: var(--ink-soft);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -357,7 +379,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 }
 .bubble.mine { align-self: flex-end; border-color: var(--ink); border-radius: 16px 16px 4px 16px; background: var(--ink); color: var(--paper); }
 .chat-error { padding: 0 16px; }
-.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.chat-form { display: flex; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 .chat-form .btn { width: 44px; padding: 0; }
 
 /* =========================================================

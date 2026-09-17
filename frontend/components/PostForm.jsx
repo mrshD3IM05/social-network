@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { apiPost, apiUpload } from '@/lib/api'
+import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import CharCount from './CharCount'
 import Icon from './Icon'
 
 // Form to write a new post. onPosted() is called after it is saved.
@@ -12,14 +14,40 @@ export default function PostForm({ onPosted }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Checked while typing so the Publish button knows if the post is valid
+  const contentError = checkText('Your post', content, LIMITS.post)
+
+  // Keep the picked images only if there are at most 3 valid ones
+  function pickFiles(e) {
+    const picked = Array.from(e.target.files)
+    const imageError = checkImages(picked)
+
+    setError(imageError)
+    setFiles(imageError ? [] : picked)
+    if (imageError) e.target.value = '' // let the user pick again
+  }
+
+  function clearFiles() {
+    setFiles([])
+    setError('')
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
+
+    // check everything once more before calling the API
+    const problem = contentError || checkImages(files)
+    if (problem) {
+      setError(problem)
+      return
+    }
+
     setError('')
     setLoading(true)
 
     try {
       // 1. create the post
-      const post = await apiPost('/posts', { content, privacy })
+      const post = await apiPost('/posts', { content: content.trim(), privacy })
 
       // 2. upload the images and attach them to the post
       if (files.length > 0) {
@@ -41,12 +69,12 @@ export default function PostForm({ onPosted }) {
   }
 
   return (
-    <form className="card composer" onSubmit={handleSubmit}>
+    <form className="card composer" onSubmit={handleSubmit} noValidate>
       <textarea
         placeholder="Share something with your followers…"
         value={content}
+        maxLength={LIMITS.post}
         onChange={e => setContent(e.target.value)}
-        required
       />
 
       <div className="composer-bar">
@@ -56,12 +84,16 @@ export default function PostForm({ onPosted }) {
           {files.length > 0 ? `${files.length} photo${files.length > 1 ? 's' : ''}` : 'Photo'}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/gif"
+            accept={IMAGE_ACCEPT}
             multiple
             hidden
-            onChange={e => setFiles(Array.from(e.target.files))}
+            onChange={pickFiles}
           />
         </label>
+
+        {files.length > 0 && (
+          <button type="button" className="tool" onClick={clearFiles}>Remove</button>
+        )}
 
         <select className="tool" value={privacy} onChange={e => setPrivacy(e.target.value)}>
           <option value="public">Public</option>
@@ -69,10 +101,14 @@ export default function PostForm({ onPosted }) {
           <option value="private">Only me</option>
         </select>
 
-        <button className="btn" disabled={loading}>
+        <CharCount value={content} max={LIMITS.post} />
+
+        <button className="btn" disabled={loading || Boolean(contentError)}>
           {loading ? 'Publishing…' : 'Publish'}
         </button>
       </div>
+
+      <p className="hint">Up to {LIMITS.images} images, JPEG, PNG or GIF, 10 MB each.</p>
 
       {error && <p className="error">{error}</p>}
     </form>
