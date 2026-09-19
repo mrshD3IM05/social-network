@@ -17,6 +17,8 @@ const icons = {
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35',
   camera: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   arrow: 'M5 12h14 M12 5l7 7-7 7',
+  plus: 'M12 5v14 M5 12h14',
+  x: 'M18 6 6 18 M6 6l12 12',
 }
 
 export default function Icon({ name, size = 18 }) {

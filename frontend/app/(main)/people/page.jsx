@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiGet } from '@/lib/api'
+import { fetchPeople } from '@/lib/people'
 import { LIMITS } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -10,38 +11,21 @@ import PageHeader from '@/components/PageHeader'
 
 export default function PeoplePage() {
   const [people, setPeople] = useState([])
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
-  // The API has no "list users" endpoint yet (GET /users returns 501),
-  // so we collect the authors of the posts in the feed.
   useEffect(() => {
-    async function load() {
-      const me = await apiGet('/me')
-      const posts = await apiGet('/posts')
-
-      const found = {}
-      for (const post of posts) {
-        if (post.author_id !== me.id) {
-          found[post.author_id] = {
-            id: post.author_id,
-            first_name: post.author_first_name,
-            last_name: post.author_last_name,
-            nickname: post.author_nickname,
-            avatar: post.author_avatar,
-          }
-        }
-      }
-      setPeople(Object.values(found))
-    }
-    load()
+    fetchPeople().catch(err => setError(err.message))
   }, [])
 
   // keep only the people whose name contains the search text
-  const shown = people.filter(person =>
-    `${person.first_name} ${person.last_name} ${person.nickname}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  )
+  function shown(list) {
+    return list.filter(person =>
+      `${person.first_name} ${person.last_name} ${person.nickname}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    )
+  }
 
   return (
     <>
@@ -57,7 +41,9 @@ export default function PeoplePage() {
         />
       </div>
 
-      {shown.length === 0 && (
+      {error && <p className="error">{error}</p>}
+
+      {shown(people).length === 0 && !error && (
         <div className="empty">
           <p className="empty-title">No one found</p>
           <p>People show up here once their posts are in your feed.</p>
@@ -65,7 +51,7 @@ export default function PeoplePage() {
       )}
 
       <div className="card list">
-        {shown.map(person => (
+        {shown(people).map(person => (
           <Link key={person.id} href={`/profile/${person.id}`} className="list-item">
             <Avatar user={person} size={44} />
             <span className="list-text">

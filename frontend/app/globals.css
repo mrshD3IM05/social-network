@@ -401,6 +401,74 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .details dd { margin: 0; font-weight: 500; text-align: right; word-break: break-word; }
 
 /* =========================================================
+   Groups
+   ========================================================= */
+.group-item { flex-wrap: wrap; }
+.group-item .list-text small { display: block; }
+.group-item .meta { margin-top: 2px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.chip-accent { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+
+.btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+.browse-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.browse-bar .section-label { margin: 32px 0 14px; }
+
+.invitations { border-color: var(--accent); }
+.invitations h2 { margin-bottom: 6px; font-size: 20px; }
+.invitation-actions { display: flex; gap: 8px; }
+
+.group-head-top { display: flex; align-items: center; gap: 14px; }
+.group-head-top .btn { margin-left: auto; }
+.join-row { display: flex; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+.invite-list { max-height: 50vh; overflow-y: auto; }
+.invite-none { padding: 12px 0; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .45);
+  animation: rise .2s var(--ease);
+}
+.modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  animation: rise .25s var(--ease);
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.modal-header h2 { font-size: 24px; }
+.modal .search { margin-top: 12px; }
+.modal .composer-bar { margin-top: 14px; padding-top: 12px; }
+.modal .composer-bar .btn { margin-left: auto; }
+
+/* =========================================================
    Login and register
    ========================================================= */
 .auth { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
@@ -454,4 +522,11 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .settings-section, .features { grid-template-columns: 1fr; }
   .row { flex-direction: column; gap: 0; }
   .chat { height: calc(100vh - 140px); }
+  .browse-bar { flex-direction: column; align-items: flex-start; gap: 0; }
+  .invitation-actions { flex-direction: column; width: 100%; }
+  .invitation-actions .btn { width: 100%; }
+  .group-head-top { flex-wrap: wrap; }
+  .group-head-top .btn { margin-left: 0; width: 100%; }
+  .group-head-top .list-text { flex: 1; }
+  .modal { max-height: calc(100dvh - 32px); }
 }

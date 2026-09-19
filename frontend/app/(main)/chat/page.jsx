@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { apiGet } from '@/lib/api'
+import { fetchPeople } from '@/lib/people'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
@@ -12,25 +12,7 @@ export default function ChatListPage() {
   const [people, setPeople] = useState([])
 
   useEffect(() => {
-    async function load() {
-      const me = await apiGet('/me')
-      const posts = await apiGet('/posts')
-
-      const found = {}
-      for (const post of posts) {
-        if (post.author_id !== me.id) {
-          found[post.author_id] = {
-            id: post.author_id,
-            first_name: post.author_first_name,
-            last_name: post.author_last_name,
-            nickname: post.author_nickname,
-            avatar: post.author_avatar,
-          }
-        }
-      }
-      setPeople(Object.values(found))
-    }
-    load()
+    fetchPeople().catch(() => {})
   }, [])
 
   return (
