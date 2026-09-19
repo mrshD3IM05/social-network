@@ -39,6 +39,24 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 
 Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`like`, `dislike`, or empty) for the requesting user.
 
+### groups
+| method | path | request | response |
+|---|---|---|---|
+| POST | /groups | form: title, description | 201 + group json, creator joins the group automatically |
+| GET | /groups | - | all groups with member_count, is_member, pending_join, is_creator for you |
+| GET | /groups/{id} | - | group + creator + members + your status; only members/creators see detail, invited users get a flag, outsiders get 404 |
+| GET | /groups/{id}/members | - | member list, members only (403 otherwise) |
+| POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
+| GET | /group-invitations | - | your pending invitations |
+| POST | /group-invitations/{id}/accept | - | 204, recipient only, joins atomically |
+| POST | /group-invitations/{id}/decline | - | 204, recipient only |
+| POST | /groups/{id}/join-requests | - | 201 + request json, non-members only; members/duplicates rejected |
+| GET | /groups/{id}/join-requests | - | pending requests, creator only |
+| POST | /group-join-requests/{id}/accept | - | 204, group creator only, joins atomically |
+| POST | /group-join-requests/{id}/decline | - | 204, group creator only |
+
+Groups notifications (group_invitation, group_join_request, group_invite_response, group_join_response) are stored in the notifications table and pushed live over /ws with the standard `{"type":"notification", ...}` event.
+
 ### files
 | method | path | request | response |
 |---|---|---|---|

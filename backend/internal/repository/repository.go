@@ -5,7 +5,11 @@ import (
 	"errors"
 )
 
-var ErrNotFound = errors.New("repository: not found")
+var (
+	ErrNotFound = errors.New("repository: not found")
+	ErrExists   = errors.New("repository: already exists")
+	ErrNotOwner = errors.New("repository: not the owner")
+)
 
 type Repository struct {
 	db *sql.DB
