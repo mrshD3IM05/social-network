@@ -11,6 +11,8 @@ export const LIMITS = {
   post: 1000,
   message: 1000,
   search: 50,
+  groupTitle: 100,       // same limit as the API (internal/service/groupsvc)
+  groupDescription: 1000,
   minAge: 13,
   images: 3, // a post can carry at most 3 images
   imageBytes: 10 * 1024 * 1024, // 10 MB, like the API
