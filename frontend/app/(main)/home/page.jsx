@@ -6,14 +6,22 @@ import PageHeader from '@/components/PageHeader'
 import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 
+const PAGE_SIZE = 20
+
 export default function HomePage() {
   const [me, setMe] = useState(null)
   const [posts, setPosts] = useState([])
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
 
-  function loadPosts() {
-    apiGet('/posts')
-      .then(setPosts)
+  // The API sends one page at a time. Asking from offset 0 reloads the feed,
+  // any other offset adds the next page to what is already on screen.
+  function loadPosts(offset = 0) {
+    apiGet(`/posts?limit=${PAGE_SIZE}&offset=${offset}`)
+      .then(page => {
+        setPosts(current => (offset === 0 ? page : [...current, ...page]))
+        setHasMore(page.length === PAGE_SIZE)
+      })
       .catch(err => setError(err.message))
   }
 
@@ -40,8 +48,14 @@ export default function HomePage() {
       )}
 
       {posts.map(post => (
-        <PostCard key={post.id} post={post} myId={me.id} onDeleted={loadPosts} />
+        <PostCard key={post.id} post={post} myId={me.id} onDeleted={() => loadPosts()} />
       ))}
+
+      {hasMore && (
+        <div className="row-actions end">
+          <button className="btn btn-light" onClick={() => loadPosts(posts.length)}>Load more</button>
+        </div>
+      )}
     </>
   )
 }

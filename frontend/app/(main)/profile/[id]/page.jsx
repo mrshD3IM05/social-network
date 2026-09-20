@@ -31,10 +31,10 @@ export default function ProfilePage() {
       setUser(await apiGet(`/user/${id}`))
       setIsPrivate(false)
       // a real endpoint now, instead of downloading the whole feed and filtering
-      setPosts(await apiGet(`/users/${id}/posts`))
+      setPosts(await apiGet(`/users/${id}/posts?limit=100`))
       const [followers, following] = await Promise.all([
-        apiGet(`/users/${id}/followers`),
-        apiGet(`/users/${id}/following`),
+        apiGet(`/users/${id}/followers?limit=100`),
+        apiGet(`/users/${id}/following?limit=100`),
       ])
       setCounts({ followers: followers.length, following: following.length })
     } catch (err) {

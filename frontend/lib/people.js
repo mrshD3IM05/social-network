@@ -4,7 +4,7 @@ import { apiGet } from '@/lib/api'
 // of the posts in your feed, which hid anyone who had not posted yet; the API
 // now has a real directory endpoint.
 export function fetchPeople() {
-  return apiGet('/users')
+  return apiGet('/users?limit=100')
 }
 
 // The people you already exchanged messages with, most recent first.

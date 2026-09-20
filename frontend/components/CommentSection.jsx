@@ -22,7 +22,7 @@ export default function CommentSection({ postId, myId, postAuthorId, count, onCo
 
   async function load() {
     try {
-      const list = await apiGet(`/posts/${postId}/comments`)
+      const list = await apiGet(`/posts/${postId}/comments?limit=100`)
       setComments(list)
       onCountChange?.(list.length)
     } catch (err) {
