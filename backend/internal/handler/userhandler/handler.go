@@ -50,7 +50,12 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "profile is private", http.StatusForbidden)
 		return
 	}
-	common.WriteJSON(w, http.StatusOK, common.PublicUser(user))
+	follower, err := h.Service.IsFollower(viewerID, user.ID)
+	if err != nil {
+		http.Error(w, "could not check profile access", http.StatusInternalServerError)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, common.Profile(user, viewerID, follower))
 }
 func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
