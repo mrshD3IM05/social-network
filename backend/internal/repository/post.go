@@ -56,7 +56,9 @@ func (r *Repository) GetPost(postID int64) (*model.Post, error) {
 }
 
 func (r *Repository) ListPostFileIDs(postID int64) ([]string, error) {
-	rows, err := r.db.Query(`SELECT id FROM files WHERE post_id = ? ORDER BY created_at, id`, postID)
+	// Comment images also carry post_id so the file visibility query can resolve
+	// them through the post; they must not show up as images of the post itself.
+	rows, err := r.db.Query(`SELECT id FROM files WHERE post_id = ? AND comment_id IS NULL ORDER BY created_at, id`, postID)
 	if err != nil {
 		return nil, err
 	}
