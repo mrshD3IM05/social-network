@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrEmailTaken         = errors.New("auth: email already registered")
+	ErrNicknameTaken      = errors.New("auth: nickname already taken")
 	ErrInvalidCredentials = errors.New("auth: invalid credentials")
 	ErrInvalidInput       = errors.New("auth: invalid registration input")
 )
@@ -72,11 +73,24 @@ func (s *Service) Register(input RegisterInput) (*model.User, error) {
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
+	nickname := strings.ToLower(strings.TrimSpace(input.Nickname))
+	// Login accepts a nickname as an identifier, so two accounts must never
+	// share one. A unique index backs this up for concurrent registrations.
+	if nickname != "" {
+		if _, err := s.users.GetUserByNickname(nickname); err == nil {
+			return nil, ErrNicknameTaken
+		} else if !errors.Is(err, repository.ErrNotFound) {
+			return nil, err
+		}
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
-	user := &model.User{Email: input.Email, Password: string(hash), FirstName: input.FirstName, LastName: input.LastName, DateOfBirth: input.DateOfBirth, Avatar: input.Avatar, Nickname: input.Nickname, AboutMe: input.AboutMe}
+	// input.Avatar is ignored on purpose: it used to be a free-text form field
+	// written straight into users.avatar. Avatars are uploaded to POST /avatar,
+	// which stores a real file id.
+	user := &model.User{Email: input.Email, Password: string(hash), FirstName: input.FirstName, LastName: input.LastName, DateOfBirth: input.DateOfBirth, Nickname: nickname, AboutMe: input.AboutMe}
 	if err := s.users.CreateUser(user); err != nil {
 		return nil, err
 	}
@@ -91,10 +105,9 @@ func validateRegisterInput(input RegisterInput) error {
 		return fmt.Errorf("%w: invalid email address", ErrInvalidInput)
 	}
 
-	if strings.TrimSpace(input.Nickname) == "" {
-		return fmt.Errorf("%w: nickname is required", ErrInvalidInput)
-	}
-	if !isValidNickname(input.Nickname) {
+	// The subject lists the nickname as optional, so it is only validated when
+	// one was actually supplied.
+	if nickname := strings.TrimSpace(input.Nickname); nickname != "" && !isValidNickname(nickname) {
 		return fmt.Errorf("%w: invalid nickname", ErrInvalidInput)
 	}
 

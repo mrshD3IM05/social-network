@@ -27,7 +27,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	user, err := h.Service.Register(authsvc.RegisterInput{Email: r.FormValue("email"), Password: r.FormValue("password"), FirstName: r.FormValue("first_name"), LastName: r.FormValue("last_name"), DateOfBirth: r.FormValue("date_of_birth"), Avatar: r.FormValue("avatar"), Nickname: r.FormValue("nickname"), AboutMe: r.FormValue("about_me")})
 	if err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, authsvc.ErrEmailTaken) {
+		if errors.Is(err, authsvc.ErrEmailTaken) || errors.Is(err, authsvc.ErrNicknameTaken) {
 			status = http.StatusConflict
 		}
 		http.Error(w, err.Error(), status)
