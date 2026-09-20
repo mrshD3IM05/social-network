@@ -12,7 +12,7 @@ export default function AudiencePicker({ myId, selected, onChange }) {
 
   useEffect(() => {
     if (!myId) return
-    apiGet(`/users/${myId}/followers`)
+    apiGet(`/users/${myId}/followers?limit=100`)
       .then(setFollowers)
       .catch(err => {
         setError(err.message)

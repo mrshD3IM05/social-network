@@ -12,7 +12,7 @@ export default function UserListModal({ title, path, onClose }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    apiGet(path)
+    apiGet(`${path}?limit=100`)
       .then(setUsers)
       .catch(err => {
         setError(err.message)
