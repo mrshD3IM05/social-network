@@ -4,9 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { apiDelete, apiPost, imageUrl } from '@/lib/api'
 import Avatar from './Avatar'
+import CommentSection from './CommentSection'
 import Icon from './Icon'
 
-const privacyNames = { public: 'Public', almost_private: 'Followers', private: 'Only me' }
+const privacyNames = { public: 'Public', almost_private: 'Followers', private: 'Chosen followers' }
 
 // One post in a list. myId is the logged-in user's id, onDeleted() refreshes the list.
 export default function PostCard({ post, myId, onDeleted }) {
@@ -14,6 +15,7 @@ export default function PostCard({ post, myId, onDeleted }) {
   const [likes, setLikes] = useState(post.likes)
   const [dislikes, setDislikes] = useState(post.dislikes)
   const [myReaction, setMyReaction] = useState(post.my_reaction)
+  const [commentCount, setCommentCount] = useState(post.comments ?? 0)
 
   const author = {
     first_name: post.author_first_name,
@@ -72,6 +74,14 @@ export default function PostCard({ post, myId, onDeleted }) {
           <Icon name="dislike" size={16} /> {dislikes}
         </button>
       </footer>
+
+      <CommentSection
+        postId={post.id}
+        myId={myId}
+        postAuthorId={post.author_id}
+        count={commentCount}
+        onCountChange={setCommentCount}
+      />
     </article>
   )
 }
