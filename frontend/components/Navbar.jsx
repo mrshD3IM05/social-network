@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/api'
 import Avatar from './Avatar'
 import Icon from './Icon'
+import NotificationBadge from './NotificationBadge'
 
 const links = [
   { href: '/home', label: 'Feed', icon: 'home' },
@@ -38,6 +39,7 @@ export default function Navbar({ user }) {
           >
             <Icon name={link.icon} />
             <span>{link.label}</span>
+            {link.href === '/notifications' && <NotificationBadge />}
           </Link>
         ))}
       </nav>
@@ -47,7 +49,7 @@ export default function Navbar({ user }) {
           <Avatar user={user} size={36} />
           <span>
             <strong>{user.first_name} {user.last_name}</strong>
-            <small>@{user.nickname}</small>
+            {user.nickname && <small>@{user.nickname}</small>}
           </span>
         </Link>
         <button className="icon-button" onClick={logout} title="Log out">

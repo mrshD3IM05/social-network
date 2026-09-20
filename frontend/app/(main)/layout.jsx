@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiGet } from '@/lib/api'
 import Navbar from '@/components/Navbar'
+import NotificationToasts from '@/components/NotificationToasts'
 
 // Wraps every page inside (main): checks you are logged in and shows the sidebar.
 export default function MainLayout({ children }) {
@@ -24,6 +25,8 @@ export default function MainLayout({ children }) {
       <main className="main">
         <div className="page">{children}</div>
       </main>
+      {/* the layout wraps every page, so notifications reach you anywhere */}
+      <NotificationToasts />
     </div>
   )
 }
