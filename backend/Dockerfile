@@ -21,6 +21,8 @@ RUN apk add --no-cache ca-certificates libgcc
 
 COPY --from=builder /server /server
 
+RUN mkdir -p /app/data /app/uploads
+
 EXPOSE 8080
 
 CMD ["/server"]
