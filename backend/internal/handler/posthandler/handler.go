@@ -29,7 +29,7 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	post, err := h.Service.Create(userID, r.FormValue("content"), r.FormValue("privacy"))
 	if err != nil {
-		if err == postsvc.ErrInvalidPrivacy {
+		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrContentTooLong {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			http.Error(w, "could not create post", http.StatusInternalServerError)
@@ -118,7 +118,7 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	post, err := h.Service.Update(userID, id, r.FormValue("content"), r.FormValue("privacy"))
 	if err != nil {
-		if err == postsvc.ErrInvalidPrivacy {
+		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrContentTooLong {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else if err == postsvc.ErrNotFound {
 			http.Error(w, "post not found", http.StatusNotFound)
