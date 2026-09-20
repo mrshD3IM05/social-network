@@ -122,14 +122,16 @@ func postVisibleArgs(viewerID int64) []any {
 	}
 }
 
-func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
+func (r *Repository) ListVisiblePosts(viewerID int64, limit, offset int) ([]*model.Post, error) {
+	args := append(postVisibleArgs(viewerID), limit, offset)
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
 		WHERE p.group_id IS NULL AND `+postVisibleCondition+`
-		ORDER BY p.created_at DESC, p.id DESC`,
-		postVisibleArgs(viewerID)...,
+		ORDER BY p.created_at DESC, p.id DESC
+		LIMIT ? OFFSET ?`,
+		args...,
 	)
 	if err != nil {
 		return nil, err

@@ -44,33 +44,38 @@ func (r *Repository) collectUsers(query string, args ...any) ([]*model.User, err
 	return users, rows.Err()
 }
 
-// ListFollowers returns the accepted followers of userID.
-func (r *Repository) ListFollowers(userID int64) ([]*model.User, error) {
+// ListFollowers returns one page of the accepted followers of userID.
+func (r *Repository) ListFollowers(userID int64, limit, offset int) ([]*model.User, error) {
 	return r.collectUsers(
 		`SELECT `+followUserColumns+`
 		 FROM follow_requests f JOIN users u ON u.id = f.from_user_id
 		 WHERE f.to_user_id = ? AND f.status = ?
-		 ORDER BY u.first_name, u.last_name, u.id`,
-		userID, model.FollowAccepted,
+		 ORDER BY u.first_name, u.last_name, u.id
+		 LIMIT ? OFFSET ?`,
+		userID, model.FollowAccepted, limit, offset,
 	)
 }
 
-// ListFollowing returns the users userID follows with an accepted request.
-func (r *Repository) ListFollowing(userID int64) ([]*model.User, error) {
+// ListFollowing returns one page of the users userID follows.
+func (r *Repository) ListFollowing(userID int64, limit, offset int) ([]*model.User, error) {
 	return r.collectUsers(
 		`SELECT `+followUserColumns+`
 		 FROM follow_requests f JOIN users u ON u.id = f.to_user_id
 		 WHERE f.from_user_id = ? AND f.status = ?
-		 ORDER BY u.first_name, u.last_name, u.id`,
-		userID, model.FollowAccepted,
+		 ORDER BY u.first_name, u.last_name, u.id
+		 LIMIT ? OFFSET ?`,
+		userID, model.FollowAccepted, limit, offset,
 	)
 }
 
-// ListAllUsers lists every account except the caller, newest profiles last.
-func (r *Repository) ListAllUsers(exceptID int64) ([]*model.User, error) {
+// ListAllUsers lists one page of accounts, the caller excluded.
+func (r *Repository) ListAllUsers(exceptID int64, limit, offset int) ([]*model.User, error) {
 	return r.collectUsers(
-		`SELECT `+followUserColumns+` FROM users u WHERE u.id <> ? ORDER BY u.first_name, u.last_name, u.id`,
-		exceptID,
+		`SELECT `+followUserColumns+` FROM users u
+		 WHERE u.id <> ?
+		 ORDER BY u.first_name, u.last_name, u.id
+		 LIMIT ? OFFSET ?`,
+		exceptID, limit, offset,
 	)
 }
 

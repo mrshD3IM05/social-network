@@ -32,7 +32,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
 	}
-	comments, err := h.Service.List(viewerID, postID)
+	limit, offset := common.Page(r)
+	comments, err := h.Service.List(viewerID, postID, limit, offset)
 	if err != nil {
 		writeError(w, err, "could not list comments")
 		return

@@ -27,7 +27,7 @@ func (h *Handler) Following(w http.ResponseWriter, r *http.Request) {
 	h.userList(w, r, h.Service.Following)
 }
 
-func (h *Handler) userList(w http.ResponseWriter, r *http.Request, list func(int64, int64) ([]*model.User, error)) {
+func (h *Handler) userList(w http.ResponseWriter, r *http.Request, list func(int64, int64, int, int) ([]*model.User, error)) {
 	viewerID, ok := h.caller(w, r)
 	if !ok {
 		return
@@ -37,7 +37,8 @@ func (h *Handler) userList(w http.ResponseWriter, r *http.Request, list func(int
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
-	users, err := list(viewerID, targetID)
+	limit, offset := common.Page(r)
+	users, err := list(viewerID, targetID, limit, offset)
 	if err != nil {
 		writeError(w, err, "could not list users")
 		return
@@ -57,7 +58,8 @@ func (h *Handler) UserPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
-	posts, err := h.Service.UserPosts(viewerID, targetID)
+	limit, offset := common.Page(r)
+	posts, err := h.Service.UserPosts(viewerID, targetID, limit, offset)
 	if err != nil {
 		writeError(w, err, "could not list posts")
 		return
@@ -72,7 +74,8 @@ func (h *Handler) Users(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	users, err := h.Service.AllUsers(viewerID)
+	limit, offset := common.Page(r)
+	users, err := h.Service.AllUsers(viewerID, limit, offset)
 	if err != nil {
 		http.Error(w, "could not list users", http.StatusInternalServerError)
 		return

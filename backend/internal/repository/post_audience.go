@@ -59,14 +59,16 @@ func (r *Repository) ListPostAudience(postID int64) ([]int64, error) {
 
 // ListUserPosts returns the posts written by authorID that viewerID is allowed
 // to see, so a profile page no longer has to filter the whole feed.
-func (r *Repository) ListUserPosts(authorID, viewerID int64) ([]*model.Post, error) {
+func (r *Repository) ListUserPosts(authorID, viewerID int64, limit, offset int) ([]*model.Post, error) {
 	args := append([]any{authorID}, postVisibleArgs(viewerID)...)
+	args = append(args, limit, offset)
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
 		WHERE p.group_id IS NULL AND p.author_id = ? AND `+postVisibleCondition+`
-		ORDER BY p.created_at DESC, p.id DESC`,
+		ORDER BY p.created_at DESC, p.id DESC
+		LIMIT ? OFFSET ?`,
 		args...,
 	)
 	if err != nil {

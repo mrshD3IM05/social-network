@@ -20,9 +20,8 @@ var (
 type Repository interface {
 	CreateComment(*model.Comment) error
 	GetComment(int64) (*model.Comment, error)
-	ListPostComments(int64, int64) ([]*model.Comment, error)
+	ListPostComments(int64, int64, int, int) ([]*model.Comment, error)
 	DeleteCommentOwned(int64, int64) ([]string, error)
-	CommentPostID(int64) (int64, error)
 	AttachFileToComment(string, int64, int64) error
 	CanViewPost(int64, int64) (bool, error)
 	GetReaction(string, int64, int64) (*model.Reaction, error)
@@ -60,7 +59,7 @@ func (s *Service) Create(authorID, postID int64, content string) (*model.Comment
 	return s.repo.GetComment(comment.ID)
 }
 
-func (s *Service) List(viewerID, postID int64) ([]*model.Comment, error) {
+func (s *Service) List(viewerID, postID int64, limit, offset int) ([]*model.Comment, error) {
 	visible, err := s.repo.CanViewPost(viewerID, postID)
 	if err != nil {
 		return nil, err
@@ -68,7 +67,7 @@ func (s *Service) List(viewerID, postID int64) ([]*model.Comment, error) {
 	if !visible {
 		return nil, ErrNotFound
 	}
-	return s.repo.ListPostComments(postID, viewerID)
+	return s.repo.ListPostComments(postID, viewerID, limit, offset)
 }
 
 func (s *Service) Get(viewerID, commentID int64) (*model.Comment, error) {

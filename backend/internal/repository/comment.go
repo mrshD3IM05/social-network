@@ -54,14 +54,15 @@ func (r *Repository) GetComment(commentID int64) (*model.Comment, error) {
 	return comment, nil
 }
 
-func (r *Repository) ListPostComments(postID, viewerID int64) ([]*model.Comment, error) {
+func (r *Repository) ListPostComments(postID, viewerID int64, limit, offset int) ([]*model.Comment, error) {
 	rows, err := r.db.Query(
 		`SELECT `+commentColumns+`
 		FROM comments c
 		JOIN users u ON u.id = c.author_id
 		WHERE c.post_id = ?
-		ORDER BY c.created_at, c.id`,
-		postID,
+		ORDER BY c.created_at, c.id
+		LIMIT ? OFFSET ?`,
+		postID, limit, offset,
 	)
 	if err != nil {
 		return nil, err
@@ -158,13 +159,4 @@ func (r *Repository) DeleteCommentOwned(commentID, ownerID int64) ([]string, err
 		return nil, err
 	}
 	return fileIDs, nil
-}
-
-func (r *Repository) CommentPostID(commentID int64) (int64, error) {
-	var postID int64
-	err := r.QueryRow(`SELECT post_id FROM comments WHERE id = ?`, commentID).Scan(&postID)
-	if err != nil {
-		return 0, notFound(err)
-	}
-	return postID, nil
 }
