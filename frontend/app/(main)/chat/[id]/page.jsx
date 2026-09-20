@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet } from '@/lib/api'
+import { onSocketEvent, sendSocket } from '@/lib/ws'
 import { LIMITS, checkText } from '@/lib/validate'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
+import EmojiPicker from '@/components/EmojiPicker'
 import Icon from '@/components/Icon'
 
-// A private conversation with one user, in real time over a WebSocket.
+// A private conversation with one user: the stored history plus live messages.
 export default function ConversationPage() {
   const { id } = useParams()
   const otherId = Number(id)
@@ -18,37 +20,47 @@ export default function ConversationPage() {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [error, setError] = useState('')
-  const socketRef = useRef(null) // useRef keeps the socket between renders
+  const [online, setOnline] = useState(false)
+  const inputRef = useRef(null)
   const bottomRef = useRef(null)
 
   useEffect(() => {
     apiGet('/me').then(setMe)
     apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
 
-    // Connect straight to the Go server (the cookie is sent automatically)
-    const socket = new WebSocket(`ws://${window.location.hostname}:8080/api/v1/ws`)
-    socketRef.current = socket
+    // messages were always saved; this reads them back
+    apiGet(`/messages/${id}`)
+      .then(setMessages)
+      .catch(err => setError(err.message))
+  }, [id])
 
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
-      if (data.type === 'message') {
-        const msg = data.message
+  useEffect(() => {
+    return onSocketEvent(event => {
+      if (event.type === 'socket') {
+        setOnline(event.state === 'open')
+        return
+      }
+      if (event.type === 'message') {
+        const message = event.message
         // keep only the messages of this conversation
-        if (msg.from_user_id === otherId || msg.to_user_id === otherId) {
-          setMessages(list => [...list, msg])
+        if (message.group_id) return
+        if (message.from_user_id === otherId || message.to_user_id === otherId) {
+          setMessages(list => (list.some(m => m.id === message.id) ? list : [...list, message]))
         }
       }
-      if (data.type === 'error') setError(data.error)
-    }
-
-    // close the connection when we leave the page
-    return () => socket.close()
-  }, [id, otherId])
+      if (event.type === 'error') setError(event.error)
+    })
+  }, [otherId])
 
   // scroll to the newest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  function insertEmoji(emoji) {
+    setText(value => value + emoji)
+    inputRef.current?.focus()
+  }
 
   function send(e) {
     e.preventDefault()
@@ -60,9 +72,7 @@ export default function ConversationPage() {
     }
 
     setError('')
-    socketRef.current.send(
-      JSON.stringify({ type: 'message', to_user_id: otherId, content: text.trim() }),
-    )
+    sendSocket({ type: 'message', to_user_id: otherId, content: text.trim() })
     setText('')
   }
 
@@ -75,15 +85,18 @@ export default function ConversationPage() {
         <Avatar user={other} size={38} />
         <div>
           <strong>{other.first_name} {other.last_name}</strong>
-          <p className="meta">Live conversation</p>
+          <p className="meta">{online ? 'Connected' : 'Reconnecting…'}</p>
         </div>
       </header>
 
       <div className="chat-messages">
-        <p className="chat-note">Messages are live only and are not saved when you reload.</p>
+        {messages.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
         {messages.map(msg => (
           <div key={msg.id} className={msg.from_user_id === me.id ? 'bubble mine' : 'bubble'}>
             {msg.content}
+            <small className="bubble-time">
+              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </small>
           </div>
         ))}
         <div ref={bottomRef} />
@@ -92,7 +105,9 @@ export default function ConversationPage() {
       {error && <p className="error chat-error">{error}</p>}
 
       <form className="chat-form" onSubmit={send} noValidate>
+        <EmojiPicker onPick={insertEmoji} />
         <input
+          ref={inputRef}
           value={text}
           maxLength={LIMITS.message}
           onChange={e => setText(e.target.value)}
