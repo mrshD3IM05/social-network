@@ -1,16 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { apiPost, apiUpload } from '@/lib/api'
+import { apiPost, apiPut, apiUpload } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import AudiencePicker from './AudiencePicker'
 import CharCount from './CharCount'
 import Icon from './Icon'
 
 // Form to write a new post. onPosted() is called after it is saved.
-export default function PostForm({ onPosted }) {
+// myId is needed to list the followers a "private" post can be shared with.
+export default function PostForm({ onPosted, myId }) {
   const [content, setContent] = useState('')
   const [privacy, setPrivacy] = useState('public')
   const [files, setFiles] = useState([])
+  const [audience, setAudience] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -49,7 +52,13 @@ export default function PostForm({ onPosted }) {
       // 1. create the post
       const post = await apiPost('/posts', { content: content.trim(), privacy })
 
-      // 2. upload the images and attach them to the post
+      // 2. a private post only reaches the followers the author picked,
+      //    which is what fills post_visibility on the API side
+      if (privacy === 'private') {
+        await apiPut(`/posts/${post.id}/audience`, { user_ids: audience })
+      }
+
+      // 3. upload the images and attach them to the post
       if (files.length > 0) {
         const formData = new FormData()
         for (const file of files) formData.append('files', file)
@@ -57,9 +66,10 @@ export default function PostForm({ onPosted }) {
         await apiUpload('/files', formData)
       }
 
-      // 3. reset the form
+      // 4. reset the form
       setContent('')
       setFiles([])
+      setAudience([])
       onPosted()
     } catch (err) {
       setError(err.message)
@@ -98,7 +108,7 @@ export default function PostForm({ onPosted }) {
         <select className="tool" value={privacy} onChange={e => setPrivacy(e.target.value)}>
           <option value="public">Public</option>
           <option value="almost_private">Followers</option>
-          <option value="private">Only me</option>
+          <option value="private">Chosen followers</option>
         </select>
 
         <CharCount value={content} max={LIMITS.post} />
@@ -107,6 +117,10 @@ export default function PostForm({ onPosted }) {
           {loading ? 'Publishing…' : 'Publish'}
         </button>
       </div>
+
+      {privacy === 'private' && (
+        <AudiencePicker myId={myId} selected={audience} onChange={setAudience} />
+      )}
 
       <p className="hint">Up to {LIMITS.images} images, JPEG, PNG or GIF, 10 MB each.</p>
 
