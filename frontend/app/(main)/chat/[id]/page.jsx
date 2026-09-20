@@ -8,7 +8,6 @@ import { onSocketEvent, sendSocket } from '@/lib/ws'
 import { LIMITS, checkText } from '@/lib/validate'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
-import EmojiPicker from '@/components/EmojiPicker'
 import Icon from '@/components/Icon'
 
 // A private conversation with one user: the stored history plus live messages.
@@ -21,7 +20,6 @@ export default function ConversationPage() {
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [online, setOnline] = useState(false)
-  const inputRef = useRef(null)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -56,11 +54,6 @@ export default function ConversationPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  function insertEmoji(emoji) {
-    setText(value => value + emoji)
-    inputRef.current?.focus()
-  }
 
   function send(e) {
     e.preventDefault()
@@ -105,9 +98,7 @@ export default function ConversationPage() {
       {error && <p className="error chat-error">{error}</p>}
 
       <form className="chat-form" onSubmit={send} noValidate>
-        <EmojiPicker onPick={insertEmoji} />
         <input
-          ref={inputRef}
           value={text}
           maxLength={LIMITS.message}
           onChange={e => setText(e.target.value)}
