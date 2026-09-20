@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -41,12 +42,16 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, sessions *sessio
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	connection, err := (&websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}).Upgrade(w, r, nil)
+	connection, err := (&websocket.Upgrader{CheckOrigin: checkOrigin}).Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	client := &Client{hub: h, connection: connection, userID: session.UserID, send: make(chan []byte, 16)}
 	h.add(client)
+	// Bind the socket to the session so logging out can close it; without this
+	// RevokeSessionClients had nothing to iterate and a logged-out tab kept
+	// receiving messages until the TCP connection died.
+	trackClient(cookie.Value, client)
 	go client.writePump()
 	client.readPump()
 }
@@ -80,13 +85,22 @@ func (h *Hub) publish(userID int64, event any) {
 	if err != nil {
 		return
 	}
+	var stalled []*Client
 	h.mu.RLock()
-	defer h.mu.RUnlock()
 	for client := range h.clients[userID] {
 		select {
 		case client.send <- payload:
 		default:
+			// A full buffer means the reader stopped draining. Silently dropping
+			// the payload would leave the client with a half-complete history,
+			// so the socket is closed instead and readPump cleans it up.
+			stalled = append(stalled, client)
 		}
+	}
+	h.mu.RUnlock()
+	for _, client := range stalled {
+		log.Printf("websocket: dropping backed-up client for user %d", client.userID)
+		_ = client.connection.Close()
 	}
 }
 
@@ -105,7 +119,7 @@ type incomingMessage struct {
 }
 
 func (c *Client) readPump() {
-	defer func() { c.hub.remove(c); c.connection.Close() }()
+	defer func() { untrackClient(c); c.hub.remove(c); c.connection.Close() }()
 	c.connection.SetReadLimit(64 << 10)
 	_ = c.connection.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.connection.SetPongHandler(func(string) error { return c.connection.SetReadDeadline(time.Now().Add(60 * time.Second)) })
