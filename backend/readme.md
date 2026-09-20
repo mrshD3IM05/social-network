@@ -79,7 +79,7 @@ cookie name is "session" (HttpOnly, SameSite=Lax)
 passwords hashed with bcrypt
 
 ## rate limiting
-every request goes through a per ip limiter: 100 requests per minute (sliding window), 429 with Retry-After when exceeded
+every request goes through a per ip limiter: 1000 requests per minute (fixed window, matches `rateLimitRequests` and the `X-RateLimit-Limit` header), 429 with Retry-After when exceeded; idle windows are swept so the map cannot grow forever
 
 ## database
 sqlite (WAL mode, foreign keys on)
@@ -127,7 +127,7 @@ sequenceDiagram
     participant DB as sqlite
 
     C->>MW: HTTP request
-    MW->>MW: rate limit check (per IP, 100/min)
+    MW->>MW: rate limit check (per IP, 1000/min)
     MW->>MW: session cookie lookup
     alt guest route
         MW->>H: forward (guest allowed)
