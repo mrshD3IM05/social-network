@@ -63,9 +63,9 @@ func (s *Service) Get(token string) (*model.Session, error) {
 func (s *Service) Delete(token string) error { return s.repo.DeleteSession(token) }
 
 func (s *Service) SetCookie(w http.ResponseWriter, session *model.Session) {
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: session.ID, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: session.ExpiresAt})
+	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: session.ID, Path: "/", HttpOnly: true, Secure: secureCookie, SameSite: http.SameSiteLaxMode, Expires: session.ExpiresAt})
 }
 
 func (s *Service) ClearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: CookieName, Path: "/", HttpOnly: true, Secure: secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
