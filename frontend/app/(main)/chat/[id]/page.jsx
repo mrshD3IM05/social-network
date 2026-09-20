@@ -64,8 +64,14 @@ export default function ConversationPage() {
       return
     }
 
+    // sendSocket answers false while the connection is down, so the message is
+    // never dropped without telling the user
+    if (!sendSocket({ type: 'message', to_user_id: otherId, content: text.trim() })) {
+      setError('Not connected yet, give it a moment and try again.')
+      return
+    }
+
     setError('')
-    sendSocket({ type: 'message', to_user_id: otherId, content: text.trim() })
     setText('')
   }
 
