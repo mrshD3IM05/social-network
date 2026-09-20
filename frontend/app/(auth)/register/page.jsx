@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { apiPost } from '@/lib/api'
+import { apiPost, apiUpload } from '@/lib/api'
 import {
+  IMAGE_ACCEPT,
   LIMITS,
   checkDateOfBirth,
   checkEmail,
+  checkImage,
   checkNickname,
   checkPassword,
   checkText,
@@ -18,7 +20,22 @@ export default function RegisterPage() {
   const router = useRouter()
   const [errors, setErrors] = useState({}) // one message per field
   const [error, setError] = useState('')
+  const [avatar, setAvatar] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  // The avatar is optional. Registering also logs you in, so the picture is
+  // uploaded right after the account is created.
+  function pickAvatar(e) {
+    const file = e.target.files[0]
+    if (!file) {
+      setAvatar(null)
+      return
+    }
+    const problem = checkImage(file)
+    setErrors(rest => ({ ...rest, avatar: problem }))
+    setAvatar(problem ? null : file)
+    if (problem) e.target.value = ''
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -41,7 +58,8 @@ export default function RegisterPage() {
       first_name: checkText('First name', values.first_name, LIMITS.firstName),
       last_name: checkText('Last name', values.last_name, LIMITS.lastName),
       email: checkEmail(values.email),
-      nickname: checkNickname(values.nickname),
+      nickname: checkNickname(values.nickname), // optional
+
       password: checkPassword(values.password),
       date_of_birth: checkDateOfBirth(values.date_of_birth),
       about_me: checkText('About me', values.about_me, LIMITS.aboutMe, { required: false }),
@@ -53,7 +71,14 @@ export default function RegisterPage() {
 
     try {
       await apiPost('/register', values)
-      // registering also logs you in
+
+      // registering also logs you in, so the avatar can be uploaded now
+      if (avatar) {
+        const formData = new FormData()
+        formData.append('avatar', avatar)
+        await apiUpload('/avatar', formData).catch(() => {}) // never block signup
+      }
+
       router.push('/home')
     } catch (err) {
       setError(err.message)
@@ -110,7 +135,7 @@ export default function RegisterPage() {
 
       <div className="row">
         <div>
-          <label>Nickname</label>
+          <label>Nickname <small>optional</small></label>
           <input
             name="nickname"
             placeholder={`${LIMITS.nickname.min}–${LIMITS.nickname.max} letters or numbers`}
@@ -139,6 +164,16 @@ export default function RegisterPage() {
         className={errors.password ? 'invalid' : undefined}
       />
       {fieldError('password')}
+
+      <label>Profile photo <small>optional</small></label>
+      <input
+        name="avatar"
+        type="file"
+        accept={IMAGE_ACCEPT}
+        onChange={pickAvatar}
+        className={errors.avatar ? 'invalid' : undefined}
+      />
+      {fieldError('avatar')}
 
       <label>About me <small>optional, up to {LIMITS.aboutMe} characters</small></label>
       <textarea

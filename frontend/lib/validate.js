@@ -45,9 +45,11 @@ export function checkEmail(value) {
   return ''
 }
 
-export function checkNickname(value) {
+// The subject marks the nickname as optional, so an empty value is fine;
+// anything else still has to match the API's rule.
+export function checkNickname(value, { required = false } = {}) {
   const nickname = (value || '').trim().toLowerCase()
-  if (!nickname) return 'Nickname is required.'
+  if (!nickname) return required ? 'Nickname is required.' : ''
   if (!nicknameRegex.test(nickname) || !letterRegex.test(nickname)) {
     const { min, max } = LIMITS.nickname
     return `Nickname must be ${min}–${max} letters or numbers, with at least one letter.`
