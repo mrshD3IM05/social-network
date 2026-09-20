@@ -29,7 +29,7 @@ export default function HomePage() {
     <>
       <PageHeader label="Feed" title={`Good to see you, ${me.first_name}.`} subtitle="The latest from you and the people you follow." />
 
-      <PostForm onPosted={loadPosts} />
+      <PostForm onPosted={loadPosts} myId={me.id} />
 
       {error && <p className="error">{error}</p>}
       {posts.length === 0 && (
