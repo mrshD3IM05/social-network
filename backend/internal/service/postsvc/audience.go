@@ -22,7 +22,6 @@ type AudienceRepository interface {
 	GetPost(int64) (*model.Post, error)
 	SetPostAudience(int64, int64, []int64) error
 	ListPostAudience(int64) ([]int64, error)
-	ListFollowers(int64) ([]*model.User, error)
 }
 
 // AudienceService fills post_visibility, which is what makes a "private" post
@@ -63,9 +62,4 @@ func (s *AudienceService) Get(authorID, postID int64) ([]int64, error) {
 		return nil, ErrNotOwner
 	}
 	return s.repo.ListPostAudience(postID)
-}
-
-// Candidates lists the accepted followers an author may pick from.
-func (s *AudienceService) Candidates(authorID int64) ([]*model.User, error) {
-	return s.repo.ListFollowers(authorID)
 }

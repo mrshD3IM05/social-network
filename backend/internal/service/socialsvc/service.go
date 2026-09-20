@@ -26,12 +26,12 @@ var nicknameRegex = regexp.MustCompile(`^[a-z0-9]{4,15}$`)
 type Repository interface {
 	GetUserByID(int64) (*model.User, error)
 	IsFollowing(int64, int64) (bool, error)
-	ListFollowers(int64) ([]*model.User, error)
-	ListFollowing(int64) ([]*model.User, error)
-	ListAllUsers(int64) ([]*model.User, error)
+	ListFollowers(int64, int, int) ([]*model.User, error)
+	ListFollowing(int64, int, int) ([]*model.User, error)
+	ListAllUsers(int64, int, int) ([]*model.User, error)
 	ListPendingFollowRequests(int64) ([]*repository.PendingFollowRequest, error)
 	FollowState(int64, int64) (string, error)
-	ListUserPosts(int64, int64) ([]*model.Post, error)
+	ListUserPosts(int64, int64, int, int) ([]*model.Post, error)
 	SetUserPrivacy(int64, bool) error
 	UpdateProfileFields(*model.User) error
 	NicknameTaken(string, int64) (bool, error)
@@ -57,25 +57,25 @@ func (s *Service) canSee(viewerID, targetID int64) (bool, error) {
 	return s.repo.IsFollowing(viewerID, targetID)
 }
 
-func (s *Service) Followers(viewerID, targetID int64) ([]*model.User, error) {
+func (s *Service) Followers(viewerID, targetID int64, limit, offset int) ([]*model.User, error) {
 	if err := s.guard(viewerID, targetID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListFollowers(targetID)
+	return s.repo.ListFollowers(targetID, limit, offset)
 }
 
-func (s *Service) Following(viewerID, targetID int64) ([]*model.User, error) {
+func (s *Service) Following(viewerID, targetID int64, limit, offset int) ([]*model.User, error) {
 	if err := s.guard(viewerID, targetID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListFollowing(targetID)
+	return s.repo.ListFollowing(targetID, limit, offset)
 }
 
-func (s *Service) UserPosts(viewerID, targetID int64) ([]*model.Post, error) {
+func (s *Service) UserPosts(viewerID, targetID int64, limit, offset int) ([]*model.Post, error) {
 	if err := s.guard(viewerID, targetID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListUserPosts(targetID, viewerID)
+	return s.repo.ListUserPosts(targetID, viewerID, limit, offset)
 }
 
 func (s *Service) guard(viewerID, targetID int64) error {
@@ -89,8 +89,8 @@ func (s *Service) guard(viewerID, targetID int64) error {
 	return nil
 }
 
-func (s *Service) AllUsers(viewerID int64) ([]*model.User, error) {
-	return s.repo.ListAllUsers(viewerID)
+func (s *Service) AllUsers(viewerID int64, limit, offset int) ([]*model.User, error) {
+	return s.repo.ListAllUsers(viewerID, limit, offset)
 }
 
 func (s *Service) PendingRequests(userID int64) ([]*repository.PendingFollowRequest, error) {

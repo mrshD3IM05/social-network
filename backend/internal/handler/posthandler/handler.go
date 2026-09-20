@@ -44,7 +44,8 @@ func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	posts, err := h.Service.ListVisible(viewerID)
+	limit, offset := common.Page(r)
+	posts, err := h.Service.ListVisible(viewerID, limit, offset)
 	if err != nil {
 		http.Error(w, "could not list posts", http.StatusInternalServerError)
 		return

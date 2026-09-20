@@ -17,7 +17,7 @@ type Repository interface {
 	GetPost(int64) (*model.Post, error)
 	UpdatePostOwned(*model.Post, int64) error
 	DeletePostOwned(int64, int64) error
-	ListVisiblePosts(int64) ([]*model.Post, error)
+	ListVisiblePosts(int64, int, int) ([]*model.Post, error)
 	CanViewPost(int64, int64) (bool, error)
 	LoadPostReactions(*model.Post, int64) error
 	GetReaction(string, int64, int64) (*model.Reaction, error)
@@ -79,8 +79,8 @@ func (s *Service) Delete(ownerID, postID int64) error {
 	}
 	return nil
 }
-func (s *Service) ListVisible(viewerID int64) ([]*model.Post, error) {
-	return s.repo.ListVisiblePosts(viewerID)
+func (s *Service) ListVisible(viewerID int64, limit, offset int) ([]*model.Post, error) {
+	return s.repo.ListVisiblePosts(viewerID, limit, offset)
 }
 
 func (s *Service) React(viewerID, postID int64, reaction string) (*model.ReactionSummary, error) {
