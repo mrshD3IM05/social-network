@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"time"
+
 	"sn-backend/internal/db/sqlite"
 	"sn-backend/internal/handler"
 	"sn-backend/internal/middleware"
@@ -11,11 +14,19 @@ import (
 )
 
 func main() {
-	if err := sqlite.InitDB("sn.db"); err != nil {
+	databasePath := os.Getenv("DB_PATH")
+	if databasePath == "" {
+		databasePath = "sn.db"
+	}
+	if err := sqlite.InitDB(databasePath); err != nil {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	server.RegisterRoutes(mux, handler.New(repository.New(sqlite.DB)))
+	repo := repository.New(sqlite.DB)
+	handlers := handler.New(repo)
+	server.RegisterRoutes(mux, handlers)
+	server.RegisterRoutesExtra(mux, repo, handlers)
+	server.StartSessionCleanup(repo, time.Hour)
 	err := http.ListenAndServe(":8080", middleware.RateLimit(mux))
 	if err != nil {
 		panic(err)
