@@ -16,12 +16,14 @@ import (
 var DB *sql.DB
 
 func InitDB(path string) error {
-	db, err := Open(path)
-	if err != nil {
+	// Migrations run first, on their own connection, before the pool that
+	// serves requests is opened with foreign keys on.
+	if err := Migrate(path); err != nil {
 		return err
 	}
 
-	if err := Migrate(db); err != nil {
+	db, err := Open(path)
+	if err != nil {
 		return err
 	}
 
@@ -72,7 +74,16 @@ func verifyForeignKeys(db *sql.DB) error {
 	return nil
 }
 
-func Migrate(db *sql.DB) error {
+// Migrate applies the embedded migrations. It uses its own connection with
+// foreign keys switched off: some migrations rebuild a table by dropping it,
+// and with enforcement on that would cascade into rows that reference it.
+func Migrate(path string) error {
+	db, err := sql.Open("sqlite3", path+"?_foreign_keys=off")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
 	source, err := migrateiofs.New(migrations.FS, "sqlite")
 	if err != nil {
 		return err
