@@ -38,6 +38,9 @@ func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, 
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
 	}
+	if len(content) > MaxContentLength {
+		return nil, ErrContentTooLong
+	}
 	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy}
 	if err := s.repo.CreatePost(post); err != nil {
 		return nil, err
@@ -47,6 +50,9 @@ func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, 
 func (s *Service) Update(ownerID, postID int64, content, privacy string) (*model.Post, error) {
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
+	}
+	if len(content) > MaxContentLength {
+		return nil, ErrContentTooLong
 	}
 	post := &model.Post{ID: postID, Content: content, Privacy: privacy}
 	if err := s.repo.UpdatePostOwned(post, ownerID); err != nil {
