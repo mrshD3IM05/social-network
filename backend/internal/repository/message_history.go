@@ -69,17 +69,20 @@ func (r *Repository) ListConversation(userID, otherID int64, limit int, before *
 // private message with, most recent first.
 func (r *Repository) ListConversations(userID int64) ([]*Conversation, error) {
 	rows, err := r.db.Query(
+		// The inner query names the other participant of each message, then keeps
+		// the newest message id per participant. Ids grow with time, so the
+		// highest id in a conversation is its last message.
 		`SELECT `+followUserColumns+`,
 		        m.id, m.from_user_id, m.to_user_id, m.group_id, m.content, m.created_at
-		 FROM messages m
-		 JOIN users u ON u.id = CASE WHEN m.from_user_id = ? THEN m.to_user_id ELSE m.from_user_id END
-		 WHERE m.group_id IS NULL AND (m.from_user_id = ? OR m.to_user_id = ?)
-		   AND m.id = (
-			SELECT MAX(m2.id) FROM messages m2
-			WHERE m2.group_id IS NULL
-			  AND ((m2.from_user_id = m.from_user_id AND m2.to_user_id = m.to_user_id)
-			    OR (m2.from_user_id = m.to_user_id AND m2.to_user_id = m.from_user_id))
-		   )
+		 FROM (
+			SELECT CASE WHEN from_user_id = ? THEN to_user_id ELSE from_user_id END AS other_id,
+			       MAX(id) AS last_id
+			FROM messages
+			WHERE group_id IS NULL AND (from_user_id = ? OR to_user_id = ?)
+			GROUP BY other_id
+		 ) last
+		 JOIN messages m ON m.id = last.last_id
+		 JOIN users u ON u.id = last.other_id
 		 ORDER BY m.created_at DESC, m.id DESC`,
 		userID, userID, userID,
 	)
