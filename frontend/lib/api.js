@@ -29,6 +29,26 @@ export function apiDelete(path) {
   return request(path, { method: 'DELETE' })
 }
 
+// Same shape as apiPost, for the endpoints that replace a whole value
+// (PUT) or change only the fields you send (PATCH).
+export function apiPut(path, data = {}) {
+  return request(path, { method: 'PUT', body: toForm(data) })
+}
+
+export function apiPatch(path, data = {}) {
+  return request(path, { method: 'PATCH', body: toForm(data) })
+}
+
+// An array value is sent as a repeated field, which is how the Go API reads lists
+function toForm(data) {
+  const form = new URLSearchParams()
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) value.forEach(item => form.append(key, item))
+    else form.append(key, value)
+  }
+  return form
+}
+
 // For file uploads: pass a FormData object
 export function apiUpload(path, formData) {
   return request(path, { method: 'POST', body: formData })

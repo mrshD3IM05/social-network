@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // stops Next from writing extra generated files into the repo
+  agentRules: false,
   async rewrites() {
     return [
       {
