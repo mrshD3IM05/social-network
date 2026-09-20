@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { apiGet } from '@/lib/api'
 import { fetchPeople } from '@/lib/people'
 import { LIMITS } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
@@ -15,7 +14,9 @@ export default function PeoplePage() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    fetchPeople().catch(err => setError(err.message))
+    fetchPeople()
+      .then(setPeople)
+      .catch(err => setError(err.message))
   }, [])
 
   // keep only the people whose name contains the search text
@@ -29,7 +30,7 @@ export default function PeoplePage() {
 
   return (
     <>
-      <PageHeader label="Directory" title="People" subtitle="Everyone who appears in your feed." />
+      <PageHeader label="Directory" title="People" subtitle="Everyone on the network." />
 
       <div className="search">
         <Icon name="search" />
@@ -46,7 +47,7 @@ export default function PeoplePage() {
       {shown(people).length === 0 && !error && (
         <div className="empty">
           <p className="empty-title">No one found</p>
-          <p>People show up here once their posts are in your feed.</p>
+          <p>Nobody matches that search.</p>
         </div>
       )}
 
@@ -56,7 +57,7 @@ export default function PeoplePage() {
             <Avatar user={person} size={44} />
             <span className="list-text">
               <strong>{person.first_name} {person.last_name}</strong>
-              <small>@{person.nickname}</small>
+              {person.nickname && <small>@{person.nickname}</small>}
             </span>
             <Icon name="arrow" size={16} />
           </Link>
