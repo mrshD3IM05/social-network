@@ -7,6 +7,7 @@ import (
 
 	handlers "sn-backend/internal/handler"
 	"sn-backend/internal/handler/commenthandler"
+	"sn-backend/internal/handler/common"
 	"sn-backend/internal/handler/messagehandler"
 	"sn-backend/internal/handler/notificationhandler"
 	"sn-backend/internal/handler/posthandler"
@@ -52,6 +53,11 @@ func RegisterRoutesExtra(mux *http.ServeMux, repo *repository.Repository, h *han
 	notifications := notificationhandler.New(notificationsvc.New(repo), sessions)
 	messages := messagehandler.New(messagesvc.New(repo), sessions)
 	audience := posthandler.NewAudience(postsvc.NewAudience(repo), sessions)
+
+	// health, for the container healthcheck (no session needed)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		common.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 
 	// people and profiles
 	mux.Handle("GET /users", auth.Authorized(http.HandlerFunc(social.Users)))
