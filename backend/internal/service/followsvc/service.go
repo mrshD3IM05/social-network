@@ -21,7 +21,10 @@ type Repository interface {
 	UpdateFollowStatus(int64, string) error
 	DeleteFollow(int64, int64) error
 }
-type Service struct{ repo Repository }
+type Service struct {
+	repo     Repository
+	notifier Notifier
+}
 
 func New(repo Repository) *Service { return &Service{repo: repo} }
 func (s *Service) Follow(from, to int64) (*model.FollowRequest, error) {
@@ -45,12 +48,22 @@ func (s *Service) Follow(from, to int64) (*model.FollowRequest, error) {
 			return nil, err
 		}
 		existing.Status = status
+		if status == model.FollowPending {
+			s.notifyFollowRequest(existing)
+		}
 		return existing, nil
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
-	return s.repo.CreateFollowRequest(from, to, status)
+	created, err := s.repo.CreateFollowRequest(from, to, status)
+	if err != nil {
+		return nil, err
+	}
+	if created.Status == model.FollowPending {
+		s.notifyFollowRequest(created)
+	}
+	return created, nil
 }
 func (s *Service) Unfollow(from, to int64) error { return s.repo.DeleteFollow(from, to) }
 func (s *Service) Respond(recipient, requestID int64, status string) error {
@@ -64,5 +77,11 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 	if follow.Status != model.FollowPending {
 		return ErrExists
 	}
-	return s.repo.UpdateFollowStatus(requestID, status)
+	if err := s.repo.UpdateFollowStatus(requestID, status); err != nil {
+		return err
+	}
+	if status == model.FollowAccepted {
+		s.notifyFollowAccepted(follow)
+	}
+	return nil
 }
