@@ -9,6 +9,7 @@ export const LIMITS = {
   password: { min: 8, max: 72 }, // bcrypt ignores anything past 72 characters
   aboutMe: 500,
   post: 1000,
+  comment: 2000,        // same limit as the API (internal/service/commentsvc)
   message: 1000,
   search: 50,
   groupTitle: 100,       // same limit as the API (internal/service/groupsvc)

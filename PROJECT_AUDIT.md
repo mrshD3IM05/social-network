@@ -1,9 +1,8 @@
-# PROJECT_AUDIT.md
+# PROJECT AUDIT — Social Network vs. subject.md
 
-**Project:** Facebook-like social network (Go backend + Next.js frontend + SQLite)
-**Audited against:** `subject.md` (official subject)
-**Audit date:** 2026-09-18
-**Method:** Full source read (backend, frontend, migrations, Docker), feature tracing frontend → backend → database, `go build ./...` + `go vet ./...` executed (both clean).
+Audit date: 2026-09-21 · Branch `oualid` · Backend: Go 1.25 (module `sn-backend`) · Frontend: Next.js 16 / React 19 · DB: SQLite (golang-migrate, embedded)
+
+Method: every backend `.go` file (40), every migration (18 versions × up/down), every frontend page/component, `compose.yml`, both Dockerfiles, both Caddyfiles and `backend/readme.md` were read in full. `go build ./...` and `go vet ./...` pass with no errors. Nothing below is inferred from file names alone; each claim cites the code that proves it.
 
 ---
 
@@ -30,335 +29,362 @@
 19. [Architecture audit](#19-architecture-audit)
 20. [Missing requirements](#20-missing-requirements)
 21. [Partially implemented requirements](#21-partially-implemented-requirements)
-22. [Extra features](#22-extra--not-required)
+22. [Extra / not required](#22-extra--not-required)
 23. [Final compliance table](#23-final-compliance-table)
 24. [Final summary](#24-final-summary)
 
-Legend: ✅ implemented · ⚠️ partial · ❌ missing · 🔴 implemented but buggy
+Status legend: ✅ IMPLEMENTED · 🟡 PARTIALLY IMPLEMENTED · ❌ MISSING · 🔴 ERROR/BUG · ➕ EXTRA
 
 ---
 
 ## 1. Requirements checklist
 
-| # | Requirement (subject) | Status | Where |
+| # | Subject requirement | Status | Evidence / problem |
 |---|---|---|---|
-| 1 | JS framework used (frontend) | ✅ | Next.js 16 App Router, `frontend/` |
-| 2 | HTML/CSS/JS, responsiveness, performance | ✅ | `globals.css` (mobile breakpoint), client components |
-| 3 | Backend with sessions + cookies | ✅ | `sessionsvc`, `middleware/auth.go` |
-| 4 | Image handling JPEG/PNG/GIF, stored files | ✅ | `filesvc`, `filehandler`, `files` table |
-| 5 | WebSocket real-time | ✅/🔴 | `websocket/hub.go` (works in dev; broken behind proxy, BUG-003) |
-| 6 | SQLite + migrations run at startup | ✅ | `db/sqlite/sqlite.go`, embedded migrations |
-| 7 | Two Docker images (backend, frontend) | ✅ | `backend/Dockerfile`, `frontend/Dockerfile`, `compose.yml` |
-| 8 | Registration: email, password, first/last name, DOB | ✅ | `authsvc.Register` |
-| 9 | Registration: avatar, nickname, about-me **present but optional** | ⚠️ | Nickname is *required* (BUG-005); no avatar input in form (BUG-012/§20) |
-| 10 | Stay logged in, logout available at all times | ✅ | 30-day cookie; logout in navbar |
-| 11 | Follow / unfollow, accept / decline requests | ✅ backend / ⚠️ UI | `followsvc`; no UI or list endpoint for pending requests (BUG-008) |
-| 12 | Public profile ⇒ auto-follow (no request) | ✅ | `followsvc.Follow` |
-| 13 | Profile: all register info (minus password) | ⚠️ | `common.PublicUser` omits email + DOB (BUG-011) |
-| 14 | Profile: user activity, own posts | ⚠️ | Feed filtered client-side in `profile/[id]/page.jsx` |
-| 15 | Profile: followers + following lists | ❌ | No endpoint, no UI |
-| 16 | Public/private profiles + visibility rules | ✅ | `usersvc.CanViewProfile`, `GET /user/{id}` 403 |
-| 17 | Toggle own profile public/private | ❌ | No endpoint, no UI (BUG-007) |
-| 18 | Posts: create with image or GIF | ✅ | `POST /posts` + `POST /files?post_id=` |
-| 19 | Posts: public / almost-private / private | ✅/✅/🔴 | `private` posts broken — `post_visibility` never written (BUG-001) |
-| 20 | Comments on posts (with image/GIF) | ❌ | No endpoints, no UI (table exists) |
-| 21 | Groups: create, invite, accept/refuse | ✅ | `groupsvc` (12 endpoints) |
-| 22 | Members can invite; join requests; creator accepts/refuses | ✅ | `groupsvc` |
-| 23 | Browse all groups section | ✅ backend / ❌ UI | `GET /groups` exists; `groups/page.jsx` is a "coming soon" placeholder |
-| 24 | Group posts + comments, member-only visibility | ❌ | `posts.group_id` never set; no endpoints/UI |
-| 25 | Group events (title/desc/date, going/not-going) | ❌ | Tables exist; zero code uses them |
-| 26 | Private chat with follow-relationship rule | ✅ | `repository.CanMessage` |
-| 27 | Real-time delivery over WebSocket | 🔴 | Works only when backend is on port 8080 of the hostname (BUG-003) |
-| 28 | Emojis in chat | ⚠️ | Unicode text passes through; no emoji picker |
-| 29 | Group chat room (members only) | ⚠️ | Backend branch complete; no UI, no history endpoint |
-| 30 | Notifications visible on **every page** | ❌ | Only `/notifications` page, realtime-only; no navbar badge |
-| 31 | Notification: follow request (private profile) | ❌ | Nothing creates it (BUG-006) |
-| 32 | Notification: group invitation | ✅ | `groupsvc.notify` → `notifications` + WS push |
-| 33 | Notification: join request to group creator | ✅ | Same |
-| 34 | Notification: event created for members | ❌ | No events exist |
-| 35 | Notifications separate from private messages | ✅ | Distinct `{"type":"notification"}` WS event |
+| 1 | JS framework for frontend | ✅ | Next.js 16 App Router used genuinely (pages, layouts, client components). `frontend/` |
+| 2 | HTML/CSS/JS frontend, responsive | ✅ | `frontend/app/globals.css` (532 lines, `@media (max-width: 860px)` mobile layout) |
+| 3 | Go backend web server | ✅ | `backend/cmd/server/main.go`, `internal/server/server.go` (31 routes) |
+| 4 | Sessions & cookies | ✅ | `internal/service/sessionsvc`, cookie `session` HttpOnly SameSite=Lax, 30-day TTL, DB-backed |
+| 5 | Images: JPEG/PNG/GIF, stored, served | ✅ | `internal/service/filesvc`, `internal/handler/filehandler`, `GET /fs/{id}` |
+| 6 | WebSocket for real time | ✅ (core) | `internal/websocket/hub.go` (gorilla/websocket) — see §16 for caveats |
+| 7 | SQLite | ✅ | `internal/db/sqlite/sqlite.go`, WAL + FK pragmas |
+| 8 | Migrations create tables on every run | ✅ | `go:embed sqlite/*.sql` + golang-migrate `m.Up()` in `sqlite.go` |
+| 9 | Two Docker images (backend, frontend) | 🟡 | Both Dockerfiles exist, but the pair cannot talk to each other as configured — BUG-009/010 |
+| 10 | Registration fields (email, password, first/last name, DOB required; avatar/nickname/about optional) | 🟡 | Nickname is *required* (authsvc + register form); avatar field absent from form; about_me present |
+| 11 | Stay logged in until logout; logout always available | ✅ | 30-day cookie + `POST /logout` in navbar (`Navbar.jsx`) |
+| 12 | Follow / unfollow / request / accept / decline | 🟡 | API complete (`followsvc`), but no way to *list* pending requests and no notification → flow dead-ends |
+| 13 | Public profile auto-follow bypass | ✅ | `followsvc.Follow` sets status `accepted` when `target.Private == false` |
+| 14 | Profile: user info | ✅ | `GET /user/{id}` → `common.PublicUser` (no password) |
+| 15 | Profile: user activity | ❌ | No endpoint, no UI |
+| 16 | Profile: user's posts | 🟡 | Profile page filters the global feed client-side; no per-user posts endpoint |
+| 17 | Profile: followers & following lists | ❌ | No endpoints, no UI |
+| 18 | Public vs private profile visibility rules | ✅ | `usersvc.CanViewProfile` + 403 in `userhandler.GetUser` |
+| 19 | Toggle own profile public/private | ❌ | `users.private` column and `repo.UpdateUser` exist, but no route/handler/UI exposes the toggle |
+| 20 | Posts: create with image/GIF | ✅ | `POST /posts` + `POST /files` (post_id), `PostForm.jsx` |
+| 21 | Posts: public / almost-private / private | 🟡 | `public` and `almost_private` enforced in SQL; `private` uses `post_visibility` which is **never populated** and no UI to pick followers |
+| 22 | Comments on posts (with image/GIF) | ❌ | `comments` table exists (migration 3/14), zero Go code, zero UI |
+| 23 | Groups: create (title, description) | ✅ | `groupsvc.Create`, `POST /groups` |
+| 24 | Groups: invite / accept / refuse invitation, members invite | ✅ | `groupsvc.Invite/RespondInvitation`, transactional accept |
+| 25 | Groups: join request, creator accepts/refuses | ✅ | `groupsvc.RequestJoin/RespondJoinRequest`, creator-only checks |
+| 26 | Groups: browse all groups | ✅ | `GET /groups` → `GroupListPayload` |
+| 27 | Group posts visible to members only | ❌ | `posts.group_id` exists but no create/list path; `ListVisiblePosts` explicitly filters `group_id IS NULL` |
+| 28 | Group comments | ❌ | Same as #22 |
+| 29 | Group events (title/description/day-time/going/not going) | ❌ | `group_events` + `event_responses` tables exist (migration 6), zero Go code, zero UI |
+| 30 | Private chat: follow-relationship rule | 🟡 | `CanMessage` allows messaging **any public-profile user** with no relationship — broader than subject |
+| 31 | Private chat: real-time delivery + persistence | 🟡 | Live delivery ✅, persisted to `messages` ✅, but **no history endpoint** and UI says "not saved when you reload" |
+| 32 | Chat emojis | ✅ | Plain-text UTF-8 over WS; emoji typeable (no picker — cosmetic) |
+| 33 | Group chat room, members only | 🟡 | Backend fully supports `group_id` messages with member check; **no frontend UI** |
+| 34 | Notifications visible on every page | ❌ | No global component/badge; only a live-only `/notifications` page |
+| 35 | Notification: private-profile follow request | ❌ | `followsvc` never creates a notification |
+| 36 | Notification: group invitation | ✅ | `groupsvc.Invite` → `notify()` |
+| 37 | Notification: join request to creator | ✅ | `groupsvc.RequestJoin` → `notify()` |
+| 38 | Notification: event created for members | ❌ | Events don't exist |
+| 39 | Notifications ≠ private messages (displayed differently) | 🟡 | Separate page/type exists, but page is ephemeral (live-only) |
+| 40 | Docker: containers start from clean environment | 🔴 | Builds fine, but frontend container cannot reach backend (`localhost:8080` rewrite) and WS bypasses the proxy |
 
 ---
 
 ## 2. Frontend audit
 
-**Framework:** Next.js (`^16.3.4`) with React 19, App Router, `frontend/package.json`. Genuinely used — routing (`app/`), layouts (`(auth)`, `(main)` route groups), client components (`'use client'`), `next/link`, `next/navigation`. This is a real framework usage, not a library.
+**Framework.** Next.js `^16.3.4` + React `^19.2.8` (`frontend/package.json`). Genuinely used: App Router file-based routes (`app/(main)/…`, `app/(auth)/…`), layouts, client components, `useRouter/useParams/usePathname`, route groups, `not-found.jsx`. This satisfies "you must use a JS framework".
 
-**Pages found:**
+**Structure.** 8 pages: home feed, people, groups (list + detail), chat (list + conversation), notifications, settings, profile, login/register, plus 8 reusable components (`Navbar`, `PostCard`, `PostForm`, `GroupCard`, `Modal`, `Avatar`, `CharCount`, `Icon`, `PageHeader`). Shared API helpers in `lib/api.js` and validation in `lib/validate.js` mirroring the Go rules (good duplication-with-a-purpose, documented as such).
 
-| Route | File | State |
-|---|---|---|
-| `/` | `app/page.jsx` | redirect to `/home` |
-| `/login`, `/register` | `app/(auth)/…` | ✅ complete, validated |
-| `/home` | `app/(main)/home/page.jsx` | feed + composer |
-| `/profile/[id]` | `app/(main)/profile/[id]/page.jsx` | profile + posts (filtered client-side) |
-| `/people` | `app/(main)/people/page.jsx` | client-side search over feed authors |
-| `/groups` | `app/(main)/groups/page.jsx` | **static "Coming soon" placeholder — no functionality** |
-| `/notifications` | `app/(main)/notifications/page.jsx` | realtime-only list, no history |
-| `/settings` | `app/(main)/settings/page.jsx` | avatar change; account details read-only |
-| `/chat`, `/chat/[id]` | `app/(main)/chat/…` | private chat (live-only) |
-| 404 | `app/not-found.jsx` | ✅ |
+**Navigation.** Sidebar with 6 links, active-link highlighting via `usePathname`, `/` redirects to `/home`, `(main)/layout.jsx` guards by calling `/me` and redirecting to `/login` on 401.
 
-**Communication:** `lib/api.js` centralizes fetch with `credentials: 'include'`; `/api/v1` prefix. In dev, `next.config.js` rewrites `/api/v1/*` → `http://localhost:8080/*`. In Docker, Caddy routes `/api/v1/*` → `backend:8080`.
+**Responsiveness.** `globals.css` line 508: `@media (max-width: 860px)` converts sidebar to a sticky top bar, single-column auth grid, full-width buttons. Present and reasonable.
 
-**Responsiveness:** `globals.css` has a real `@media (max-width: 860px)` block (sidebar becomes a top bar, grids collapse). ✅
+**Frontend↔backend communication.** All HTTP goes through `/api/v1` prefix; `next.config.js` rewrites to `http://localhost:8080`. `credentials: 'include'` everywhere, so the session cookie flows. WebSockets bypass the rewrite and hardcode `ws://${hostname}:8080/api/v1/ws` (see BUG-009).
 
-**Navigation:** `components/Navbar.jsx` sidebar with active-link highlighting, logout button. ✅
+**UI coverage of subject features present:** register/login, feed + post composer with privacy selector and image attach, reactions, profile card with follow/unfollow/message buttons and "private profile" locked state, groups browse/create/invite/join-request flows, 1:1 live chat, live notifications page, settings (avatar upload, read-only account details).
 
-**Performance / obvious issues**
+**UI gaps vs subject:** no comment UI (none exists server-side), no group post/event UI, no follower lists, no profile-privacy toggle, no private-post audience picker, no follow-request inbox, no group-chat room UI.
 
-- `/home` fetches *all* posts then renders all — no pagination anywhere (backend admits this in `backend/readme.md`).
-- `people/page.jsx` and `chat/page.jsx` duplicate the same "derive people from feed posts" logic.
-- Profile page derives "user's posts" by fetching the whole feed and filtering — an N-posts endpoint would be correct.
-- Two pages open **two separate WebSockets** (`chat/[id]` and `notifications`); no shared socket or reconnect logic (the docs/WEBSOCKET-PROTOCOL.md describes reconnection with backoff — **not implemented**).
+**Performance notes (minor).**
+- `lib/people.js` derives the "people" list by downloading the *entire* feed (`/posts`) and de-duplicating authors. Works, but scales poorly and means users who never posted are invisible to People/Chat/Invite pickers.
+- `profile/[id]/page.jsx` loads the whole feed to filter one author's posts (no per-user endpoint).
 
-**Missing UI for existing backend endpoints:** group browsing/creation/invitations/join-requests, accept/decline follow requests, public/private profile toggle, group chat, events, selected-followers picker, notification history/badge.
+**Cannot be verified from the provided source code:** actual rendering in a browser; visual responsiveness beyond the CSS present.
 
 ---
 
 ## 3. Backend audit
 
-**Server & structure:** `cmd/server/main.go` → `http.ListenAndServe(":8080", middleware.RateLimit(mux))`, routes in `internal/server/server.go`. Layered: `middleware → handler → service → repository → sqlite`, with the WS hub beside it (`backend/readme.md` matches reality).
+**Architecture.** Clean layering, matching `backend/readme.md`:
 
-**Routes (all registered, verified against handlers):**
+```
+middleware (rate limit, auth) → handler → service → repository → SQLite
+websocket hub ↘ repository (direct)
+```
 
-- Auth: `POST /register` (Guest), `POST /login` (Guest), `POST /logout`, `GET /me`
-- Users: `GET /user/{id}`, `POST|DELETE /users/{id}/follow`, `POST /follow-requests/{id}/accept|decline`
-- Posts: `GET|POST /posts`, `PUT|DELETE /posts/{id}`, `POST|DELETE /posts/{id}/reactions`
-- Files: `POST /files`, `POST /avatar`, `GET /fs/{id}`
-- Groups: 12 routes (create, list, detail, members, invitations, join-requests + responses)
-- WS: `GET /ws`
+- `cmd/server/main.go` — `sqlite.InitDB("sn.db")` → `repository.New` → `server.RegisterRoutes` → `:8080`.
+- `internal/server/server.go` — 31 routes on Go 1.22+ method-pattern mux (`"POST /posts/{id}/reactions"`).
+- Repositories: raw `database/sql` with **only** parameterized queries (`?` placeholders everywhere — no string-built SQL found).
+- Services: pure business logic behind small `Repository` interfaces (dependency-injection friendly, easy to mock).
+- Handlers: parse form/path, map service errors to status codes via `common` / `writeError`.
+- Error handling: consistent `http.Error` flat-text bodies; `repository.ErrNotFound/ErrExists/ErrNotOwner` sentinel errors mapped to 404/409/403.
 
-**Middleware:** rate limiting (per-IP window) + `Authorized`/`Guest` session checks. Note: rate limit constant is **1000/min** (`rate_limit.go`), the `X-RateLimit-Limit` header says **100**, and the readme says 100/min — inconsistent (BUG-013).
+**Route inventory (server.go):** auth (register/login/logout/me), user (get/follow/unfollow/respond), posts (CRUD + reactions), files (upload/avatar/download), groups (create/list/detail/members/invitations/join-requests/respond), `GET /ws`.
 
-**Error handling:** consistent `http.Error` flat-text style; handlers map sentinel errors → 400/401/403/404/409/500. Group flows are the most rigorous (errors re-checked inside transactions).
+**Middleware.**
+- `middleware/auth.go` — `Authorized` (401 without valid session) and `Guest` (403 when already authenticated) — applied consistently to every route, including `/ws`.
+- `middleware/rate_limit.go` — per-IP fixed-window limiter, **extra** feature. Bugs noted (BUG-017, BUG-021).
 
-**Authorization:** every handler resolves the user from the session cookie, never from the body. Object-level checks verified: post update/delete are `WHERE author_id = ?`; invitation/join-request responses re-verify ownership inside the DB transaction; group membership/creator checks present; file serving has a visibility query.
+**Gaps.** No endpoint for: comments, group posts, group events, notification listing, message history, follow-request listing, followers/following lists, profile update/privacy toggle, per-user posts. Several of these are subject requirements — see §20.
 
-**Known gaps:** no comments endpoints, no group posts, no events, no notification list/read endpoints, no "list my pending follow requests", no profile-update/privacy-toggle endpoint, no message-history endpoint. See §20.
-
-`go build ./...` and `go vet ./...` pass.
+**README drift (backend/readme.md).** Claims `GET /users` returns 501 (route not registered at all), claims follow-request notifications over WS (not implemented), claims rate limit of 100/min (code enforces 1000). Treat the README as aspirational in those spots.
 
 ---
 
 ## 4. Authentication audit
 
-| Item | Status | Evidence |
+| Requirement | Status | Evidence |
 |---|---|---|
-| Registration required fields (email, password, first/last, DOB) | ✅ | `authsvc.validateRegisterInput` (regexes, 13+ age check) |
-| Nickname optional | ❌ | **Required** by backend and frontend — contradicts subject (BUG-005) |
-| Avatar/Nickname/About-me "present but skippable" | ⚠️ | About-me ✅ optional; nickname forced; **avatar field absent from the register form** (only `POST /avatar` after login) |
-| Password handling | ✅ | bcrypt `GenerateFromPassword`/`CompareHashAndPassword`, hash never serialized (responses use `common.PublicUser`/`PrivateUser` maps) |
-| Login | ✅ | By email **or** nickname; generic "invalid email or password" (no enumeration) |
-| Sessions | ✅ | 32 random bytes (`crypto/rand`), stored in `sessions`, 30-day expiry, expiry checked on read |
-| Cookies | ✅ | `HttpOnly`, `SameSite=Lax`, `Path=/` (no `Secure` — fine for the HTTP-only deployment, would need it for HTTPS) |
-| Logout | ✅/🔴 | Deletes session, clears cookie; **but does not actually close the session's WebSockets** — `RevokeSessionClients` iterates a map that is never populated (BUG-004), contradicting the readme |
-| Stay logged in | ✅ | Cookie + session; `(main)/layout.jsx` gate via `GET /me` |
-| `Guest` middleware | ✅ | Logged-in users cannot re-register/login (403) |
+| Registration with email/password/first/last/DOB | ✅ | `authsvc.Register` + `validateRegisterInput` (regex email, DOB parse `2006-01-02`, no future dates) |
+| Nickname optional | 🔴 BUG-018 | `authsvc`: nickname **required**; frontend `register/page.jsx` marks it required too. Subject lists it as optional |
+| Avatar optional in form | 🔴 BUG-019 | Register form has **no avatar input**; backend reads `avatar` as a plain form *string* (a file ID, not an upload) — avatar can only be set later via `POST /avatar` |
+| About me optional | ✅ | Optional both sides |
+| Password storage | ✅ | bcrypt `GenerateFromPassword`/`CompareHashAndPassword` (`authsvc`); hash never serialized to clients (`common.PublicUser/PrivateUser` omit it) |
+| Sessions | ✅ | 32 random bytes (`crypto/rand`), stored in `sessions` table, 30-day TTL, expiry checked on every `Get`, expired rows deleted |
+| Cookies | ✅ | `session` cookie: `HttpOnly`, `SameSite=Lax`, `Path=/`; cleared with `MaxAge=-1` on logout. No `Secure` flag (BUG-023) |
+| Stay logged in | ✅ | Persistent cookie + DB session; `(main)/layout.jsx` restores user via `/me` |
+| Logout available at all times | ✅ | Navbar logout button on every page → `POST /logout` → session deleted, cookie cleared |
+| Login with email or nickname | ➕ | `authsvc.Login` accepts either identifier (not required by subject; harmless) |
+| Authorization model | ✅ | Every route wrapped in `Authorized`; per-object checks in services (`ErrNotRecipient`, `ErrNotGroupCreator`, owner-only post update/delete) |
 
-Note: register responds `201` and immediately creates a session — good UX, not required by subject.
+Guest-only enforcement on `/register` and `/login` (403 when a cookie is presented) is slightly stricter than the subject but coherent.
 
 ---
 
 ## 5. Followers audit
 
-**Backend flow (`followsvc/service.go`, `repository/follow.go`):**
+Implemented in `internal/service/followsvc/service.go` on top of the `follow_requests` table (one row per (from,to), `status` = pending/accepted/declined — the table doubles as the follow graph, which is fine but the name is misleading).
 
-- `POST /users/{id}/follow` → if target `private = 0` → row inserted with `status='accepted'` (auto-follow ✅); if private → `status='pending'`.
-- Re-follow after decline re-activates the row; duplicate pending/accepted → 409.
-- `POST /follow-requests/{id}/accept|decline` → recipient-only check (`follow.ToUserID != recipient → 403`), only while pending.
-- `DELETE /users/{id}/follow` → deletes the row. Unfollow without following is a silent 204 (harmless).
-- `IsFollowing` (accepted only) is used for private-profile access and almost-private posts. Correct directionality everywhere (`from = viewer, to = author`).
-
-**Gaps:**
-
-- **No endpoint to list pending follow requests received by the current user** — the accept/decline endpoints are unusable from any UI because nobody can learn the request IDs (BUG-008).
-- **No notification when a follow request arrives** — explicitly required by the subject (BUG-006).
-- **No UI** for accept/decline (frontend only has Follow/Unfollow buttons on the profile page).
-- The readme's sequence diagram claims the WS hub notifies the target on follow — **not implemented** anywhere in `followsvc`.
+- **Send follow request** ✅ — `POST /users/{id}/follow`. Public target → row created/updated with `status=accepted` (auto-follow bypass ✅). Private target → `pending`.
+- **Accept / decline** ✅ at API level — `POST /follow-requests/{id}/accept|decline`; `Respond` verifies the caller is the recipient (`ErrNotRecipient`) and the request is still pending.
+- **Unfollow** ✅ — `DELETE /users/{id}/follow` deletes the row (so re-follow is possible — good).
+- **Privacy-aware visibility** ✅ — `usersvc.CanViewProfile` grants private-profile content only to accepted followers; `ListVisiblePosts` uses the same rule in SQL.
+- 🔴 **BUG-007/008 — the request flow dead-ends.** There is **no endpoint to list pending follow requests** for the recipient, and `followsvc` **never creates a notification** (the required notification for private-profile follow requests). The frontend has no request inbox. A recipient can only accept a request if they guess its numeric ID. Combined, private-profile following is not completable through the product.
+- 🟡 Frontend `profile/[id]/page.jsx` always renders both Follow and Unfollow buttons without knowing current relationship state (minor UX, API rejects duplicates with 409).
 
 ---
 
 ## 6. Profile audit
 
-- `GET /user/{id}` (`userhandler.GetUser`): returns `common.PublicUser` (id, first/last, avatar, nickname, about_me, private, created_at). **403 "profile is private"** when target is private and viewer doesn't follow — correct privacy rule, and private-profile 403 is what the frontend uses to render the locked card.
-- **Privacy leak check:** email, DOB, password never included in `PublicUser` ✅. Password hash also never serialized anywhere (models have JSON tags but responses are hand-built maps). ✅
-- **BUG-011 (Medium):** the subject says the profile shows *every* piece of register info except password — email and date of birth are missing from `GET /user/{id}` even for the owner (owner's own email only appears on `/me`).
-- **User activity / posts:** the frontend filters the whole feed by `author_id` — works for posts the viewer may see, but there is no dedicated "posts of user X respecting privacy" endpoint; a visitor who can see the profile sees only posts that also pass feed visibility. Acceptable approximation, marked partial.
-- **Followers / following lists:** ❌ nothing exists (subject requires displaying them).
-- **Toggle public/private:** ❌ `repository.UpdateUser` writes the `private` column but the only caller is `SetAvatar`; there is no endpoint and no settings UI (the settings page literally says "Editing these needs an API endpoint that does not exist yet").
+- **User information** ✅ — `GET /user/{id}` returns `common.PublicUser`: id, first/last name, avatar, nickname, about_me, private flag, created_at. **Password is never included** ✅, email/DOB only in `PrivateUser` (self) ✅.
+- **Visibility rules** ✅ — private profile → 403 `profile is private` unless the viewer follows the owner (`usersvc.CanViewProfile`). Own profile always visible.
+- **User activity** ❌ — nothing (no endpoint, no UI).
+- **Posts of the user** 🟡 — frontend filters `/posts` by `author_id`. Because the feed already applies privacy rules, this leaks nothing, but it misses posts the viewer may legitimately see only via other filters and is inefficient.
+- **Followers / following lists** ❌ — required by subject; no endpoints, no UI.
+- **Toggle public/private** ❌ — BUG-001. `users.private` (INTEGER, default 0) and `repo.UpdateUser` exist, but no route, handler or UI exposes the switch. Settings page literally says: *"Editing these needs an API endpoint that does not exist yet."* This is a headline subject requirement.
+- **Privacy-leak check** ✅ — group payloads go through `model.GroupCreator` (comment in `repository/group.go` documents that password/email/DOB never reach clients). `GET /user/{id}` on a private profile returns 403 rather than a redacted body — no partial leak.
 
 ---
 
 ## 7. Posts audit
 
-- **Create:** `POST /posts` (form `content`, `privacy`) → 201. Privacy validated against the three constants. Content length is *not* validated server-side (frontend caps 1000) — BUG-017.
-- **Images:** created separately via `POST /files` with `post_id`; only the post author may attach (`filesvc.Upload` checks `post.AuthorID != ownerID`); max 3 images/10 MB; served by `GET /fs/{id}` with per-viewer visibility. `Post.Images` hydrated from the `files` table. ✅
-- **public** — visible to all authenticated users (`ListVisiblePosts` condition). ✅
-- **almost_private** — visible when viewer follows the author (accepted follow). ✅ Correct direction.
-- **private** ("only the followers chosen by the creator") — 🔴 **BUG-001 (Critical):** visibility depends on rows in `post_visibility`, but **no code path ever inserts into that table**. There is no API to declare chosen followers and no UI to pick them. A `private` post is therefore visible only to its author, forever. The subject requirement is not satisfied.
-- **Update/Delete:** owner-only via `WHERE id = ? AND author_id = ?`, `RowsAffected` → 404. ✅
-- **Reactions:** extra feature (see §22), correctly gated by `CanViewPost`.
-- **Comments:** ❌ entirely missing — no handler/service/repository code, no endpoints, no UI. Only the `comments` table and the unused `files.comment_id` column exist. The subject explicitly requires creating comments with image/GIF.
-- **Group posts:** ❌ `posts.group_id` exists and `ListVisiblePosts` correctly excludes group posts (`WHERE p.group_id IS NULL`), but nothing can ever create one — `postsvc.Create` has no group parameter and no route accepts `group_id`.
+- **Create** ✅ — `POST /posts` (content, privacy ∈ {public, almost_private, private}; validated in `postsvc.validPrivacy`).
+- **Update/Delete own post** ➕ — owner-only (`UpdatePostOwned`/`DeletePostOwned` with `author_id` predicate). Not required by subject; harmless.
+- **Privacy enforcement** (`repository/post.go::postVisibleCondition`):
+  - public → everyone ✅
+  - almost_private → viewer has accepted follow **to the author** ✅
+  - private → row in `post_visibility` for (post, viewer) ✅ *in SQL*…
+- 🔴 **BUG-002 — private posts are unusable.** Nothing ever inserts into `post_visibility`: no endpoint accepts a list of chosen followers, `postsvc.Create` doesn't take one, the composer has no audience picker. A "private" post is therefore visible to its author only. The subject's "only the followers chosen by the creator" is not deliverable.
+- **Images/GIFs** ✅ — composer uploads up to 3 files to `POST /files` with `post_id`, images listed from `files` table (`ListPostFileIDs`), rendered via `GET /fs/{id}` with per-viewer visibility (`CanViewFile`). GIF accepted (`image/gif` in `allowedImageType`).
+- **Comments** ❌ — BUG-003. The `comments` table exists (created migration 000003, `image` column dropped in 000014) but there is no Go code, route, or UI. The subject requires commenting, with optional image/GIF, respecting post permissions. `model.ReactionTargetComment` and `files.comment_id` are vestiges of an abandoned start.
+- **Reactions** ➕ — like/dislike with toggle + summary (`repository/reaction.go`), properly gated by `CanViewPost`. Extra feature.
 
 ---
 
 ## 8. Groups audit
 
-The backend is the strongest part of the project (recently built; see `GROUPS_BACKEND_IMPLEMENTATION.md`, which matches the code):
+Backend `internal/service/groupsvc/service.go` + `internal/handler/grouphandler/handler.go` — the strongest part of the project.
 
-- **Create** (`POST /groups`): title ≤100 required, description ≤1000 optional; creator auto-inserted into `group_members`. ✅
-- **Browse** (`GET /groups`): all groups + `member_count`, `is_member`, `pending_join`, `is_creator`. Satisfies the subject's "browse through all groups" — **but only in the API; the groups page is a placeholder**.
-- **Detail** (`GET /groups/{id}`): members+creator see everything; invited/pending users get flags; everyone else 404 (anti-enumeration). Creator is projected through `GroupCreator` — no email/DOB/password leak. ✅
-- **Invitations**: members invite non-members; self-invite 400, unknown user 404, duplicate 409 (pre-check + `UNIQUE(group_id,to_user_id)` + `isUnique()` race mapping). Recipient-only accept/decline, re-validated **inside a transaction** (`AcceptGroupInvitationTx`), membership insert + status update atomic. ✅
-- **Join requests**: non-members only (creator can't request own group); creator-only pending list; creator-only accept/decline with the same transactional re-validation. ✅
-- **Notifications** on invite / join-request / accept — persisted to `notifications` and pushed live (`hub.PublishNotification`). ✅ (types: `group_invitation`, `group_join_request`, `group_invite_response`, `group_join_response`)
-- **Group posts/comments**: ❌ missing (see §7).
-- **Group events**: ❌ missing — `group_events` and `event_responses` tables (migration 000006) have **zero** references in Go code. Title/description/date-time/going/not-going are all unimplemented.
-- Known product quirk: after a decline, the `UNIQUE` pair constraint prevents a new invitation/request for the same (group,user) — permanent 409 (BUG-016).
+- **Create group (title + description)** ✅ — validation (title ≤100 chars, description ≤1000), creator auto-added to `group_members` ✅.
+- **Invite users** ✅ — any *member* can invite (`IsGroupMember` gate); rejects self-invite, unknown users, existing members, duplicates (409); invitation persisted in `group_invitations` with UNIQUE(group,to_user).
+- **Accept / refuse invitation** ✅ — `AcceptGroupInvitationTx` inserts membership **and** flips status inside one transaction; `RefuseGroupInvitationTx` refuses only pending + recipient-owned. Recipient-only enforced (`ErrNotOwner`).
+- **Join requests** ✅ — `POST /groups/{id}/join-requests` (non-members only, creator excluded); `GET /groups/{id}/join-requests` creator-only; `RespondJoinRequest` verifies `group.CreatorID == creatorID` before accepting/refusing, accept is transactional.
+- **Browsing** ✅ — `GET /groups` returns all groups with member_count, is_member, pending_join, is_creator (batched map lookups, no N+1).
+- **Group detail privacy** ✅ (design choice) — outsiders get 404 unless invited/pending (`groupsvc.Detail`), members list 403 for non-members.
+- **Notifications for invite / join-request / responses** ✅ — persisted via `CreateNotification` + live push `hub.PublishNotification`.
+- 🔴 **BUG-015** — after an invitation or join request is declined, the UNIQUE(group_id,to_user_id) constraint plus the service's "processed rows are history" logic make re-inviting / re-requesting impossible forever (returns 409). A declined user can never enter the group.
+- **Group posts** ❌ — BUG-004. `posts.group_id` column exists, but `CreatePost` never sets it, `ListVisiblePosts` filters `p.group_id IS NULL`, and there is no member-gated group-post route. The subject's "posts and comments only displayed to members of the group" is absent.
+- **Group comments** ❌ — same as post comments.
+- **Group events** ❌ — BUG-005. `group_events` (title/description/date_time) and `event_responses` (choice, UNIQUE(event,user)) are fully modeled in migration 000006 and then never touched by any Go code, route, or UI. Going/Not-going is entirely missing, as is the "event created" notification.
+- **Group chat** — backend ready, UI missing (§10).
 
 ---
 
 ## 9. Private chat audit
 
-- **Eligibility rule** (subject: "at least one of the users must be following the other", plus the public-profile exception): `repository.CanMessage` allows private messages when recipient `private = 0` **or** an accepted follow exists in either direction. Matches the subject exactly. ✅
-- **Real-time:** sender's message is persisted (`CreateMessage`) and pushed to recipient **and** echoed to sender (`hub.publish`). Multiple tabs per user supported (per-user client map). ✅ in dev.
-- **Delivery in the real deployment:** 🔴 BUG-003 — both chat pages hardcode `ws://${window.location.hostname}:8080/api/v1/ws`. Behind Caddy (host port **8000**) or in Docker (8080 not published), the socket cannot connect. Chat and live notifications only work when the backend is reachable at `hostname:8080` (dev).
-- **Persistence/conversations:** messages are stored in `messages`, but there is **no endpoint to fetch history** and the UI says "Messages are live only and are not saved when you reload." Data is saved yet unreachable — partial.
-- **Emojis:** no picker; UTF-8 emoji text survives the JSON round-trip, so emojis *work* but the feature is minimal. ⚠️
-- **Authorization on send:** enforced server-side (`CanMessage` before persist); failures produce `{"type":"error"}`. ✅
+- **Transport** ✅ — single WebSocket `GET /ws` (gorilla), cookie-authenticated before upgrade, per-user client map, sender echo, multiple tabs supported (map of clients per user ID).
+- **Persistence** 🟡 — messages are written to `messages` (`CreateMessage`) ✅, but there is **no endpoint to read history**; `chat/[id]/page.jsx` shows only messages received since page load and even prints *"Messages are live only and are not saved when you reload."* The data is stored; the feature (conversations) isn't retrievable. BUG-013.
+- **Authorization to send** 🔴 BUG-014 — subject: "at least one of the users must be following the other". `repository.CanMessage` allows messaging whenever `target.private = 0` **regardless of any follow relationship**, i.e. any user can DM any public-profile stranger. Broader than the spec.
+- **Delivery rule** — subject: recipient receives instantly if they follow the sender **or** the recipient has a public profile. The implementation just publishes to the recipient's connected clients whenever the send was allowed; combined with BUG-014 the effective behavior is "anyone public receives", which covers the subject's public-profile exception but not its restriction.
+- **Emojis** ✅ — content is arbitrary UTF-8 text; emojis work. No emoji picker (cosmetic).
+- **Conversations list** 🟡 — `/chat` derives contacts from feed authors (`fetchPeople`); no conversation-history basis.
+- **Error handling** ✅ — server emits `{"type":"error"}` for invalid payloads, non-permitted sends, and save failures; client displays it.
+- **Lifecycle** 🟡 — client closes socket on unmount; no auto-reconnect, no `onclose`/`onerror` UI state. Logout does **not** close sockets (BUG-011).
 
 ---
 
 ## 10. Group chat audit
 
-- **Backend:** the WS hub accepts `{"type":"message","group_id":X}`, checks membership via `CanMessage`, persists, and fans out to `GroupMemberIDs`. ✅ backend logic complete.
-- **Frontend:** ❌ no group chat UI exists (groups page is a placeholder), and there is no message-history endpoint, so even a hand-crafted client couldn't read the room's past messages.
-- Net status: **not usable end-to-end**; backend ready for a follow-up.
+- **Backend** ✅ — the hub accepts `{"type":"message","group_id":N,"content":…}`, `CanMessage` verifies sender membership in `group_members`, the message is persisted with `group_id`, and `GroupMemberIDs` fans the event out to every member (including the sender). The `messages` table CHECK constraint was rebuilt twice (migrations 000008, 000017) specifically to permit group rows (`to_user_id IS NULL`).
+- **Frontend** ❌ — no group chat room exists in the UI; `chat/[id]/page.jsx` is strictly 1:1 (`to_user_id`). The subject's "common chat room" is therefore not user-reachable. BUG-006.
+- **History** — same gap as private chat: nothing reads `messages` back.
 
 ---
 
 ## 11. Notifications audit
 
-- **Created today:** group invitations, join requests, and the two "response" variants (`groupsvc.notify` → `repository.CreateNotification` → `hub.PublishNotification`). Content strings are human-readable; `group_id` attached; failures logged, never roll back the group operation. ✅
-- **Not created:** follow-request notifications (subject-required ❌), event notifications (no events ❌).
-- **Visibility on every page:** ❌ The only consumer is `/notifications`, which builds its list **only from live WS events received while the page is open**. There is no `GET /notifications` endpoint, no unread badge on the navbar, and the `read` column is never updated. A notification that arrives while you're on another page is invisible.
-- **Separation from private messages:** ✅ distinct `{"type":"notification", ...}` vs `{"type":"message", ...}` WS events, distinct UI treatment.
-- `docs/WEBSOCKET-PROTOCOL.md` documents `follow_request`/`follow_accepted`/`group_event` notification types — **documentation only, not implemented**.
+- **Types implemented** (`model/group.go` consts): `group_invitation`, `group_join_request`, `group_invite_response`, `group_join_response`. Created in `groupsvc.notify()` → persisted in `notifications` → `hub.PublishNotification` pushes `{"type":"notification",…}` to the recipient's sockets in real time ✅.
+- **Required by subject but absent:**
+  - follow request on a private profile — `followsvc` has no notification code at all (❌ BUG-007);
+  - event creation for group members — no events (❌).
+- **Visible on every page** ❌ — the navbar has a bell *link*, but no badge/count/live feed; nothing通知-like renders on other pages. BUG-016.
+- **Separate from private messages** 🟡 — separate page and separate WS event type ✅, but the page is ephemeral: it only accumulates events received while open, and there is **no GET endpoint** for stored notifications, so the persisted rows are never displayed after a reload.
+- **Read/unread** — `notifications.read` column exists and is indexed, but nothing ever sets or filters on it; `model.Notification.Read` is only read back at insert.
+- **Recipient correctness** ✅ — each notification's `user_id` is the invitee / creator / inviter / requester as appropriate (verified per call site in `groupsvc`).
 
 ---
 
 ## 12. SQLite audit
 
-**Tables (16 app tables + `schema_migrations`):**
+Driver: `mattn/go-sqlite3`; opened in `db/sqlite/sqlite.go` with `PRAGMA foreign_keys=ON`, `journal_mode=WAL`, `busy_timeout=5000`. **Connection:** file `sn.db` in the working directory.
+
+**Actual schema (after migrations 000001–000018; snapshot also kept in `backend/schema.sql`):**
 
 ```
 users (id PK, email UNIQUE, password, first_name, last_name, date_of_birth,
        avatar, nickname, about_me, private, created_at)
- ├─< sessions (id PK, user_id FK→users CASCADE, expires_at)
- ├─< posts (author_id FK→users CASCADE, group_id FK→groups CASCADE NULL, privacy, content)
- │    ├─< post_visibility (PK(post_id,user_id), FKs CASCADE)          ← never written (BUG-001)
- │    ├─< comments (post_id FK, author_id FK)                          ← unused by app
- │    └─< files (id TEXT PK, owner FK CASCADE, post_id FK SET NULL,
- │              comment_id FK SET NULL, message_id FK SET NULL)
- ├─< follow_requests (from,to FKs CASCADE, status, UNIQUE(from,to))
- ├─< groups (creator_id FK→users CASCADE, title, description)
- │    ├─< group_members (PK(group_id,user_id), FKs CASCADE)
- │    ├─< group_invitations (FKs CASCADE, status, UNIQUE(group_id,to_user_id))
- │    ├─< group_join_requests (FKs CASCADE, status, UNIQUE(group_id,user_id))
- │    ├─< group_events (FKs CASCADE)                                   ← unused by app
- │    │    └─< event_responses (UNIQUE(event_id,user_id))              ← unused by app
- │    └─< notifications (user_id FK, actor_id FK, group_id FK SET NULL, read)
- └─< messages (from FK, to FK NULL, group_id FK NULL,
-               CHECK (from_user_id <> to_user_id OR to_user_id IS NULL))
-reactions (target_type CHECK post|comment, target_id, user_id FK, reaction CHECK like|dislike,
-           UNIQUE(target_type,target_id,user_id))   ← no FK on target_id (polymorphic)
+ ├─1:N─ sessions (id PK, user_id FK→users CASCADE, expires_at)
+ ├─N:M─ follow_requests (from_user_id FK, to_user_id FK, status, UNIQUE(from,to))   [also = follow graph]
+ ├─1:N─ posts (author_id FK→users CASCADE, privacy, group_id FK→groups CASCADE, created_at)
+ │        ├─1:N─ comments (post_id FK CASCADE, author_id FK CASCADE)      ← UNUSED by code
+ │        ├─1:N─ post_visibility (post_id,user_id PK, FK CASCADE)         ← NEVER POPULATED
+ │        └─1:N─ files (id TEXT PK, owner FK CASCADE, post_id FK SET NULL,
+ │                    comment_id FK SET NULL, message_id FK SET NULL)
+ ├─1:N─ reactions (target_type post|comment, target_id, user_id FK, UNIQUE triple) [comment target unused]
+ ├─N:M─ group_members (group_id FK CASCADE, user_id FK CASCADE, PK(group,user))
+ ├─1:N─ groups (creator_id FK→users CASCADE, title, description)
+ │        ├─1:N─ group_invitations (group FK, from/to user FK, status, UNIQUE(group,to))
+ │        ├─1:N─ group_join_requests (group FK, user FK, status, UNIQUE(group,user))
+ │        ├─1:N─ group_events (group FK, creator FK, title, description, date_time) ← UNUSED
+ │        │        └─1:N─ event_responses (event FK, user FK, choice, UNIQUE(event,user)) ← UNUSED
+ │        └─1:N─ messages (group_id FK CASCADE) + 1:1 private (to_user_id FK)
+ ├─1:N─ messages (from_user_id FK, to_user_id FK?, group_id FK?, CHECK(from<>to OR to IS NULL))
+ └─1:N─ notifications (user_id FK, actor_id FK, type, content, group_id FK SET NULL, read)
+schema_migrations (golang-migrate bookkeeping)
 ```
 
-**Good:** composite PK on `group_members`; `UNIQUE` pairs on invitations/join-requests/follows; indexes on all FK lookup paths (`idx_follow_requests_to/from`, `idx_posts_author/group`, `idx_notifications_user`, `idx_messages_to/group`, …); messages CHECK constraint fixed in 000017 to allow group messages; FKs with sensible CASCADE / SET NULL.
+**Strengths.** Proper FKs with intentional CASCADE/SET-NULL choices; composite PKs/UNIQUE constraints prevent duplicates exactly where needed (follows, memberships, invitations, join requests, event responses, reactions); sensible indexes on every hot lookup path (`to_user_id+status`, `group_id+status`, `user_id+read`, posts by author/group, messages by to/group); transactions used for accept flows (`withTx`); reactions use `ON CONFLICT … DO UPDATE` upsert.
 
-**Issues:**
+**Issues.**
+- 🔴 **BUG-012** — `PRAGMA foreign_keys` and `busy_timeout` are per-connection in SQLite; `db.Exec("PRAGMA …")` applies them to *one* pooled connection, and `SetMaxOpenConns(1)` is not called. FK enforcement is therefore unreliable for queries served by other pool connections. (WAL is persistent, so that one sticks.)
+- 🟡 `messages` was rebuilt twice (000008 then 000017) — migration history noise, harmless.
+- 🟡 `comments`, `post_visibility`, `group_events`, `event_responses`, `files.comment_id`, reactions-on-comments are schema-only — the unused-schema footprint of the missing features.
+- 🟡 `follow_requests` naming (it stores accepted follows too) — works, but confusing.
+- 🟡 No composite index for `messages` conversation reads (from+to) — moot until a history endpoint exists.
 
-- 🔴 **BUG-002:** `PRAGMA foreign_keys = ON` is per-connection in SQLite, but `sqlite.Open` executes it **once** on one pooled connection (`db.Exec`). Other pool connections run with FK enforcement off. Same for `busy_timeout`. (`journal_mode=WAL` is persistent, so that one is fine.) Cascades and FK-based integrity are therefore unreliable.
-- `users.nickname` has **no UNIQUE constraint** and registration never checks nickname collisions, while login accepts nickname as identifier → ambiguous login (BUG-010).
-- Unused-but-present: `comments`, `group_events`, `event_responses`, `post_visibility`, `files.comment_id` — schema exists for missing features.
-- `reactions.target_id` is polymorphic without FK (acceptable pattern, worth knowing).
+**No SQL-injection surface:** every query in `internal/repository/*.go` uses placeholders; no fmt-concatenated SQL found.
 
 ---
 
 ## 13. Migration audit
 
-- **System:** `golang-migrate` + `iofs` source; **migrations are embedded** (`//go:embed sqlite/*.sql`) and applied in `sqlite.Migrate()` at every startup (`main.go → sqlite.InitDB`). A clean database gets all 18 versions. ✅
-- **Structure:** `backend/internal/db/migrations/sqlite/000NNN_name.{up,down}.sql` — 18 up + 18 down, all pairs present. The subject's suggested layout is `backend/pkg/db/...` but explicitly allows "organized as you wish"; the applied path is internal, which satisfies "the application of migrations and the file organization will be tested" as long as the runner works — and it runs from code, not from a filesystem path.
-- **Order:** 000001 users → 000002 sessions → 000003 posts/comments/post_visibility → 000004 follows → 000005 groups → 000006 events → 000007 notifications/messages → 000008 messages rebuild → 000009 reactions → 000010 files → 000011 files.message_id → 000012/13 URL-prefix data fixes (still-safe column present) → 00014 drop legacy `image` columns → 00015 avatar prefix strip → 00016 add `posts.type` → 00017 messages CHECK rebuild → 00018 drop `posts.type`. Data migrations precede the drops that would break them. ✅
-- **Schema matches `schema.sql` snapshot** (reference file, not executed).
-- Verification note: migration *execution* against a clean DB was not run during this audit (would require creating a DB); correctness is established by code reading + the successful build. **Actual clean-database run cannot be verified from the provided source code alone.**
+- **System** ✅ — `golang-migrate/migrate/v4` with `source/iofs` over `//go:embed sqlite/*.sql` (`internal/db/migrations/migrations.go`) and `database/sqlite3.WithInstance`. Applied automatically in `sqlite.InitDB` → `Migrate` → `m.Up()` (tolerating `ErrNoChange`) on **every** start, satisfying "every time the application runs, it creates the specific tables".
+- **Files** ✅ — 18 versions, each with a matching `.up.sql` **and** `.down.sql` (37 SQL files verified), numbered `000001_…` → `000018_…` in `backend/internal/db/migrations/sqlite/`.
+- **Folder structure** 🟡 — subject's example tree is `backend/pkg/db/migrations/sqlite`; the project uses `backend/internal/db/migrations/sqlite`. The subject explicitly allows other organization ("It can be organized as you wish"), and the naming pattern matches what testers look for (`file://…/migrations/sqlite` style). Note it for evaluators anyway.
+- **Order** ✅ — users → sessions → posts/comments → follows → groups → events → notifications/messages → reactions → files → data fixes → schema fixes. Dependencies respected (e.g. files references messages, created after; `post_type` added in 16 and dropped in 18 — redundant but valid).
+- **Clean-database behavior** ✅ (by code path) — `InitDB` opens, pragmas, migrates; `go build` passes; migration 1 creates `users` first. Not executed live during this audit — runtime creation from a pristine DB **cannot be verified from the provided source code** beyond the code path review.
+- **`sqlite.go` role** ✅ — connection + pragmas + migration application, exactly what the subject asks that file to do.
+- **Down migrations** present; 000014's down correctly rebuilds `comments` with the `image` column — consistent.
 
 ---
 
 ## 14. Images audit
 
-- **Types:** content sniffed via `http.DetectContentType` on the first 512 bytes; only `image/jpeg`, `image/png`, `image/gif` accepted — subject's three types covered, extension never trusted. ✅
-- **Size/count:** 10 MB per image (`MaxBytesReader` + `LimitReader`), max 3 per request. ✅
-- **Storage:** random 32-hex ID → `uploads/<id>` (`0o750` dir, `0o640` file, `O_EXCL`); metadata in `files` with `storage_path` hidden from JSON (`json:"-"`). Original filename stored via `filepath.Base` — **no path traversal** (user input never used to build the path). ✅
-- **Retrieval:** `GET /fs/{id}` is authenticated and runs `CanViewFile` (owner, avatar references, post visibility, message participants, group members) → 404 otherwise; `Cache-Control: private, immutable` is safe for content-addressed IDs. ✅
-- **Cleanup:** on DB insert failure the file is removed; on write failure the partial file is removed. ✅
-- **Gaps:** no re-encode/sanitization (subject doesn't require it); avatar at **registration** not possible (form field missing) — only `POST /avatar` after login; register still accepts a legacy `avatar` *string* form field that is stored verbatim in `users.avatar` without validation (BUG-012).
+`internal/service/filesvc/service.go`, `internal/handler/filehandler/handler.go`, served by `GET /fs/{id}`.
+
+- **Formats** ✅ — `http.DetectContentType` magic-byte sniffing (512-byte header), allow-list `image/jpeg | image/png | image/gif`. Extension/MIME from the client is ignored — spoof-resistant.
+- **Limits** ✅ — 10 MB per file (`MaxImageSize`), max 3 per upload (`MaxImages`), `http.MaxBytesReader` on the body, `io.LimitReader` while copying.
+- **Storage** ✅ — random 16-byte hex ID (`crypto/rand`), file written to `uploads/<id>` with `O_EXCL`, mode 0640, dir 0750; metadata (original name via `filepath.Base`, mime, size, owner, post/message linkage) in the `files` table. On DB failure the file is removed.
+- **Path traversal** ✅ — the client never influences the storage path; serving uses the stored `storage_path`, and the ID is server-generated. `original_name` is sanitized with `filepath.Base`.
+- **Retrieval authorization** ✅ — `CanViewFile` mirrors post privacy (owner, any-user avatar, public/followers/selected posts, message participants, group members) before `http.ServeFile`; invisible → 404. `Cache-Control: private, immutable` is appropriate for content-addressed IDs.
+- **Avatar** ✅ — `POST /avatar` (single file, same checks) updates `users.avatar` to the file ID; rendered by `Avatar.jsx` via `imageUrl(id)`.
+- **Gaps** — register-time avatar not supported (BUG-019); orphan files never garbage-collected (old avatars/uploaded-but-unattached files accumulate) — minor.
 
 ---
 
 ## 15. Docker audit
 
-- **Images:** `backend/Dockerfile` — two-stage `golang:1.25-alpine` with `CGO_ENABLED=1` (needed by `go-sqlite3`), runtime `alpine:3.22` + `libgcc`/`ca-certificates`. `frontend/Dockerfile` — `node:22-alpine`, `npm ci`, `next build`, `next start -p 3000`. Both look correct. ✅
-- **compose.yml:** backend (`expose 8080`), frontend (`expose 3000`), Caddy (published `8000:80`, `8443:443`) with `Caddyfile.docker` routing `/api/v1/*` → `backend:8080` and `/` → `frontend:3000` (prefix stripped via `handle_path`, matching the Go mux). Volumes for DB and uploads. Subject's "two images" satisfied; Caddy is a legitimate third service (the subject itself suggests Caddy).
-- **Database in containers:** `sn.db` is created in the working directory `/app`, persisted through the `backend-data` named volume; uploads through `backend-uploads`.
-  - ⚠️ BUG-018: `backend-data` is mounted **over `/app`** — the volume shadows the image's `/app` (works only because Docker copies image content into an empty named volume on first use; a non-empty or reused volume would hide `/server`). Mounting `/app/data` would be robust.
-- **Communication:** HTTP works through Caddy. **WebSocket does not**: the frontend connects to `ws://hostname:8080` (BUG-003), and neither 8080 nor 3000 is published to the host; in the composed deployment, chat and live notifications fail.
-- `next.config.js` rewrite to `http://localhost:8080` is dead in Docker (harmless; Caddy owns `/api/v1`).
-- No healthchecks; `depends_on` only orders startup (migrations run fast, so acceptable).
-- **A real clean-environment container start was not executed during this audit** ("cannot be verified from the provided source code"); the assessment is config-level.
+**Images.** `backend/Dockerfile`: multi-stage `golang:1.25-alpine` (build-base for CGO/sqlite) → `alpine:3.22` runtime, `CGO_ENABLED=1 go build`, exposes 8080, runs `/server`. Sound for mattn/go-sqlite3. `frontend/Dockerfile`: `node:22-alpine`, `npm ci`, `npm run build`, `npm run start`, exposes 3000. Both are valid single images each — the "two Docker images" requirement is structurally met (Caddy is a third, extra container).
+
+**Compose** (`compose.yml`): backend + frontend on a private network, `expose` (not published) for 8080/3000, Caddy published on 8000:80 proxying `/api/v1/*` → `backend:8080` and everything else → `frontend:3000`; named volumes `backend-data:/app` (DB) and `backend-uploads:/app/uploads`. Caddy terminates and proxies WebSocket upgrades correctly *by configuration*.
+
+🔴 **BUG-010 — the two required containers cannot talk.** `next.config.js` rewrites `/api/v1/*` to `http://localhost:8080`. Rewrites are executed by the Next **server** inside the frontend container, where `localhost:8080` is nothing (backend is a different container). Every API call fails in the composed deployment. Destination must be `http://backend:8080` (or via env var).
+
+🔴 **BUG-009 — WebSocket bypasses everything.** The chat/notifications pages dial `ws://${hostname}:8080/api/v1/ws`. In the composed setup nothing publishes 8080 to the host → connections fail. (Next rewrites can't proxy WS either, which is presumably why 8080 was hardcoded for dev.)
+
+**Other observations.**
+- No environment variables anywhere; ports/URLs are hardcoded (host dev assumptions baked into images).
+- DB persists via the `backend-data` volume; a clean `docker compose up` should boot and migrate — but the app is unusable due to BUG-009/010, so *realistic clean-environment startup* fails today.
+- `backend-data` mounted over `/app` (the image's WORKDIR) is unusual, though harmless since the binary lives at `/server`; the nested `backend-uploads` mount works.
+- Subject ports guidance is satisfied only through Caddy (8000→frontend), not by the frontend container itself — acceptable, worth noting.
 
 ---
 
 ## 16. WebSocket audit
 
-- **Upgrade/auth:** `GET /ws` behind `auth.Authorized`, then the hub re-reads the session cookie before `Upgrade` (gorilla). Unauthenticated → 401 before upgrade. ✅
-- **Client registry:** `Hub.clients map[userID]map[*Client]struct{}` guarded by `sync.RWMutex`; `add`/`remove` are locked; supports **multiple tabs/devices per user**. ✅
-- **Concurrency:** one goroutine per client for `writePump`; `readPump` runs in the request goroutine; sends are non-blocking `select`/`default` on a buffered chan (16). No obvious races; `go vet` clean.
-- **Health:** write-side ping every 45s, 60s read deadline refreshed by pong handler, 64 KB read limit, 10s write deadline. ✅
-- **Cleanup:** on read error the client is removed and the connection closed; `writePump` exit closes the socket too. ✅
-- **🔴 BUG-004:** `websocket/session.go` (`trackClient`/`untrackClient`/`RevokeSessionClients`) is **dead code** — `ServeHTTP` never calls `trackClient` and `readPump`'s defer never calls `untrackClient`. Consequence: `POST /logout` deletes the session, but already-open sockets stay authenticated for as long as the TCP connection lives (the hub doesn't re-check the session per message), and the readme's claim "force closes that session's websockets" is false.
-- **Message drops:** when a client's send buffer is full the payload is silently discarded (no close, no error) — low severity (BUG-015).
-- **`CheckOrigin: func(*http.Request) bool { return true }`** — accepts any origin. Cross-Site WebSocket Hijacking is mitigated in practice by the `SameSite=Lax` cookie (browsers don't attach it to cross-site WS handshakes), but the permissive origin check is still worth tightening (see §18).
+`internal/websocket/hub.go` (+ `session.go`).
+
+- **Upgrade & auth** ✅ — `Authorized` middleware + explicit cookie/session re-check in `ServeHTTP` before `websocket.Upgrader.Upgrade`. Unauthenticated upgrade → 401 before the connection exists.
+- **Registration/disconnect** ✅ — `Hub.clients map[userID]map[*Client]struct{}` guarded by `sync.RWMutex`; `add` on connect, `remove` in `readPump`'s defer, empty per-user maps deleted. Multiple tabs/devices per user supported.
+- **Concurrency** ✅ — one read goroutine (the handler's) + one `writePump` goroutine per client; all sends go through the buffered `send` channel (16) owned by `writePump` (single writer per conn — correct per gorilla). `publish` takes `RLock` and uses non-blocking sends (slow clients drop rather than block the hub).
+- **Routing** ✅ — 1:1 (`publish(to)` + echo to sender) and group fan-out via `GroupMemberIDs`.
+- **Health** ✅ — 45 s ping ticker with 10 s write deadline; 60 s read deadline reset by pong handler; 64 KB read limit.
+- **Errors** ✅ — malformed frames, unauthorized targets and save failures emit `{"type":"error",…}` without killing the connection; read errors tear down cleanly.
+- 🔴 **BUG-011** — `websocket/session.go` (`trackClient`/`untrackClient`/`RevokeSessionClients`) is **dead code**: nothing calls track/untrack (confirmed by search; the project's own `docs/BACKEND.md` admits it). Logout's `RevokeSessionClients(cookie.Value)` therefore finds nothing — a logged-out tab keeps a live, authenticated socket indefinitely.
+- 🟡 `CheckOrigin: func(*http.Request) bool { return true }` — combined with cookie auth this permits cross-site WebSocket hijacking (BUG-022).
+- 🟡 No deadline on the time between `add` and `readPump` starting — fine in practice since it's sequential.
 
 ---
 
 ## 17. Bug audit
 
+Only code-supported findings. Severity: Critical = breaks a subject requirement end-to-end; High = breaks a feature or deployment; Medium = functional deviation; Low = cosmetic/robustness.
+
 | ID | Severity | Location | Problem / Why / Expected vs current / Fix |
 |---|---|---|---|
-| **BUG-001** | **Critical** | `repository/post.go` (`postVisibleCondition`), `postsvc.Create`, `PostForm.jsx` | **`private` (selected-followers) posts can never be shared.** Visibility requires `post_visibility` rows, but nothing ever inserts there and no API/UI lets the author pick followers. Expected: chosen followers see the post. Current: only the author ever sees it. Fix: accept a list of allowed user IDs on post creation (validate they follow the author), insert into `post_visibility`, and add the follower-picker UI. |
-| **BUG-002** | High | `db/sqlite/sqlite.go` `Open()` | **FK enforcement unreliable.** `PRAGMA foreign_keys`/`busy_timeout` are per-connection but executed once on one pooled connection. Expected: FKs enforced on every connection. Fix: set them in the DSN (`file:sn.db?_foreign_keys=on&_busy_timeout=5000`) or via a `ConnectHook`. |
-| **BUG-003** | High | `chat/[id]/page.jsx:29`, `notifications/page.jsx:13` | **Hardcoded `ws://hostname:8080/api/v1/ws`.** Breaks behind Caddy (host port 8000) and in Docker (8080 unpublished). Expected: WS through the same origin/proxy. Fix: derive scheme/host from `window.location` (`wss?://location.host/api/v1/ws`). |
-| **BUG-004** | High | `websocket/session.go`, `hub.go ServeHTTP`, `authhandler.Logout` | **Session-revocation dead code.** `trackClient`/`untrackClient` are never called, so `RevokeSessionClients` is a no-op; logout leaves sockets live. Expected: logout closes that session's sockets (readme claims it). Fix: call `trackClient(sessionID, client)` after `add`, `untrackClient` in `readPump`'s defer. |
-| **BUG-005** | Medium | `authsvc.validateRegisterInput`, `register/page.jsx` | **Nickname required** although the subject marks it optional. Fix: make nickname optional backend+frontend (keep uniqueness when provided). |
-| **BUG-006** | Medium | `followsvc` | **No notification on follow request** (subject-required; `docs/WEBSOCKET-PROTOCOL.md` even documents the type). Fix: create + push a `follow_request` notification in `Follow` when status is pending. |
-| **BUG-007** | Medium | `usersvc`/`userhandler`, `settings/page.jsx` | **No way to toggle profile public/private** (subject-required). `UpdateUser` supports it but no endpoint/UI exists. Fix: `PATCH /me` or `POST /users/me/privacy` + settings toggle. |
-| **BUG-008** | Medium | server.go, `followsvc` | **No endpoint listing my pending follow requests**, so accept/decline routes are unreachable from any client. Fix: `GET /follow-requests` (recipient-scoped) + UI. |
-| **BUG-009** | Medium | notifications page, Navbar | **Notifications not visible on every page**: no history endpoint, no navbar badge/counter; events missed while off-page are lost to the user. Fix: `GET /notifications` (+ mark-read), global listener in the `(main)` layout with a badge. |
-| **BUG-010** | Medium | migration 000001, `authsvc` | **Nickname not unique** but used as a login identifier → first-match login, ambiguous accounts. Fix: `UNIQUE` on `users.nickname` (new migration) + registration check. |
-| **BUG-011** | Medium | `common/response.go` `PublicUser`, `userhandler.GetUser` | **Profile omits email and date of birth**, though the subject says the profile carries every register field except password. Fix: include email/DOB when viewer is owner or an accepted follower. |
-| **BUG-012** | Low | `authhandler.Register`, `authsvc.RegisterInput.Avatar` | Legacy `avatar` form string is stored verbatim in `users.avatar` with no validation (garbage breaks `<img>` URLs). Fix: ignore the field or accept an uploaded file ID only. |
-| **BUG-013** | Low | `middleware/rate_limit.go`, `backend/readme.md` | Rate limit is 1000/min in code, `X-RateLimit-Limit: 100` in header, "100/min" in readme. Fix: pick one value; align header + docs. |
-| **BUG-014** | Low | `middleware/rate_limit.go` | Client map never pruned → unbounded memory growth over time. Fix: evict stale windows. |
-| **BUG-015** | Low | `hub.go publish/sendError` | Full send buffer ⇒ silent message drop (no close/error). Fix: close slow clients or log. |
-| **BUG-016** | Low | `group_invitations`/`group_join_requests` UNIQUE pairs | After a decline, the same (group,user) pair can never invite/request again (permanent 409). Flagged as product decision in `GROUPS_BACKEND_IMPLEMENTATION.md`; fix would be status-reset or new-row schema change. |
-| **BUG-017** | Low | `postsvc.Create/Update` | Post content length unvalidated server-side (frontend caps 1000; API accepts arbitrary length). Fix: mirror the 1000-char cap. |
-| **BUG-018** | Low | `compose.yml` | `backend-data` volume mounted over `/app` shadows the image workdir (works only via Docker's first-use copy). Fix: mount a subdirectory (e.g. `/app/data`). |
-| **BUG-019** | Low | `sessionsvc.Get` | Expired sessions are deleted only when touched; dead rows accumulate. Fix: periodic cleanup or delete-on-expiry sweep. |
+| BUG-001 | **Critical** | `internal/server/server.go` (no route), `internal/repository/user.go::UpdateUser` (orphaned), `frontend/app/(main)/settings/page.jsx` | **No way to toggle profile public/private.** Subject requires the option on the own profile; the column and repo method exist but no handler/route/UI. Expected: user can switch. Current: impossible; settings page admits it. Fix: add `PUT /me` (or `/users/{id}/privacy`) handler calling `UpdateUser`, wire a toggle in Settings/Profile. |
+| BUG-002 | **Critical** | `internal/service/postsvc/service.go::Create`, `repository/post.go` (`post_visibility` condition), `frontend/components/PostForm.jsx` | **Private posts have no audience selection.** `post_visibility` is never written; no endpoint/UI picks followers. Expected: only *chosen* followers see the post. Current: only the author sees it. Fix: accept a `viewers[]` list on create/update, insert `post_visibility` rows, add UI picker of accepted followers. |
+| BUG-003 | **Critical** | `internal/db/migrations/sqlite/000003…` (table) vs. no Go code/routes | **Comments not implemented at all** (nor comment images). Subject requires commenting on posts with permission inheritance. Fix: repository+service+handler for `GET/POST /posts/{id}/comments` reusing `CanViewPost`; extend `PostCard.jsx`. |
+| BUG-004 | **Critical** | `repository/post.go::ListVisiblePosts` (`p.group_id IS NULL`), `postsvc.Create`, no group-post route/UI | **Group posts not implemented.** Column exists; nothing sets or reads it. Subject: group posts visible only to members. Fix: member-gated `POST/GET /groups/{id}/posts`, drop the NULL filter for member viewers or query separately, add UI. |
+| BUG-005 | **Critical** | `migrations/000006_*` (tables) vs. no Go code/routes/UI | **Group events + going/not-going not implemented**, incl. the required event-created notification. Fix: event CRUD + `event_responses` endpoints, member-gated; notification to members on create; UI in group detail. |
+| BUG-006 | High | `internal/websocket/hub.go` (group branch works) vs. `frontend/app/(main)/chat/*` | **Group chat has no UI.** Backend routes/persists/fans out group messages; frontend only ever sends `to_user_id`. Subject: members chat in a common room. Fix: add group room page reusing the hub protocol with `group_id`. |
+| BUG-007 | **Critical** | `internal/service/followsvc/service.go` (no notification call) | **No follow-request notification.** Subject explicitly requires it for private profiles; groupsvc shows the pattern exists. Fix: after creating a pending request, `CreateNotification` + `hub.PublishNotification` to the target. |
+| BUG-008 | High | `internal/server/server.go`, frontend | **No listing of pending follow requests** (no endpoint, no inbox UI); recipient can only respond by ID. With BUG-007 the private-follow flow is unreachable in practice. Fix: `GET /follow-requests` + inbox UI (notifications page or profile). |
+| BUG-009 | High | `frontend/app/(main)/chat/[id]/page.jsx` line ~26, `frontend/app/(main)/notifications/page.jsx` line ~12 | **WS URL hardcoded to `ws://hostname:8080`** — fails behind Caddy/compose (nothing on host :8080) and breaks TLS. Fix: derive from `location` (e.g. `wss?://host/api/v1/ws`) and proxy WS through Caddy. |
+| BUG-010 | High | `frontend/next.config.js` | **Rewrite target `http://localhost:8080` unreachable from the frontend container** — the whole API is dead in `docker compose up`. Fix: `http://backend:8080`, ideally from `process.env.BACKEND_URL`. |
+| BUG-011 | Medium | `internal/websocket/session.go` (dead code), `internal/handler/authhandler/handler.go::Logout` | **Logout doesn't close live WebSockets.** `trackClient/untrackClient` never called; `RevokeSessionClients` no-ops. Expected: revoked session loses its sockets. Fix: call `trackClient(cookie.Value, client)` after add and `untrackClient(c)` in readPump's defer. |
+| BUG-012 | Medium | `internal/db/sqlite/sqlite.go::Open` | **FK/busy_timeout pragmas applied to a single pooled connection** (per-connection pragmas + `database/sql` pool). FK enforcement unreliable. Fix: `db.SetMaxOpenConns(1)` (fine for SQLite/WAL) or set pragmas in a `connect hook`. |
+| BUG-013 | Medium | `internal/server/server.go` (no message-read route), `frontend/app/(main)/chat/[id]/page.jsx` | **No message history** despite persistence; UI states "not saved when you reload". Subject implies conversations. Fix: `GET /messages?user_id=` / `?group_id=` with participation checks; load on page open. |
+| BUG-014 | Medium | `internal/repository/message.go::CanMessage` | **DM authorization broader than subject**: `target.private = 0 OR <follow exists>` allows DMing any public stranger with no relationship. Subject: at least one must follow the other. Fix: drop the `private = 0` short-circuit, keep the follow-exists clause (optionally keep public-recipient rule only for *delivery*, per subject wording). |
+| BUG-015 | Medium | `internal/service/groupsvc/service.go::Invite/RequestJoin`, `migrations/000005` UNIQUE(group,to_user) | **Declined invitations/join requests are permanent blockers** — re-inviting or re-requesting returns 409 forever. Fix: on decline, delete the row (or relax the UNIQUE constraint to partial-index on pending). |
+| BUG-016 | High | `frontend/components/Navbar.jsx`, no notification GET route | **Notifications not visible on every page** (no badge/global component) and **never listed after reload** (no GET endpoint) — persisted rows are unreadable. Subject: notifications visible on every page. Fix: `GET /notifications` (+ mark-read), global bell with unread count fed by the existing WS. |
+| BUG-017 | Low | `internal/middleware/rate_limit.go` | Headers advertise `X-RateLimit-Limit: 100` while 1000 is enforced; comment contradicts itself. Fix: single constant used for both. |
+| BUG-018 | Low | `internal/service/authsvc/service.go::validateRegisterInput`, `frontend/app/(auth)/register/page.jsx` | **Nickname required** though subject marks it optional (and `users.nickname` has `DEFAULT ''`). Fix: drop the required/regex gate when empty (keep uniqueness if enforced later). |
+| BUG-019 | Low | `frontend/app/(auth)/register/page.jsx`, `authhandler.Register` | **No avatar field in the registration form** (subject: field must be present, skippable); backend accepts only a string, not an upload. Fix: add optional file input, upload after account creation via `/avatar`. |
+| BUG-020 | Medium | `userhandler`/`server.go` | **No followers/following endpoints or UI** and **no user-activity feed** — required profile sections absent (overlap with §20). Fix: `GET /users/{id}/followers|following` gated by `CanViewProfile`; render lists on the profile. |
+| BUG-021 | Low | `internal/middleware/rate_limit.go` | Client map grows unbounded (entries never evicted) — slow memory leak on hostile traffic. Fix: periodic sweep or eviction on window expiry. |
+| BUG-022 | Low→Medium | `internal/websocket/hub.go::ServeHTTP` | `CheckOrigin` accepts all origins; with cookie auth this enables cross-site WebSocket hijacking. Fix: echo-only origin allow-list. |
+| BUG-023 | Low | `internal/service/sessionsvc/service.go::SetCookie` | No `Secure` attribute on the session cookie (fine for local HTTP, wrong in production). Fix: `Secure: true` behind TLS. |
+| BUG-024 | Low | `backend/readme.md` | Docs drift: claims `GET /users` 501 (route not registered at all), follow-request WS notifications (not implemented), 100/min rate limit (code: 1000). Fix: align docs. |
+| BUG-025 | Low | `frontend/lib/people.js` | People/Chat/Invite pickers only show users who authored visible posts — you cannot discover or DM a follower who never posted. Fix: real `GET /users` search endpoint (or followers-derived list). |
+| BUG-026 | Low | `frontend/app/(main)/chat/[id]/page.jsx` | No WS `onclose`/`onerror` handling or reconnection; the chat silently dies. Fix: status indicator + reconnect backoff. |
 
-**Compile errors:** none (`go build`, `go vet` clean). **SQL injection:** none found — every query is parameterized. **Runtime verification** of server behavior beyond the code (live requests, container start) was not performed in this audit: *"Cannot be verified from the provided source code."*
+Non-bugs explicitly checked and found correct: bcrypt compare order; `Respond` recipient check; owner-only post update/delete predicates; group accept transactions; invitation/join-request duplicate handling (aside from BUG-015); `CanViewFile` parity with post visibility; `go build`/`go vet` clean.
 
 ---
 
@@ -366,76 +392,80 @@ reactions (target_type CHECK post|comment, target_id, user_id FK, reaction CHECK
 
 | Area | Finding |
 |---|---|
-| Password hashing | ✅ bcrypt, default cost; hashes never leave the server (hand-built JSON maps). |
-| Sessions | ✅ 32-byte CSPRNG tokens; server-side store; expiry enforced. ⚠️ Cookie lacks `Secure` (fine for the HTTP-only Caddy setup; required for HTTPS). |
-| Cookies | ✅ `HttpOnly`, `SameSite=Lax` — Lax also blocks the cookie on cross-site WS handshakes and most cross-site posts (de-facto CSRF mitigation). No CSRF token (acceptable given Lax + JSON/form APIs; note it). |
-| Authorization / IDOR | ✅ Verified: post update/delete owner-scoped in SQL; follow responses recipient-checked; group invitation/join responses re-checked **inside transactions**; group member/creator checks on every group route; files visibility-checked per viewer; caller ID always from the session cookie. |
-| SQL injection | ✅ All queries parameterized (`?`), no string-built values. |
-| XSS | ✅ React escapes by default; no `dangerouslySetInnerHTML` anywhere. |
-| Uploads | ✅ Magic-byte sniffing (extension ignored), size caps, random storage names, no path traversal, `json:"-"` hides storage paths. |
-| WebSocket | ⚠️ `CheckOrigin` always true — currently mitigated by the Lax cookie; tighten to expected host(s). Auth enforced before upgrade and per message (via `CanMessage`). |
-| Information exposure | ✅ Password/email/DOB never in public payloads; group detail projects creator through a safe struct; 404-instead-of-403 for hidden groups. ⚠️ Register returns 409 for taken emails (standard, minor enumeration). |
-| Rate limiting | ✅ present (per-IP). ⚠️ Header/value/doc mismatch + unbounded map (BUG-013/014). |
-| Secrets | ✅ None hardcoded; no `.env` committed (`.gitignore`). |
-| Misc | ⚠️ `POST /register` accepts a raw `avatar` string into `users.avatar` (BUG-012). ⚠️ No input length caps on some backend fields (posts BUG-017; group fields *are* capped). |
+| Password hashing | ✅ bcrypt (DefaultCost) in `authsvc`; hash never leaves the server (`PublicUser`/`PrivateUser` omit it; `model.User` JSON tags exist but that struct is never marshaled directly to clients for user endpoints) |
+| Sessions | ✅ 256-bit random IDs, DB-backed, expiry enforced server-side, deleted on logout. 🟡 no server-side re-validation of the cookie value against timing attacks (acceptable), no rotation on privilege change |
+| Cookies | 🟡 `HttpOnly`, `SameSite=Lax`; **no `Secure`** (BUG-023) |
+| Authentication middleware | ✅ applied to all 31 routes incl. `/ws`; `Guest` prevents session fixation via re-login of an authed user |
+| Authorization / IDOR | ✅ strong overall: post update/delete owner-scoped in SQL; follow response recipient-checked; group join-response creator-checked; invitation response recipient-checked (transactional); file downloads visibility-checked. ❌ **profile privacy toggle missing** (BUG-001) means the `private` flag is currently immutable — no bypass, but no feature either |
+| Private profile visibility | ✅ enforced at both profile (403) and feed-SQL level |
+| Private post visibility | 🔴 enforced in SQL but feature-incomplete (BUG-002) |
+| Group authorization | ✅ membership/creator checks in service layer before every mutation; members list 403 for outsiders; detail 404 |
+| WebSocket authorization | ✅ session checked pre-upgrade and per-message via `CanMessage`; 🟡 `CheckOrigin: true` (BUG-022), 🟡 logged-out sockets survive (BUG-011) |
+| SQL injection | ✅ none found — 100% parameterized queries across `internal/repository` |
+| XSS | ✅ React escapes all interpolated content; images served from same-origin `/api/v1/fs/<id>` with sniffed content-type; no `dangerouslySetInnerHTML` anywhere |
+| CSRF | 🟡 `SameSite=Lax` + JSON-ish APIs mitigates the classic cases; no CSRF token (state-changing POSTs rely on Lax); WebSocket path covered by BUG-022 |
+| File upload validation | ✅ magic-byte sniffing, size/count caps, `O_EXCL` random paths, `MaxBytesReader` — no path traversal, no executable storage paths |
+| Sensitive exposure | ✅ password never serialized; email/DOB only on `PrivateUser` (self); group creator mapped to a public subset. 🟡 `model.User`'s JSON tags would leak if ever marshaled directly — currently never happens for other users |
+| Secrets/API keys | ✅ none present |
+| CORS | ✅ n/a (same-origin proxy); frontend never hits the backend cross-origin |
+| Input validation | ✅ mirrored client+server for auth/posts/groups/messages; 🟡 message content length not capped server-side beyond the 64 KB frame (frontend caps 1000) |
+| Rate limiting | ➕ present but mislabeled and leaky (BUG-017/021) |
 
 ---
 
 ## 19. Architecture audit
 
-**Strengths**
+**Strengths.**
+- Textbook layering with dependency injection via small service-level interfaces (`authsvc.Repository`, `groupsvc.Repository`, …) — testable and mockable.
+- Consistent error taxonomy (`repository.ErrNotFound/ErrExists/ErrNotOwner` → HTTP mapping in one place per handler package).
+- Transactional multi-table operations done right (`withTx`, `AcceptGroupInvitationTx`).
+- Embedded migrations mean the binary is self-contained — good for Docker.
+- Frontend mirrors backend validation in one module (`lib/validate.js`) with comments cross-referencing the Go rules.
 
-- Clean layering (`model / middleware / handler / service / repository / db`) with dependency injection composed in one place (`handler/handlers.go`). Interfaces are consumer-defined (`authsvc.Repository`, `groupsvc.Repository`…) — good Go style.
-- The groups vertical is exemplary: transactions in the repository, sentinel-error mapping, race-safe duplicate handling, documented (`GROUPS_BACKEND_IMPLEMENTATION.md`).
-- Frontend mirrors the backend limits in one module (`lib/validate.js`) — nice consistency.
-- Documentation (`backend/readme.md`, `docs/`, `schema.sql`) is unusually complete and mostly accurate — except the follow-notification and logout-WS claims (see BUG-004/006).
-
-**Issues (not subject requirements)**
-
-1. **Dead code:** `websocket/session.go` entirely unused; `repository.isUniqueConstraint`, `CreateNotificationTx`, `UpdateGroupInvitationStatus`, `UpdateGroupJoinRequestStatus`, `GetPendingInvitationsForGroup`, `UpdateGroup`, `DeleteGroup`, `DeleteUser` have no callers. `groupsvc.isUnique` duplicates `repository.isUniqueConstraint`.
-2. **Repo directly in WS hub:** the hub bypasses the service layer (documented) — pragmatic, but it means chat has no validation/service home for future rules (length caps live only in the frontend).
-3. **Duplication:** frontend `people/page.jsx` and `chat/page.jsx` duplicate the feed-derivation logic; backend has parallel follow/invitation/join-request service shapes (acceptable).
-4. **No pagination** anywhere (`GET /posts`, `GET /groups`, member lists).
-5. **No tests committed:** `.gitignore` excludes `*_test.go`, so the "tests" claimed in `CHANGELOG.md` are not in the repo; verification relies on manual/integration sessions.
-6. **Mixed response styles:** handlers return hand-built maps (`common.PublicUser`) instead of model JSON tags — safe but easy to drift (already caused the email/DOB omission).
-7. Naming and file organization are consistent; no circular imports; `internal/` layout follows Go conventions.
+**Issues (architecture-level, not subject violations).**
+1. **Handler-layer session re-resolution.** `Authorized` resolves the session, then every handler calls `common.CurrentUserID` which re-reads cookie + session from the DB (e.g. `userhandler.GetUser` does it twice). Resolve once in middleware and inject via context.
+2. **Hub ↔ repository bypass.** The hub talks straight to the repository (documented), duplicating authorization logic (`CanMessage`) outside the service layer. A `chatsvc` would keep policy in one place.
+3. **Dead/orphan code.** `websocket/session.go` (never called), `repository.UpdateUser` (no route), `CreateNotificationTx`, `GetPendingInvitationsForGroup` (declared in the service interface, never invoked), `UpdateGroup/DeleteGroup/DeleteUser`, comment-reaction constants. Prune or wire up.
+4. **N+1 query patterns.** `ListVisiblePosts` issues 2 extra queries per post (files + reaction summary); fine at lab scale, worth batching (`WHERE post_id IN (…)`) later.
+5. **Flat-text error bodies** (`http.Error`) vs JSON everywhere else — the frontend surfaces raw strings like `"authentication required"` to users. Pick one response envelope.
+6. **No tests at all** (0 test files). For a subject that emphasizes migration testing, at least repository/migration smoke tests would pay off.
+7. **Naming:** `follow_requests` doubles as the follow graph; `almost_private`/`private` mapping is counterintuitive (private = "selected followers"); document or rename in a future migration.
+8. **Config:** hardcoded ports/paths (`:8080`, `sn.db`, `uploads`, `localhost:8080`) — env-var-ify before Docker can work (BUG-010).
 
 ---
 
 ## 20. Missing requirements
 
-| Requirement | Subject reference | What's missing | Affected parts |
+| Requirement (subject reference) | What is missing | What to implement | Affected parts |
 |---|---|---|---|
-| Comments on posts (with image/GIF) | "create posts **and comments** on already created posts… can include an image or GIF" | Entire feature: no endpoints, service, repo code, UI. Only the `comments` table exists. | Backend posts, frontend PostCard, files (`comment_id` unused) |
-| Private posts with selected followers | "private (only the followers chosen by the creator)" | API to declare chosen followers + picker UI; `post_visibility` never written | `postsvc`, new endpoint, `PostForm.jsx`, DB writes |
-| Group posts + group comments | "in a group a user can create posts and comment… only displayed to members" | No creation path (`posts.group_id` never set), no member-scoped endpoints/UI | `postsvc`, grouphandler, groups UI |
-| Group events | "create an event… title, description, day/time, going / not going" | Entire feature; tables exist unused | New service/handler/routes, groups UI, `group_events`/`event_responses` |
-| Group UI (browse/create/invite/join/chat) | whole Groups section | Backend is done; the page is a "coming soon" placeholder | `frontend/app/(main)/groups/` |
-| Follow-request notification | "notified if… some other user sends him/her a following request" | No creation anywhere | `followsvc`, notification fan-out |
-| Event-creation notification | "notified if… an event is created" | Blocked on events existing | Events + `groupsvc`/eventsvc |
-| Notifications on every page | "see the notifications in every page" | No history endpoint, no global badge/listener; page-only realtime | `(main)/layout.jsx`, Navbar, new `GET /notifications` |
-| Toggle profile public/private | "option that allows the user to turn its profile public or private" | No endpoint, no UI | `usersvc`/`userhandler`, settings page |
-| Followers/following lists on profile | "display the users that are following… and who he/she is following" | No endpoints, no UI | `followsvc`, profile page |
-| Accept/decline follow requests (usable) | "recipient can choose to accept or decline" | Backend respond endpoints exist but no list endpoint + no UI | `GET /follow-requests`, frontend |
-| Avatar in the registration form | "Avatar/Image (Optional)… should be present in the form" | Field absent; only post-login `POST /avatar` | `register/page.jsx` (multipart submit) |
-| Emojis in chat (picker-level) | "send emojis to each other" | Unicode text works; no picker UI | `chat/[id]/page.jsx` |
-| Message history / conversations | implied by chat + persistence already built | `messages` saved but never fetchable | `GET /messages` endpoint, chat UI load |
+| **Comments on posts, with optional image/GIF, respecting post permissions** (Posts) | Everything above the `comments` table | Comment CRUD endpoints gated by `CanViewPost`, image attach via existing `files` table (`comment_id` already reserved), `PostCard` comment section | repository, new service/handler, routes, frontend PostCard |
+| **Group posts + group comments, members-only visibility** (Groups) | Everything above the `posts.group_id` column | Member-gated create/list endpoints; visibility = group membership; UI in group detail | postsvc/repository, grouphandler, routes, frontend group page |
+| **Group events: title, description, day/time, Going/Not-going choice** (Groups) | Everything above `group_events`/`event_responses` tables | Event create/list for members; response endpoint (choice upsert); UI; notification on creation | new eventsvc/handler, routes, frontend, notification hookup |
+| **Notification: follow request on private profile** (Notifications) | No notification emitted by followsvc | `CreateNotification` + `PublishNotification` on pending request creation | followsvc (needs hub), frontend inbox |
+| **Notification: event created** (Notifications) | Events missing (above) | Same as events | eventsvc |
+| **Notifications visible on every page** (Notifications) | No global UI, no unread badge, no GET endpoint | `GET /notifications` + mark-read; global bell component in `Navbar` fed by the WS already connected per tab | handler/route, Navbar, layouts |
+| **Profile: user activity** (Profile) | No notion of activity anywhere | Derive from posts/comments/reactions/events, endpoint + UI section | backend, profile page |
+| **Profile: followers & following lists** (Profile) | No endpoints/UI; data exists in `follow_requests` | Two read endpoints gated by `CanViewProfile` + profile UI lists | userhandler/routes, profile page |
+| **Toggle own profile public/private** (Profile) | No route/handler/UI despite DB support | `PUT /me` (or privacy endpoint) + toggle control | userhandler, server.go, settings/profile pages |
+| **Private post audience selection** (Posts) | No way to populate `post_visibility` | Accepted-followers picker on the composer; persist selections on create/update | postsvc, files? no — post_visibility writes, PostForm UI |
+| **Listing/acting on pending follow requests** (Followers, UX-level) | No GET endpoint/inbox | `GET /follow-requests` + accept/decline inbox | userhandler, frontend |
+| **Group chat room UI** (Chat) | Backend ready, no frontend | Group room view sending `group_id` messages | frontend chat module |
+| **Conversation/history retrieval** (Chat) | No read endpoint for `messages` | `GET /messages?user_id|group_id` + load-on-open UI | repository, handler, frontend |
+| **Avatar field present (optional) at registration** (Authentication) | Form lacks it; backend takes a string not a file | Optional file input; upload after register | register page, authhandler |
 
 ---
 
 ## 21. Partially implemented requirements
 
-1. **Private posts (selected followers)** — What works: the three-level privacy model, `private` level validation, and the visibility *query* (which checks `post_visibility`). What doesn't: nothing can ever populate `post_visibility`; no selection UI. Fix: see BUG-001.
-2. **Real-time chat delivery** — What works: full hub, auth, persistence, echo, group fan-out (in dev against `hostname:8080`). What doesn't: unreachable behind the Caddy port mapping / in Docker (BUG-003).
-3. **Notifications** — What works: group invite/join-request/response notifications, persisted + pushed, distinct message shape. What doesn't: follow-request notifications, history endpoint, read/unread, global visibility (BUG-006, BUG-009).
-4. **Logout WebSocket revocation** — What works: session deletion, cookie clearing. What doesn't: sockets of that session stay open (BUG-004).
-5. **Registration form** — Works: required fields, DOB 13+, about-me optional. Doesn't: nickname forced (BUG-005), avatar field missing (BUG-012/§20).
-6. **Profile information** — Works: public/private gating, 403 for hidden profiles, safe field projection. Doesn't: email/DOB omitted (BUG-011), followers/following lists missing, no privacy toggle, "activity" approximated by feed filtering.
-7. **Follow system** — Works: follow/unfollow, auto-accept for public, recipient-only accept/decline with duplicate handling. Doesn't: no pending-request list endpoint/UI (BUG-008), no notification (BUG-006).
-8. **Private chat** — Works: eligibility rule (follow-or-public), live delivery in dev, persistence to DB. Doesn't: history fetch, emoji picker, delivery through proxy.
-9. **Group chat** — Works: backend send/authorize/fan-out branch. Doesn't: UI, history.
-10. **Docker deployment** — Works: images build plausibly, HTTP path end-to-end via Caddy. Doesn't: WS path; fragile `/app` volume (BUG-018).
-11. **Rate limiting** — Works: per-IP window, 429 + `Retry-After`. Doesn't: coherent limits/docs (BUG-013), map pruning (BUG-014).
+1. **Private posts ("selected followers").** *Works:* privacy enum validated; SQL visibility condition for `post_visibility` correct; reactions respect it. *Doesn't work:* nothing can insert into `post_visibility`; no UI; net effect = author-only posts. *Change:* audience picker + persistence (BUG-002).
+2. **Private chat.** *Works:* real-time 1:1 delivery, persistence to DB, multi-tab, error events, emoji text. *Doesn't:* history retrieval, DM rule broader than subject (BUG-013/014), no reconnect handling. *Change:* messages GET endpoint + `CanMessage` fix.
+3. **Group chat.** *Works:* entire backend path (member check, persistence, fan-out). *Missing:* any UI surface (BUG-006).
+4. **Notifications.** *Works:* group-related notifications persisted + pushed live, correct recipients, distinct event type. *Doesn't:* follow-request + event notifications; every-page visibility; history; read state (BUG-016, §20).
+5. **Follow system.** *Works:* request/accept/decline/unfollow API with correct authorization, auto-follow for public profiles, privacy-coupled visibility. *Doesn't:* discovery of incoming requests + the required notification (BUG-007/008) → flow not completable by a normal user.
+6. **Profiles.** *Works:* info display, privacy-gated access, no password exposure. *Missing:* activity, followers/following, per-user posts endpoint, privacy toggle (BUG-020/001, §20).
+7. **Registration fields.** *Works:* all required fields, bcrypt, auto-login. *Deviates:* nickname forced required (BUG-018), avatar field absent (BUG-019).
+8. **Docker.** *Works:* both images build; Caddy proxy config is correct; volumes persist DB/uploads. *Doesn't:* frontend container can't reach the API (BUG-010) and WS is unreachable (BUG-009) → composed app non-functional.
+9. **Migrations.** *Works:* embedded, auto-applied, ordered, reversible. *Note:* `internal/` vs subject's example `pkg/` path (explicitly permitted, but call it out at defense); schema carries unused tables from unimplemented features.
 
 ---
 
@@ -443,18 +473,16 @@ reactions (target_type CHECK post|comment, target_id, user_id FK, reaction CHECK
 
 | Feature | Location | Assessment |
 |---|---|---|
-| Post like/dislike reactions | `posthandler.ReactionPost/DeleteReaction`, `reactions` table, `PostCard.jsx` | Harmless, well-gated by `CanViewPost`; extra polish |
-| Group invite/join **response** notifications | `groupsvc` | Extra; the subject explicitly welcomes extra notifications |
-| Per-IP rate limiting | `middleware/rate_limit.go` | Extra; harmless beyond the doc/header mismatch |
-| Third Caddy container | `compose.yml`, `caddy/` | Subject suggests Caddy; fine |
-| Login with nickname | `authsvc.Login` | Extra convenience; caused the nickname-required contradiction |
-| People directory derived from feed | `people/page.jsx` | Extra workaround; slightly misleading ("Everyone who appears in your feed") |
-| Message image attachments | `files.message_id`, `CanAttachToMessage` | Extra; implemented with proper authorization |
-| Group detail relationship flags | `GroupDetail`/`GroupListItem` | Supporting extra; good API hygiene |
-| Char counters / shared validation module | `CharCount.jsx`, `lib/validate.js` | Extra polish; harmless |
-| `POST /avatar` endpoint + settings UI | `filehandler.SetAvatar` | Supports the subject's avatar requirement (post-registration) |
-
-None of these are errors; the notification extras and reactions add review surface but no subject violations.
+| Post like/dislike reactions (+toggle, summary) | `repository/reaction.go`, `PostCard.jsx` | Harmless; nicely gated by visibility |
+| Post edit/delete | `postsvc`, `PostCard.jsx` | Harmless |
+| Per-IP rate limiting | `middleware/rate_limit.go` | Good instinct; fix label + leak (BUG-017/021) |
+| Caddy reverse-proxy container | `compose.yml`, `caddy/` | Extra vs "two images", but it's what makes single-port serving possible; keep |
+| Login by nickname | `authsvc.Login` | Harmless |
+| Age ≥ 13 check | `authsvc` | Harmless |
+| Group creator/invite/join response notifications | `groupsvc` | Subject says extra notifications are welcome |
+| Dark-mode support | `globals.css` | Harmless |
+| Char counters, modals, icon set | frontend components | Harmless polish |
+| `backend/schema.sql` snapshot + extensive README/docs | repo root, `docs/` | Helpful; fix drift (BUG-024) |
 
 ---
 
@@ -462,115 +490,79 @@ None of these are errors; the notification extras and reactions add review surfa
 
 | Category | Requirement | Status | Evidence | Problem |
 |---|---|---|---|---|
-| Frontend | JS framework genuinely used | ✅ | Next.js App Router throughout | — |
-| Frontend | Responsiveness | ✅ | `globals.css` mobile block | — |
-| Frontend | Navigation | ✅ | `Navbar.jsx`, route groups | — |
-| Frontend | FE/BE communication | ✅ | `lib/api.js`, cookies | — |
-| Frontend | Register form (optional fields present) | ⚠️ | `register/page.jsx` | nickname required; no avatar input |
-| Frontend | Posts composer (privacy + images) | ⚠️ | `PostForm.jsx` | no selected-followers picker |
-| Frontend | Comments UI | ❌ | — | feature absent |
-| Frontend | Groups UI | ❌ | `groups/page.jsx` | static placeholder |
-| Frontend | Events UI | ❌ | — | feature absent |
-| Frontend | Private chat UI | ⚠️ | `chat/[id]/page.jsx` | no history; hardcoded WS |
-| Frontend | Group chat UI | ❌ | — | absent |
-| Frontend | Notifications on every page | ❌ | `notifications/page.jsx` | page-only, no badge/history |
-| Frontend | Accept/decline follow UI | ❌ | — | no pending-request list |
-| Frontend | Public/private toggle UI | ❌ | `settings/page.jsx` | read-only |
-| Auth | Register required fields | ⚠️ | `authsvc` | nickname rule contradicts subject |
-| Auth | Login | ✅ | `authhandler.Login` | — |
-| Auth | Logout | ⚠️ | `authhandler.Logout` | WS not revoked (BUG-004) |
-| Auth | Sessions & cookies | ✅ | `sessionsvc` | no `Secure` flag (HTTP-only deploy) |
-| Auth | bcrypt | ✅ | `authsvc` | — |
-| Auth | Stay logged in | ✅ | 30-day session | — |
-| Followers | Follow request / accept / decline | ⚠️ | `followsvc` | no list endpoint → unusable end-to-end |
-| Followers | Public auto-follow | ✅ | `followsvc.Follow` | — |
-| Followers | Unfollow | ✅ | `DeleteFollow` | — |
-| Followers | Follow-request notification | ❌ | — | not created |
-| Profile | Public/private visibility rules | ✅ | `CanViewProfile` | — |
-| Profile | All register info minus password | ⚠️ | `PublicUser` | email/DOB omitted |
-| Profile | Own posts on profile | ⚠️ | `profile/[id]/page.jsx` | feed-filter approximation |
-| Profile | Followers/following lists | ❌ | — | absent |
-| Profile | Toggle public/private | ❌ | — | absent |
-| Profile | Password never displayed | ✅ | hand-built JSON maps | — |
-| Posts | Create with image/GIF | ✅ | `POST /posts` + `/files` | — |
-| Posts | Public posts | ✅ | `postVisibleCondition` | — |
-| Posts | Almost-private posts | ✅ | follow-based condition | — |
-| Posts | Private (selected followers) | 🔴 | `post_visibility` | never populated (BUG-001) |
-| Posts | Comments with images | ❌ | — | absent |
-| Posts | Group posts | ❌ | — | `group_id` never set |
-| Groups | Create / invite / accept / refuse | ✅ | `groupsvc` | — |
-| Groups | Members invite others | ✅ | `Invite` | — |
-| Groups | Join requests + creator decisions | ✅ | `RequestJoin`/`RespondJoinRequest` | — |
-| Groups | Browse all groups | ⚠️ | `GET /groups` | no UI |
-| Groups | Group posts/comments member-only | ❌ | — | absent |
-| Groups | Events + going/not-going | ❌ | — | tables unused |
-| Chat | Private-message eligibility rule | ✅ | `CanMessage` | — |
-| Chat | Real-time delivery | 🔴 | `hub.go` | hardcoded WS URL (BUG-003) |
-| Chat | Message persistence | ⚠️ | `messages` table | saved but never readable |
-| Chat | Emojis | ⚠️ | text passthrough | no picker |
-| Chat | Group chat room | ❌ | backend branch only | not end-to-end |
-| Notifications | Group invitation / join-request | ✅ | `groupsvc.notify` | — |
-| Notifications | Follow-request notification | ❌ | — | absent |
-| Notifications | Event notification | ❌ | — | no events |
-| Notifications | History / read-unread | ❌ | — | no endpoints |
-| SQLite | SQLite used, schema & constraints | ✅ | migrations, `schema.sql` | — |
-| SQLite | FK enforcement reliable | 🔴 | `sqlite.go Open()` | per-connection pragma (BUG-002) |
-| Migrations | System + files + run at startup | ✅ | golang-migrate embedded | clean-DB run not executed here |
-| Images | JPEG/PNG/GIF + validation + serving | ✅ | `filesvc` | — |
-| Images | Avatar at registration | ❌ | — | post-login only |
-| Docker | Backend + frontend images | ✅ | Dockerfiles | — |
-| Docker | Containers communicate | ⚠️ | Caddyfile.docker | WS path broken |
-| Docker | Clean-environment startup | ⚠️ | compose.yml | volume-over-/app quirk; not live-tested |
-| WebSocket | Upgrade, auth, multi-tab, ping/pong | ✅ | `hub.go` | — |
-| WebSocket | Logout revocation | 🔴 | `session.go` | dead code (BUG-004) |
+| Frontend | JS framework | ✅ | Next.js 16 App Router, 8 pages, layouts | — |
+| Frontend | HTML/CSS/JS + responsiveness | ✅ | `globals.css` @media 860px, mobile topbar | — |
+| Frontend | FE/BE communication | ✅ (dev) | `lib/api.js`, `/api/v1` rewrite, credentials | breaks in Docker (BUG-010) |
+| Backend | Server, routes, middleware, error mapping | ✅ | `server.go` 31 routes, 2 middlewares | session double-lookup (arch.) |
+| Backend | DB interaction | ✅ | parameterized repos, transactions | FK pragma pool issue (BUG-012) |
+| Auth | Sessions/cookies | ✅ | `sessionsvc` + HttpOnly cookie | no `Secure` (BUG-023) |
+| Auth | Registration fields | 🟡 | `authsvc.validateRegisterInput` | nickname required; avatar field absent (BUG-018/019) |
+| Auth | Logout always available | ✅ | `Navbar` + `POST /logout` | WS not revoked (BUG-011) |
+| Followers | Follow/unfollow/request/accept/decline | 🟡 | `followsvc` | no request listing/notification (BUG-007/008) |
+| Followers | Public auto-follow bypass | ✅ | `Follow()` status=accepted | — |
+| Profile | Info w/o password | ✅ | `common.PublicUser` | — |
+| Profile | Privacy-gated viewing | ✅ | `usersvc.CanViewProfile` | — |
+| Profile | Activity / followers lists | ❌ | absent | §20 |
+| Profile | Public/private toggle | ❌ | column+repo exist, no route/UI | BUG-001 |
+| Posts | Create w/ image or GIF | ✅ | `POST /posts` + `/files` | — |
+| Posts | Public / almost-private | ✅ | `postVisibleCondition` SQL | — |
+| Posts | Private (chosen followers) | 🔴 | `post_visibility` never populated | BUG-002 |
+| Posts | Comments (+image) | ❌ | table only | BUG-003 |
+| Groups | Create/invite/accept/refuse | ✅ | `groupsvc` + txs | re-invite after decline blocked (BUG-015) |
+| Groups | Join requests, creator-only decision | ✅ | `RequestJoin/RespondJoinRequest` | — |
+| Groups | Browse all groups | ✅ | `GET /groups` | — |
+| Groups | Group posts/comments | ❌ | column only, filter `IS NULL` | BUG-004 |
+| Groups | Events + going/not-going | ❌ | tables only | BUG-005 |
+| Chat | Private messaging, real-time | ✅ | hub + `messages` | — |
+| Chat | Follow-relationship rule | 🔴 | `CanMessage` public short-circuit | BUG-014 |
+| Chat | Persistence/history | 🟡 | persisted, never read | BUG-013 |
+| Chat | Emojis | ✅ | UTF-8 text content | no picker (cosmetic) |
+| Group chat | Members-only room | 🟡 | backend complete | no UI (BUG-006) |
+| Notifications | Group invite / join-request / responses | ✅ | `groupsvc.notify` | — |
+| Notifications | Follow-request / event notifications | ❌ | absent | BUG-007, events |
+| Notifications | Visible on every page | ❌ | no global UI/endpoint | BUG-016 |
+| SQLite | Schema, FKs, constraints, indexes | ✅ | migrations 1–18 | unused tables; BUG-012 |
+| Migrations | Auto-applied, up/down, ordering | ✅ | embedded golang-migrate | `internal/` vs `pkg/` path note |
+| Images | JPEG/PNG/GIF, storage, auth'd serving | ✅ | `filesvc`, `CanViewFile` | register avatar gap |
+| Docker | Two images build | ✅ | Dockerfiles ×2 | — |
+| Docker | Containers interoperate / clean start | 🔴 | rewrite→localhost:8080; WS→:8080 | BUG-009/010 |
+| WebSocket | Auth, hub, routing, pings, cleanup | ✅ | `hub.go` | BUG-011/022 |
 
 ---
 
 ## 24. Final summary
 
 ### ✅ Working correctly
-- Next.js frontend with real routing, validation, responsive layout; login/register flows.
-- Session-cookie authentication with bcrypt, HttpOnly cookies, guest/authorized middleware, 30-day persistence.
-- Follow system backend: request/accept/decline/unfollow + public auto-follow, duplicate-safe.
-- Posts: create/update/delete with ownership checks; public and almost-private visibility; multi-image attachments (JPEG/PNG/GIF sniffed, size-capped, per-viewer file serving).
-- **Groups backend end-to-end**: create, browse, detail with anti-enumeration, invitations and join requests with transactional accept/refuse, race-safe duplicates, group notifications persisted and pushed.
-- Private-chat eligibility rule exactly as the subject defines it (follow-relationship or public profile), message persistence, multi-tab WebSocket hub with ping/pong.
-- SQLite schema with strong constraints; embedded golang-migrate migrations applied at startup; clean build (`go build`/`go vet`).
+Next.js frontend with real routing/responsiveness; Go backend with clean layered architecture and 31 authorized routes; DB-backed cookie sessions with bcrypt; complete group membership lifecycle (create, invite, accept/decline, join requests, creator-only decisions) with atomic transactions; group invitation/join-request/response notifications persisted and pushed live; posts with three privacy values enforced in SQL plus image/GIF upload with magic-byte validation and per-viewer file serving; SQLite schema with proper FKs, constraints and indexes; 18 ordered up/down migrations embedded and auto-applied on every start; WebSocket hub with per-user fan-out, ping/pong health, correct single-writer goroutine model; JWT-free session model exactly as the subject demands.
 
-### ⚠️ Needs improvement
-- Real-time delivery only works against `hostname:8080` — must go through the same origin/proxy.
-- Notification system is group-only and page-local; needs history endpoint, read state, and a global badge.
-- Profile completeness (email/DOB), followers/following lists, privacy toggle, pending-follow-request listing.
-- Logout doesn't close WebSockets (dead session-tracking code).
-- Docker: WS path, volume-over-`/app`, rate-limit consistency.
+### Needs improvement
+Private-post audience selection (SQL ready, pipeline missing); private-chat authorization scope and history; group-chat UI; notification visibility/history/read-state; follow-request discoverability; registration nickname/avatar semantics; Docker env wiring; session-context reuse in handlers; N+1 list queries; docs drift.
 
 ### Missing
-- Comments (with images); private-post selected followers; group posts/comments; group events + RSVP; groups UI; group chat UI; follow-request & event notifications; notifications on every page; profile privacy toggle; followers/following lists; avatar in registration form; message-history/conversations endpoint; emoji picker.
+Comments (posts and groups) with images; group posts; group events with Going/Not-going; follow-request and event-creation notifications; notifications on every page; profile activity; followers/following lists; profile public/private toggle; private-post audience picker; follow-request inbox; message-history and group-chat UI; avatar field in the registration form.
 
-### Errors / bugs
-- 19 findings: 1 critical (BUG-001 private posts unusable), 3 high (FK pragma, hardcoded WS URL, dead session revocation), 7 medium, 8 low — details in §17.
+### Errors / Bugs
+26 tracked findings — headline items: BUG-001 (no privacy toggle), BUG-002 (private posts unreachable to anyone but author), BUG-003/004/005 (comments/group posts/events absent), BUG-007/008 (follow-request flow dead-ends), BUG-009/010 (Docker FE↔BE and WS connectivity), BUG-011 (logout doesn't revoke sockets), BUG-012 (FK pragma pool), BUG-013 (no history), BUG-014 (DM rule too permissive), BUG-015 (declined group requests are permanent), BUG-016 (no notification listing).
 
 ### Extra
-- Post reactions, response notifications, rate limiting, Caddy service, nickname login, people directory, chat image attachments, group detail flags, validation/counter polish — see §22.
+Reactions, post edit/delete, rate limiting, Caddy container, nickname login, age gate, dark mode, response notifications — none harmful; prune or keep deliberately.
 
 ### Security issues
-- Permissive `CheckOrigin` (mitigated by SameSite=Lax); no `Secure` cookie flag (HTTP-only deployment); raw `avatar` string accepted at register; rate-limit header/value mismatch; unbounded limiter map. No SQLi, no XSS, no path traversal, no password/PII leaks found; object-level authorization consistently enforced.
+No `Secure` cookie flag; WS `CheckOrigin` open (CSWSH); logout leaves sockets alive; FK enforcement unreliable across the pool; unbounded rate-limit map; no CSRF tokens (mitigated by SameSite=Lax). No SQL-injection, XSS, path-traversal, password-hash, or IDOR findings.
 
 ### Docker issues
-- WS unreachable in the composed deployment (BUG-003); `backend-data` volume mounted over `/app` (BUG-018); no healthchecks; clean-container run not executed in this audit (*cannot be verified from the provided source code*).
+Frontend container cannot reach the backend (`localhost:8080` rewrite); WebSocket hardcodes host port 8080; no env-var configuration; frontend container itself doesn't publish a browser-facing port (Caddy does it on 8000). Backend/frontend images and Caddy WS proxying are otherwise sound.
 
 ### Database/Migration issues
-- Per-connection `PRAGMA foreign_keys` misapplied once (BUG-002); `nickname` not unique while used for login (BUG-010); unused tables/columns (`comments`, `group_events`, `event_responses`, `post_visibility`, `files.comment_id`); expired sessions only reaped on access. Migrations themselves are well-formed, ordered, paired up/down, and executed automatically.
+Per-connection pragmas not guaranteed pool-wide (FK enforcement); four tables and two columns exist only for unimplemented features (`comments`, `post_visibility` unpopulated, `group_events`, `event_responses`, `files.comment_id`); double rebuild of `messages` in history; declined invitation/join rows permanently block re-entry; migration folder uses `internal/` instead of the subject's example `pkg/` (permitted, but be ready to explain it).
 
 ### Overall compliance
+Counted against the 40-row checklist in §1 (excluding extras):
 
-| Metric | Count |
-|---|---|
-| Requirements fully implemented | **34** |
-| Requirements partially implemented | **14** |
-| Requirements missing | **21** |
-| Requirements implemented but with a blocking bug | **4** |
-| Distinct bug findings (§17) | **19** (1 critical, 3 high, 7 medium, 8 low) |
-| Extra (not required) features | **10** |
+- **Fully implemented: 19** requirements.
+- **Partially implemented: 10** requirements (work exists at one layer, incomplete at another — details in §21).
+- **Missing: 11** requirements (§20), concentrated in comments, group content (posts/events), notifications-on-every-page, profile followers/activity/privacy-toggle, and private-post audience selection.
+- **Requirements with detected bugs: 14** rows carry at least one of the 26 tracked bugs (§17); 6 of those bugs are Critical because they nullify a subject requirement end-to-end.
+- **Extra features: 10** (§22), none flagged as harmful.
 
-Largest compliance gaps to close before presentation, in order of subject impact: **selected-followers private posts (BUG-001)**, **comments**, **group UI (posts/comments/events/chat over the finished groups backend)**, **events**, **notifications on every page + follow-request notification**, **profile privacy toggle**, and **the WebSocket URL fix** that makes chat work in the graded Docker setup.
+Largest single leverage for compliance: implement the group-content trio (group posts → group chat UI → events) on top of the already-complete membership/authorization machinery, then close the notification loop (follow-request notification + global notification surface), then fix the two Docker wiring constants.

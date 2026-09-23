@@ -58,16 +58,33 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		messageID = &parsed
 	}
+	var commentID *int64
+	if value := r.FormValue("comment_id"); value != "" {
+		parsed, parseErr := strconv.ParseInt(value, 10, 64)
+		if parseErr != nil || parsed < 1 {
+			http.Error(w, "invalid comment id", http.StatusBadRequest)
+			return
+		}
+		commentID = &parsed
+	}
 	if postID != nil && messageID != nil {
 		http.Error(w, "post_id and message_id cannot be combined", http.StatusBadRequest)
 		return
 	}
-	stored, err := h.Service.UploadMany(ownerID, headers, postID, messageID)
+	if postID != nil && commentID != nil {
+		http.Error(w, "post_id and comment_id cannot be combined", http.StatusBadRequest)
+		return
+	}
+	if messageID != nil && commentID != nil {
+		http.Error(w, "message_id and comment_id cannot be combined", http.StatusBadRequest)
+		return
+	}
+	stored, err := h.Service.UploadMany(ownerID, headers, postID, messageID, commentID)
 	if err != nil {
 		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge || err == filesvc.ErrTooManyImages {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else if err == repository.ErrNotFound {
-			http.Error(w, "post or message not found", http.StatusNotFound)
+			http.Error(w, "post, comment or message not found", http.StatusNotFound)
 		} else {
 			http.Error(w, "could not store file", http.StatusInternalServerError)
 		}

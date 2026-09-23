@@ -29,6 +29,7 @@ type Repository interface {
 	GetFile(string) (*model.File, error)
 	CanViewFile(int64, string) (bool, error)
 	GetPost(int64) (*model.Post, error)
+	GetComment(int64) (*model.Comment, error)
 	CanAttachToMessage(int64, int64) (bool, error)
 	GetUserByID(int64) (*model.User, error)
 	UpdateUser(*model.User) error
@@ -43,11 +44,11 @@ func New(repo Repository, storagePath string) *Service {
 	return &Service{repo: repo, storagePath: storagePath}
 }
 
-func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID, messageID *int64) (*model.File, error) {
+func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID, messageID, commentID *int64) (*model.File, error) {
 	if header == nil || header.Size > MaxImageSize {
 		return nil, ErrFileTooLarge
 	}
-	if postID == nil && messageID != nil {
+	if postID == nil && messageID != nil && commentID == nil {
 		allowed, err := s.repo.CanAttachToMessage(*messageID, ownerID)
 		if err != nil {
 			return nil, err
@@ -62,6 +63,15 @@ func (s *Service) Upload(ownerID int64, header *multipart.FileHeader, postID, me
 			return nil, err
 		}
 		if post.AuthorID != ownerID {
+			return nil, repository.ErrNotFound
+		}
+	}
+	if commentID != nil {
+		comment, err := s.repo.GetComment(*commentID)
+		if err != nil {
+			return nil, err
+		}
+		if comment.AuthorID != ownerID {
 			return nil, repository.ErrNotFound
 		}
 	}
@@ -108,7 +118,7 @@ if err := s.repo.CreateFile(file); err != nil {
 	}
 	return file, nil
 }
-func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, postID, messageID *int64) ([]*model.File, error) {
+func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, postID, messageID, commentID *int64) ([]*model.File, error) {
 	if len(headers) == 0 {
 		return nil, errors.New("file: at least one image is required")
 	}
@@ -117,7 +127,7 @@ func (s *Service) UploadMany(ownerID int64, headers []*multipart.FileHeader, pos
 	}
 	files := make([]*model.File, 0, len(headers))
 	for _, header := range headers {
-		file, err := s.Upload(ownerID, header, postID, messageID)
+		file, err := s.Upload(ownerID, header, postID, messageID, commentID)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +143,7 @@ func (s *Service) CanView(viewerID int64, id string) (bool, error) {
 }
 
 func (s *Service) SetAvatar(ownerID int64, header *multipart.FileHeader) (*model.User, error) {
-	file, err := s.Upload(ownerID, header, nil, nil)
+	file, err := s.Upload(ownerID, header, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}

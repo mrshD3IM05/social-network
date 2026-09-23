@@ -10,6 +10,7 @@ var (
 	ErrInvalidPrivacy  = errors.New("post: invalid privacy")
 	ErrInvalidReaction = errors.New("post: invalid reaction")
 	ErrNotFound        = errors.New("post: not found")
+	ErrNotGroupMember  = errors.New("post: only group members can do that")
 )
 
 type Repository interface {
@@ -24,6 +25,8 @@ type Repository interface {
 	SetReaction(string, int64, int64, string) error
 	DeleteReaction(string, int64, int64) error
 	GetReactionSummary(string, int64, int64) (*model.ReactionSummary, error)
+	IsGroupMember(int64, int64) (bool, error)
+	ListGroupPosts(groupID, viewerID int64) ([]*model.Post, error)
 }
 type Service struct{ repo Repository }
 
@@ -75,6 +78,67 @@ func (s *Service) Delete(ownerID, postID int64) error {
 }
 func (s *Service) ListVisible(viewerID int64) ([]*model.Post, error) {
 	return s.repo.ListVisiblePosts(viewerID)
+}
+
+// Get returns one post the viewer is allowed to see (privacy rules for
+// normal posts, group membership for group posts — both in CanViewPost).
+func (s *Service) Get(viewerID, postID int64) (*model.Post, error) {
+	visible, err := s.repo.CanViewPost(viewerID, postID)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, ErrNotFound
+	}
+	post, err := s.repo.GetPost(postID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.LoadPostReactions(post, viewerID); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+// CreateGroupPost creates a post inside a group. Membership is verified
+// server-side; the visibility of group posts is membership, so the privacy
+// column is pinned to public (never used by the group branch of the
+// visibility rules) and client-supplied privacy values are ignored.
+func (s *Service) CreateGroupPost(authorID, groupID int64, content, privacy string) (*model.Post, error) {
+	member, err := s.repo.IsGroupMember(groupID, authorID)
+	if err != nil {
+		return nil, err
+	}
+	if !member {
+		return nil, ErrNotGroupMember
+	}
+	if !validPrivacy(privacy) {
+		privacy = model.PostPublic
+	}
+	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy, GroupID: &groupID}
+	if err := s.repo.CreatePost(post); err != nil {
+		return nil, err
+	}
+	created, err := s.repo.GetPost(post.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.LoadPostReactions(created, authorID); err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// GroupPosts lists the posts of one group. Members only.
+func (s *Service) GroupPosts(viewerID, groupID int64) ([]*model.Post, error) {
+	member, err := s.repo.IsGroupMember(groupID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !member {
+		return nil, ErrNotGroupMember
+	}
+	return s.repo.ListGroupPosts(groupID, viewerID)
 }
 
 func (s *Service) React(viewerID, postID int64, reaction string) (*model.ReactionSummary, error) {

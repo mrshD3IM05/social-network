@@ -51,6 +51,32 @@ func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusOK, posts)
 }
+
+// GetPost handles GET /posts/{id}. Visibility follows CanViewPost: privacy
+// rules for normal posts, group membership for group posts — invisible posts
+// answer 404 like the reaction endpoints.
+func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
+	viewerID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	id, err := parseID(r)
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	post, err := h.Service.Get(viewerID, id)
+	if err != nil {
+		if err == postsvc.ErrNotFound {
+			http.Error(w, "post not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "could not get post", http.StatusInternalServerError)
+		}
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, post)
+}
 func (h *Handler) ReactionPost(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
