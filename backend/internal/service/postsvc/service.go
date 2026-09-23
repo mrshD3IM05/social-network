@@ -77,6 +77,26 @@ func (s *Service) ListVisible(viewerID int64) ([]*model.Post, error) {
 	return s.repo.ListVisiblePosts(viewerID)
 }
 
+// Get returns one post the viewer is allowed to see (privacy rules for
+// normal posts, group membership for group posts — both in CanViewPost).
+func (s *Service) Get(viewerID, postID int64) (*model.Post, error) {
+	visible, err := s.repo.CanViewPost(viewerID, postID)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, ErrNotFound
+	}
+	post, err := s.repo.GetPost(postID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.LoadPostReactions(post, viewerID); err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
 func (s *Service) React(viewerID, postID int64, reaction string) (*model.ReactionSummary, error) {
 	if !validReaction(reaction) {
 		return nil, ErrInvalidReaction
