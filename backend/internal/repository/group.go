@@ -393,6 +393,66 @@ func (r *Repository) GetGroupCreator(id int64) (*model.GroupCreator, error) {
 
 // ------------------------------------------------------------ aggregates
 
+// ListGroupPostIDs returns the IDs of the posts that belong to a group.
+func (r *Repository) ListGroupPostIDs(groupID int64) ([]int64, error) {
+	rows, err := r.db.Query(`SELECT id FROM posts WHERE group_id = ?`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// IsGroupPost reports whether postID belongs to groupID.
+func (r *Repository) IsGroupPost(groupID, postID int64) (bool, error) {
+	var exists int
+	err := r.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM posts WHERE id = ? AND group_id = ?)`,
+		postID, groupID,
+	).Scan(&exists)
+	return exists == 1, err
+}
+
+// GetGroupIDForPost returns the group a post belongs to. ErrNotFound when the
+// post does not exist or is not a group post.
+func (r *Repository) GetGroupIDForPost(postID int64) (int64, error) {
+	var groupID *int64
+	if err := r.QueryRow(`SELECT group_id FROM posts WHERE id = ?`, postID).Scan(&groupID); err != nil {
+		return 0, notFound(err)
+	}
+	if groupID == nil {
+		return 0, ErrNotFound
+	}
+	return *groupID, nil
+}
+
+// IsGroupEvent reports whether eventID belongs to groupID.
+func (r *Repository) IsGroupEvent(groupID, eventID int64) (bool, error) {
+	var exists int
+	err := r.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM group_events WHERE id = ? AND group_id = ?)`,
+		eventID, groupID,
+	).Scan(&exists)
+	return exists == 1, err
+}
+
+// GetGroupIDForEvent returns the group an event belongs to.
+func (r *Repository) GetGroupIDForEvent(eventID int64) (int64, error) {
+	var groupID int64
+	if err := r.QueryRow(`SELECT group_id FROM group_events WHERE id = ?`, eventID).Scan(&groupID); err != nil {
+		return 0, notFound(err)
+	}
+	return groupID, nil
+}
+
 func (r *Repository) CountGroupMembers(groupID int64) (int, error) {
 	var count int
 	err := r.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ?`, groupID).Scan(&count)
