@@ -8,16 +8,18 @@ import (
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/groupsvc"
+	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
 )
 
 type Handler struct {
 	Service *groupsvc.Service
+	Post    *postsvc.Service
 	Session *sessionsvc.Service
 }
 
-func New(service *groupsvc.Service, session *sessionsvc.Service) *Handler {
-	return &Handler{Service: service, Session: session}
+func New(service *groupsvc.Service, post *postsvc.Service, session *sessionsvc.Service) *Handler {
+	return &Handler{Service: service, Post: post, Session: session}
 }
 
 func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +221,63 @@ func (h *Handler) PendingJoinRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.WriteJSON(w, http.StatusOK, requests)
+}
+
+// ------------------------------------------------------------- group posts
+
+// CreateGroupPost handles POST /groups/{id}/posts (members only).
+func (h *Handler) CreateGroupPost(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	post, err := h.Post.CreateGroupPost(userID, groupID, r.FormValue("content"), r.FormValue("privacy"))
+	if err != nil {
+		writeGroupPostError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusCreated, post)
+}
+
+// ListGroupPosts handles GET /groups/{id}/posts (members only).
+func (h *Handler) ListGroupPosts(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	posts, err := h.Post.GroupPosts(userID, groupID)
+	if err != nil {
+		writeGroupPostError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, posts)
+}
+
+func writeGroupPostError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, postsvc.ErrNotGroupMember):
+		http.Error(w, "only group members can view or create group posts", http.StatusForbidden)
+	case errors.Is(err, postsvc.ErrInvalidPrivacy):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		http.Error(w, "could not process group post", http.StatusInternalServerError)
+	}
 }
 
 // writeError maps service and repository errors to the project's flat-text
