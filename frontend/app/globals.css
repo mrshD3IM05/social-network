@@ -383,6 +383,76 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .chat-form .btn { width: 44px; padding: 0; }
 
 /* =========================================================
+   Comments (inside PostCard)
+   ========================================================= */
+.comments {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comments-empty { padding: 4px 0; }
+.comment { display: flex; gap: 10px; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.comment-author { font-weight: 600; font-size: 14px; }
+.comment-author:hover { text-decoration: underline; text-underline-offset: 3px; }
+.comment-content { font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+.comment-images { display: flex; gap: 6px; margin-top: 6px; }
+.comment-images img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.comment-form textarea { min-height: 44px; padding: 9px 12px; font-size: 14px; }
+.comment-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.comment-bar .tool { height: 30px; padding: 0 10px; font-size: 12px; }
+.comment-bar .counter { margin-left: auto; }
+.comment-bar .btn { margin-left: 4px; }
+
+/* =========================================================
+   Group events
+   ========================================================= */
+.event { padding: 16px 20px; }
+.event-head { display: flex; align-items: center; gap: 12px; }
+.event-who { flex: 1; min-width: 0; }
+.event-who h3 { margin: 0; font-size: 18px; }
+.event-when { text-align: right; line-height: 1.35; }
+.event-when strong { display: block; font-weight: 600; }
+.event-description { margin-top: 10px; font-size: 14.5px; color: var(--ink-soft); white-space: pre-wrap; word-break: break-word; }
+.event-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.event-footer .meta { flex: 1; min-width: 140px; }
+.event-actions { display: flex; gap: 8px; }
+
+/* =========================================================
+   Group page: header bar + bottom composer
+   ========================================================= */
+.group-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; }
+.group-bar-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.group-bar-title strong { font-family: var(--font-title), sans-serif; font-size: 20px; font-weight: 700; }
+.group-bar .btn { flex-shrink: 0; }
+
+.group-composer {
+  margin-top: 32px;
+}
+.group-composer .composer-bar::after { content: none; }
+.group-composer-event { margin-top: 10px; width: 100%; }
+
+.info-members { max-height: 40vh; overflow-y: auto; }
+
+/* =========================================================
    Groups (coming soon) and settings
    ========================================================= */
 .features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -528,5 +598,12 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .group-head-top { flex-wrap: wrap; }
   .group-head-top .btn { margin-left: 0; width: 100%; }
   .group-head-top .list-text { flex: 1; }
+  .group-bar { flex-wrap: wrap; }
+  .group-bar .btn { width: 100%; }
+  .group-bar-title { flex: 1; }
+  .event-head { flex-wrap: wrap; }
+  .event-when { text-align: left; }
+  .event-actions { width: 100%; }
+  .event-actions .btn { flex: 1; }
   .modal { max-height: calc(100dvh - 32px); }
 }
