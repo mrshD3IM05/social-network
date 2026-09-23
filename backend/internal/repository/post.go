@@ -164,6 +164,37 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 	return r.enrichPosts(posts, viewerID)
 }
 
+// ListGroupPosts returns the posts of one group, newest first. The service
+// layer checks group membership before calling this — the query itself is
+// only reachable for authorized viewers.
+func (r *Repository) ListGroupPosts(groupID, viewerID int64) ([]*model.Post, error) {
+	rows, err := r.db.Query(`
+		SELECT `+postColumns+`
+		FROM posts p
+		JOIN users u ON u.id = p.author_id
+		WHERE p.group_id = ?
+		ORDER BY p.created_at DESC, p.id DESC`,
+		groupID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	posts := make([]*model.Post, 0)
+	for rows.Next() {
+		post, err := scanPost(rows)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return r.enrichPosts(posts, viewerID)
+}
+
 // enrichPosts attaches images, reaction summaries and comment counts in
 // batched queries (files once per post, reactions and comments grouped).
 func (r *Repository) enrichPosts(posts []*model.Post, viewerID int64) ([]*model.Post, error) {
