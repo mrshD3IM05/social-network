@@ -101,20 +101,33 @@ func (r *Repository) DeletePostOwned(postID, ownerID int64) error {
 	return nil
 }
 
+// postVisibleCondition is the single source of truth for "viewer can see this
+// post row". Group posts bypass the privacy columns entirely: only members of
+// the post's group can see them, no matter which privacy value the row
+// carries. Normal (group-less) posts keep the author/public/followers/selected
+// rules unchanged.
 const postVisibleCondition = `(
-	p.author_id = ? OR p.privacy = ? OR
-	(p.privacy = ? AND EXISTS (
-		SELECT 1 FROM follow_requests f
-		WHERE f.from_user_id = ? AND f.to_user_id = p.author_id AND f.status = ?
-	)) OR
-	(p.privacy = ? AND EXISTS (
-		SELECT 1 FROM post_visibility v
-		WHERE v.post_id = p.id AND v.user_id = ?
-	))
+	p.group_id IS NOT NULL AND EXISTS (
+		SELECT 1 FROM group_members gm
+		WHERE gm.group_id = p.group_id AND gm.user_id = ?
+	)
+	OR
+	p.group_id IS NULL AND (
+		p.author_id = ? OR p.privacy = ? OR
+		(p.privacy = ? AND EXISTS (
+			SELECT 1 FROM follow_requests f
+			WHERE f.from_user_id = ? AND f.to_user_id = p.author_id AND f.status = ?
+		)) OR
+		(p.privacy = ? AND EXISTS (
+			SELECT 1 FROM post_visibility v
+			WHERE v.post_id = p.id AND v.user_id = ?
+		))
+	)
 )`
 
 func postVisibleArgs(viewerID int64) []any {
 	return []any{
+		viewerID,
 		viewerID, model.PostPublic, model.PostFollowersOnly, viewerID, model.FollowAccepted,
 		model.PostSelected, viewerID,
 	}
@@ -140,6 +153,12 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 		if err != nil {
 			return nil, err
 		}
+		posts = append(posts, post)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, post := range posts {
 		post.Images, err = r.ListPostFileIDs(post.ID)
 		if err != nil {
 			return nil, err
@@ -147,10 +166,6 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 		if err := r.LoadPostReactions(post, viewerID); err != nil {
 			return nil, err
 		}
-		posts = append(posts, post)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	return posts, nil
 }
