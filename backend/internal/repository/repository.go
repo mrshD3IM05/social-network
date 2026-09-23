@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 var (
@@ -28,4 +29,18 @@ func notFound(err error) error {
 		return ErrNotFound
 	}
 	return err
+}
+
+// placeholders returns "?, ?, ?" for n arguments (IN clauses).
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+// int64sToAny converts an ID slice into query arguments.
+func int64sToAny(ids []int64) []any {
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	return args
 }
