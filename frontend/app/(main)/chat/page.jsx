@@ -1,41 +1,39 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { fetchPeople } from '@/lib/people'
-import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
+import PersonRow from '@/components/PersonRow'
 
-// List of people you can chat with (the authors in your feed).
+// List of people you can chat with (everyone on the network).
 export default function ChatListPage() {
-  const [people, setPeople] = useState([])
+  const [people, setPeople] = useState(null)
 
   useEffect(() => {
-    fetchPeople().catch(() => {})
+    fetchPeople()
+      .then(setPeople)
+      .catch(() => setPeople([]))
   }, [])
 
   return (
     <>
       <PageHeader label="Inbox" title="Messages" subtitle="Pick someone to start a real-time conversation." />
 
-      {people.length === 0 && (
+      {people === null && <p className="loading">Loading…</p>}
+
+      {people !== null && people.length === 0 && (
         <div className="empty">
-          <p className="empty-title">No conversations yet</p>
-          <p>Open a profile and press Message to start one.</p>
+          <p className="empty-title">No one to message yet</p>
+          <p>You are the only member so far.</p>
         </div>
       )}
 
       <div className="card list">
-        {people.map(person => (
-          <Link key={person.id} href={`/chat/${person.id}`} className="list-item">
-            <Avatar user={person} size={44} />
-            <span className="list-text">
-              <strong>{person.first_name} {person.last_name}</strong>
-              <small>@{person.nickname}</small>
-            </span>
+        {people?.map(person => (
+          <PersonRow key={person.id} person={person} href={`/chat/${person.id}`}>
             <Icon name="chat" size={16} />
-          </Link>
+          </PersonRow>
         ))}
       </div>
     </>

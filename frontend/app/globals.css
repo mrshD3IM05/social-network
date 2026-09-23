@@ -442,7 +442,8 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .group-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; }
 .group-bar-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
 .group-bar-title strong { font-family: var(--font-title), sans-serif; font-size: 20px; font-weight: 700; }
-.group-bar .btn { flex-shrink: 0; }
+.group-bar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.group-bar-actions .btn { flex-shrink: 0; }
 
 .group-composer {
   margin-top: 32px;
@@ -504,11 +505,9 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .invitation-actions { display: flex; gap: 8px; }
 
 .group-head-top { display: flex; align-items: center; gap: 14px; }
-.group-head-top .btn { margin-left: auto; }
 .join-row { display: flex; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 
 .invite-list { max-height: 50vh; overflow-y: auto; }
-.invite-none { padding: 12px 0; }
 
 .modal-backdrop {
   position: fixed;
@@ -596,11 +595,11 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .invitation-actions { flex-direction: column; width: 100%; }
   .invitation-actions .btn { width: 100%; }
   .group-head-top { flex-wrap: wrap; }
-  .group-head-top .btn { margin-left: 0; width: 100%; }
   .group-head-top .list-text { flex: 1; }
   .group-bar { flex-wrap: wrap; }
-  .group-bar .btn { width: 100%; }
   .group-bar-title { flex: 1; }
+  .group-bar-actions { width: 100%; }
+  .group-bar-actions .btn { flex: 1; }
   .event-head { flex-wrap: wrap; }
   .event-when { text-align: left; }
   .event-actions { width: 100%; }

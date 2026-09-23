@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
+import { fetchPeople } from '@/lib/people'
 import { LIMITS, checkText } from '@/lib/validate'
 import Modal from '@/components/Modal'
+import Avatar from '@/components/Avatar'
 import GroupCard from '@/components/GroupCard'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
@@ -13,6 +15,7 @@ import CharCount from '@/components/CharCount'
 export default function GroupsPage() {
   const [groups, setGroups] = useState(null)
   const [invitations, setInvitations] = useState([])
+  const [people, setPeople] = useState({}) // user id → person, to name the inviters
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [joiningId, setJoiningId] = useState(null) // id of the group being joined
@@ -26,7 +29,13 @@ export default function GroupsPage() {
       .catch(() => {}) // the inbox is secondary; the list above still shows
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    load()
+    // the directory turns "user #3" into a name and a face on the invitations
+    fetchPeople()
+      .then(list => setPeople(Object.fromEntries(list.map(person => [person.id, person]))))
+      .catch(() => {})
+  }, [])
 
   async function respondInvitation(id, accept) {
     setError('')
@@ -62,19 +71,22 @@ export default function GroupsPage() {
       {invitations.length > 0 && (
         <section className="card invitations">
           <h2>Group invitations</h2>
-          {invitations.map(inv => (
-            <div key={inv.id} className="list-item">
-              <span className="list-icon"><Icon name="users" size={16} /></span>
-              <span className="list-text">
-                <strong>You are invited to join “{inv.group_title}”</strong>
-                <small>User #{inv.from_user_id} invited you</small>
-              </span>
-              <div className="invitation-actions">
-                <button className="btn" onClick={() => respondInvitation(inv.id, true)}>Accept</button>
-                <button className="btn btn-light" onClick={() => respondInvitation(inv.id, false)}>Decline</button>
+          {invitations.map(inv => {
+            const from = people[inv.from_user_id]
+            return (
+              <div key={inv.id} className="list-item">
+                {from ? <Avatar user={from} size={40} /> : <span className="list-icon"><Icon name="users" size={16} /></span>}
+                <span className="list-text">
+                  <strong>You are invited to join “{inv.group_title}”</strong>
+                  <small>{from ? `${from.first_name} ${from.last_name} invited you` : 'You have a pending invitation'}</small>
+                </span>
+                <div className="invitation-actions">
+                  <button className="btn btn-sm" onClick={() => respondInvitation(inv.id, true)}>Accept</button>
+                  <button className="btn btn-light btn-sm" onClick={() => respondInvitation(inv.id, false)}>Decline</button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
 
@@ -103,7 +115,7 @@ export default function GroupsPage() {
       {showCreate && (
         <CreateGroupModal
           onClose={() => setShowCreate(false)}
-          onCreated={group => {
+          onCreated={() => {
             setShowCreate(false)
             load() // the new group shows up in the list (as creator)
           }}

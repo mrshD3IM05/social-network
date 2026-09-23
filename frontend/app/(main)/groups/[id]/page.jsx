@@ -4,20 +4,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiGet, apiPost } from '@/lib/api'
-import { fetchPeople } from '@/lib/people'
+import { fetchPeople, searchPeople } from '@/lib/people'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import CharCount from '@/components/CharCount'
+import PersonRow from '@/components/PersonRow'
 import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
 import { LIMITS } from '@/lib/validate'
 
-// One group: header bar with Group Info, posts (members), events (members),
-// and a chat-style bottom bar with the Create Event action. The API hides
-// groups you have no relation to (404) and gates posts/events to members.
+// One group: header bar with the Invite and Group Info actions, a composer,
+// events and posts (members only). The API hides groups you have no relation
+// to (404) and gates posts/events to members.
 export default function GroupDetailPage() {
   const { id } = useParams()
   const [me, setMe] = useState(null)
@@ -33,7 +34,7 @@ export default function GroupDetailPage() {
 
   const isMember = group?.is_member || group?.is_creator
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [detail, current] = await Promise.all([apiGet(`/groups/${id}`), apiGet('/me')])
       setGroup(detail)
@@ -42,51 +43,59 @@ export default function GroupDetailPage() {
       if (err.status === 404) setNotFound(true)
       else setError(err.message)
     }
-  }
+  }, [id])
+
+  // Posts and events sit behind the same membership check, so both the first
+  // paint and every refresh go through these two helpers.
+  const loadPosts = useCallback(
+    () => apiGet(`/groups/${id}/posts`).then(setPosts).catch(() => setPosts([])),
+    [id],
+  )
+  const loadEvents = useCallback(
+    () => apiGet(`/groups/${id}/events`).then(setEvents).catch(() => setEvents([])),
+    [id],
+  )
 
   useEffect(() => {
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [load])
 
-  // Posts and events are only reachable for members; the API answers 403 for
-  // outsiders and the sections simply stay empty instead of erroring.
   useEffect(() => {
     if (!isMember) {
       setPosts(null)
       setEvents(null)
       return
     }
-    apiGet(`/groups/${id}/posts`).then(setPosts).catch(() => setPosts([]))
-    apiGet(`/groups/${id}/events`).then(setEvents).catch(() => setEvents([]))
-  }, [id, isMember])
+    loadPosts()
+    loadEvents()
+  }, [isMember, loadPosts, loadEvents])
 
-  const loadPosts = useCallback(() => {
-    apiGet(`/groups/${id}/posts`).then(setPosts).catch(err => setError(err.message))
-  }, [id])
-
-  async function respondJoinRequest(request, accept) {
+  // Every action reports through the same notice/error pair and reloads the
+  // group, so membership chips and counts stay in sync.
+  async function run(action, message) {
     setError('')
     setNotice('')
     try {
-      await apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`)
-      setNotice(accept ? `${request.first_name} is now a member.` : 'Request declined.')
+      await action()
+      setNotice(message)
       load()
     } catch (err) {
       setError(err.message)
     }
   }
 
-  async function requestJoin() {
-    setError('')
-    setNotice('')
-    try {
-      await apiPost(`/groups/${id}/join-requests`)
-      setNotice('Join request sent. The creator will review it.')
-      load()
-    } catch (err) {
-      setError(err.message)
-    }
+  function respondJoinRequest(request, accept) {
+    return run(
+      () => apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`),
+      accept ? `${request.first_name} is now a member.` : 'Request declined.',
+    )
+  }
+
+  function requestJoin() {
+    return run(
+      () => apiPost(`/groups/${id}/join-requests`),
+      'Join request sent. The creator will review it.',
+    )
   }
 
   if (notFound) {
@@ -113,9 +122,14 @@ export default function GroupDetailPage() {
             {group.is_creator && <> · you created this group</>}
           </small>
         </div>
-        <button className="btn btn-light" onClick={() => setShowInfo(true)}>
-          Group Info
-        </button>
+        <div className="group-bar-actions">
+          {isMember && (
+            <button className="btn" onClick={() => setShowInvite(true)}>
+              <Icon name="plus" size={16} /> Invite
+            </button>
+          )}
+          <button className="btn btn-light" onClick={() => setShowInfo(true)}>Group Info</button>
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -145,41 +159,17 @@ export default function GroupDetailPage() {
         </section>
       )}
 
+      {/* The creator answers the queue first, then reads along. */}
+      {group.is_creator && (
+        <JoinRequestsCard groupId={id} refresh={group} onRespond={respondJoinRequest} />
+      )}
+
       {/* ------------------------------------------------ member view */}
       {isMember && (
         <>
-          <p className="eyebrow section-label">Group posts</p>
-
-          {posts === null && <p className="loading">Loading posts…</p>}
-          {posts !== null && posts.length === 0 && (
-            <div className="empty">
-              <p className="empty-title">No posts yet</p>
-              <p>Write the first one with the composer below.</p>
-            </div>
-          )}
-
-          {posts?.map(post => (
-            <PostCard key={post.id} post={post} myId={me.id} onDeleted={loadPosts} />
-          ))}
-
-          <p className="eyebrow section-label">Events</p>
-          {events === null && <p className="loading">Loading events…</p>}
-          {events !== null && events.length === 0 && (
-            <div className="empty">
-              <p className="empty-title">No events scheduled</p>
-              <p>Create one with the + button below.</p>
-            </div>
-          )}
-          {events?.map(event => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onChanged={() => apiGet(`/groups/${id}/events`).then(setEvents).catch(() => {})}
-            />
-          ))}
-
-          {/* chat-style composer at the bottom: the real post form (it
-              publishes group posts) plus the Create Event action. */}
+          {/* the real post form (it publishes group posts) plus the Create
+              Event action, together at the top of the group. */}
+          <p className="eyebrow section-label">Share with the group</p>
           <div className="group-composer">
             <PostForm groupId={id} onPosted={loadPosts} />
             <button
@@ -189,11 +179,31 @@ export default function GroupDetailPage() {
               <Icon name="plus" size={16} /> Create Event
             </button>
           </div>
-        </>
-      )}
 
-      {group.is_creator && (
-        <JoinRequestsCard requests={group} onRespond={respondJoinRequest} onLoaded={setGroup} groupId={id} />
+          <p className="eyebrow section-label">Events</p>
+          {events === null && <p className="loading">Loading events…</p>}
+          {events !== null && events.length === 0 && (
+            <div className="empty">
+              <p className="empty-title">No events scheduled</p>
+              <p>Create one with the button above.</p>
+            </div>
+          )}
+          {events?.map(event => (
+            <EventCard key={event.id} event={event} onChanged={loadEvents} />
+          ))}
+
+          <p className="eyebrow section-label">Group posts</p>
+          {posts === null && <p className="loading">Loading posts…</p>}
+          {posts !== null && posts.length === 0 && (
+            <div className="empty">
+              <p className="empty-title">No posts yet</p>
+              <p>Write the first one with the composer above.</p>
+            </div>
+          )}
+          {posts?.map(post => (
+            <PostCard key={post.id} post={post} myId={me.id} onDeleted={loadPosts} />
+          ))}
+        </>
       )}
 
       {showInvite && (
@@ -208,16 +218,7 @@ export default function GroupDetailPage() {
         />
       )}
 
-      {showInfo && (
-        <InfoModal
-          group={group}
-          onClose={() => setShowInfo(false)}
-          onInviteClick={() => {
-            setShowInfo(false)
-            setShowInvite(true)
-          }}
-        />
-      )}
+      {showInfo && <InfoModal group={group} onClose={() => setShowInfo(false)} />}
 
       {showEventForm && (
         <EventFormModal
@@ -225,7 +226,7 @@ export default function GroupDetailPage() {
           onClose={() => setShowEventForm(false)}
           onCreated={event => {
             setShowEventForm(false)
-            setEvents(list => [...(list || []), event])
+            loadEvents() // the API returns events in date order, so re-read
             setNotice(`Event "${event.title}" created. Members have been notified.`)
           }}
         />
@@ -236,17 +237,16 @@ export default function GroupDetailPage() {
 
 // Pending join requests, visible to the group creator only.
 // Loaded from GET /groups/{id}/join-requests (403 for everyone else).
-function JoinRequestsCard({ requests, onRespond, onLoaded, groupId }) {
+function JoinRequestsCard({ groupId, refresh, onRespond }) {
   const [pending, setPending] = useState(null)
 
   useEffect(() => {
     apiGet(`/groups/${groupId}/join-requests`)
       .then(setPending)
       .catch(() => setPending([])) // not the creator per the API — hide the card
-  }, [groupId, requests])
+  }, [groupId, refresh])
 
-  if (pending === null) return null
-  if (pending.length === 0) return null
+  if (!pending?.length) return null
 
   function respond(request, accept) {
     setPending(list => list.filter(r => r.id !== request.id))
@@ -258,17 +258,12 @@ function JoinRequestsCard({ requests, onRespond, onLoaded, groupId }) {
       <p className="eyebrow section-label">Join requests</p>
       <div className="card list">
         {pending.map(request => (
-          <div key={request.id} className="list-item">
-            <span className="list-icon"><Icon name="users" size={16} /></span>
-            <span className="list-text">
-              <strong>{request.first_name} {request.last_name} wants to join</strong>
-              <small>@{request.nickname}</small>
-            </span>
+          <PersonRow key={request.id} person={request} size={40}>
             <div className="invitation-actions">
-              <button className="btn" onClick={() => respond(request, true)}>Accept</button>
-              <button className="btn btn-light" onClick={() => respond(request, false)}>Decline</button>
+              <button className="btn btn-sm" onClick={() => respond(request, true)}>Accept</button>
+              <button className="btn btn-light btn-sm" onClick={() => respond(request, false)}>Decline</button>
             </div>
-          </div>
+          </PersonRow>
         ))}
       </div>
     </>
@@ -276,8 +271,9 @@ function JoinRequestsCard({ requests, onRespond, onLoaded, groupId }) {
 }
 
 // Group Info dialog: everything GET /groups/{id} already provides — title,
-// description, creator, members and the caller's own status.
-function InfoModal({ group, onClose, onInviteClick }) {
+// description, creator, members and the caller's own status. Inviting lives
+// in the header bar, not here.
+function InfoModal({ group, onClose }) {
   return (
     <Modal title="Group Info" onClose={onClose}>
       <dl className="details">
@@ -289,36 +285,28 @@ function InfoModal({ group, onClose, onInviteClick }) {
             <dd><Link href={`/profile/${group.creator.id}`}>{group.creator.first_name} {group.creator.last_name}</Link></dd>
           </div>
         )}
-        <div><dt>Members</dt><dd>{group.member_count}</dd></div>
         <div><dt>Created</dt><dd>{new Date(group.created_at).toLocaleDateString()}</dd></div>
         <div><dt>Your status</dt><dd>{group.is_creator ? 'Creator' : group.is_member ? 'Member' : 'Not a member'}</dd></div>
       </dl>
 
-      <p className="eyebrow section-label">Members</p>
+      <p className="eyebrow section-label">Members · {group.member_count}</p>
       <div className="info-members">
         {group.members.map(member => (
-          <Link key={member.user_id} href={`/profile/${member.user_id}`} className="list-item">
-            <Avatar user={member} size={36} />
-            <span className="list-text">
-              <strong>{member.first_name} {member.last_name}</strong>
-              <small>@{member.nickname}</small>
-            </span>
+          <PersonRow key={member.user_id} person={member} href={`/profile/${member.user_id}`} size={36}>
             {member.user_id === group.creator_id && <span className="chip chip-accent">Creator</span>}
-          </Link>
+          </PersonRow>
         ))}
       </div>
 
       <div className="composer-bar">
-        {onInviteClick && (
-          <button className="btn btn-light" onClick={onInviteClick}>Invite people</button>
-        )}
         <button className="btn" onClick={onClose}>Done</button>
       </div>
     </Modal>
   )
 }
 
-// Pick a person from your feed and invite them to the group.
+// Pick someone from the people directory (GET /users) and invite them.
+// Members are filtered out; the API answers 409 for anyone already invited.
 function InviteModal({ groupId, memberIds, onClose, onInvited }) {
   const [people, setPeople] = useState(null)
   const [search, setSearch] = useState('')
@@ -345,12 +333,8 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
     setBusyId(null)
   }
 
-  const shown = (people || []).filter(person =>
-    !memberIds.has(person.id) &&
-    `${person.first_name} ${person.last_name} ${person.nickname}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  )
+  const candidates = (people || []).filter(person => !memberIds.has(person.id))
+  const shown = searchPeople(candidates, search)
 
   return (
     <Modal title="Invite people" onClose={onClose}>
@@ -367,33 +351,34 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
 
       {error && <p className="error">{error}</p>}
 
-      {people !== null && people.length === 0 && (
-        <div className="empty">
-          <p className="empty-title">No one to invite yet</p>
-          <p>People show up here once their posts are in your feed.</p>
-        </div>
-      )}
+      {people === null && !error && <p className="loading">Loading…</p>}
 
-      {people !== null && people.length > 0 && shown.length === 0 && (
-        <p className="meta invite-none">No one matching — everyone is already a member or invited.</p>
+      {people !== null && shown.length === 0 && (
+        <div className="empty">
+          <p className="empty-title">No one to invite</p>
+          <p>
+            {candidates.length === 0
+              ? 'Everyone on the network is already a member.'
+              : 'No one matches that search.'}
+          </p>
+        </div>
       )}
 
       <div className="invite-list">
         {shown.map(person => (
-          <div key={person.id} className="list-item">
-            <Avatar user={person} size={40} />
-            <span className="list-text">
-              <strong>{person.first_name} {person.last_name}</strong>
-              <small>@{person.nickname}</small>
-            </span>
+          <PersonRow key={person.id} person={person} size={40}>
             {invited[person.id] ? (
               <span className="chip">Invited</span>
             ) : (
-              <button className="btn btn-light btn-sm" onClick={() => invite(person)} disabled={busyId === person.id}>
+              <button
+                className="btn btn-light btn-sm"
+                onClick={() => invite(person)}
+                disabled={busyId === person.id}
+              >
                 {busyId === person.id ? '…' : 'Invite'}
               </button>
             )}
-          </div>
+          </PersonRow>
         ))}
       </div>
 
