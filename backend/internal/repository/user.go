@@ -69,6 +69,26 @@ func (r *Repository) GetUserByID(id int64) (*model.User, error) {
 	return user, nil
 }
 
+// ListUsers returns every registered user except excludeID (pass 0 to keep
+// everyone), ordered by name so the directory reads the same on every call.
+func (r *Repository) ListUsers(excludeID int64) ([]*model.User, error) {
+	rows, err := r.db.Query(`SELECT `+userColumns+` FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id`, excludeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*model.User{}
+	for rows.Next() {
+		user, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, rows.Err()
+}
+
 func (r *Repository) GetUserByEmail(email string) (*model.User, error) {
 	user, err := scanUser(r.QueryRow(`SELECT `+userColumns+` FROM users WHERE email = ?`, email))
 	if err != nil {

@@ -20,6 +20,28 @@ type Handler struct {
 func New(service *usersvc.Service, session *sessionsvc.Service, follow *followsvc.Service) *Handler {
 	return &Handler{Service: service, Session: session, Follow: follow}
 }
+
+// ListUsers handles GET /users: the people directory every "pick a person"
+// screen reads from (People, Messages, group invites). It never includes the
+// caller and only exposes the public profile fields.
+func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	viewerID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	users, err := h.Service.ListUsers(viewerID)
+	if err != nil {
+		http.Error(w, "could not list users", http.StatusInternalServerError)
+		return
+	}
+	people := make([]map[string]any, 0, len(users))
+	for _, user := range users {
+		people = append(people, common.PublicUser(user))
+	}
+	common.WriteJSON(w, http.StatusOK, people)
+}
+
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {

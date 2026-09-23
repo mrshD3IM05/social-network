@@ -11,7 +11,8 @@ import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 import CharCount from '@/components/CharCount'
 
-// Groups hub: browse every group, manage your invitations and create a group.
+// Groups hub: your invitations first, then the groups you belong to, then the
+// ones left to discover — so the list you act on is never mixed with the rest.
 export default function GroupsPage() {
   const [groups, setGroups] = useState(null)
   const [invitations, setInvitations] = useState([])
@@ -26,7 +27,7 @@ export default function GroupsPage() {
       .catch(err => setError(err.message))
     apiGet('/group-invitations')
       .then(setInvitations)
-      .catch(() => {}) // the inbox is secondary; the list above still shows
+      .catch(() => {}) // the inbox is secondary; the lists below still show
   }
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function GroupsPage() {
     try {
       await apiPost(`/group-invitations/${id}/${accept ? 'accept' : 'decline'}`)
       setInvitations(list => list.filter(inv => inv.id !== id))
-      load() // membership changed → refresh the browse list
+      load() // membership changed → the group moves to "Your groups"
     } catch (err) {
       setError(err.message)
     }
@@ -62,9 +63,21 @@ export default function GroupsPage() {
     setJoiningId(null)
   }
 
+  const mine = groups?.filter(group => group.is_member || group.is_creator) || []
+  const others = groups?.filter(group => !group.is_member && !group.is_creator) || []
+
   return (
     <>
       <PageHeader label="Communities" title="Groups" subtitle="Find your people, or start a space of your own." />
+
+      <div className="section-bar">
+        <p className="eyebrow">
+          {groups === null ? 'Loading…' : `${mine.length} joined · ${others.length} to discover`}
+        </p>
+        <button className="btn" onClick={() => setShowCreate(true)}>
+          <Icon name="plus" size={16} /> Create a group
+        </button>
+      </div>
 
       {error && <p className="error">{error}</p>}
 
@@ -75,7 +88,9 @@ export default function GroupsPage() {
             const from = people[inv.from_user_id]
             return (
               <div key={inv.id} className="list-item">
-                {from ? <Avatar user={from} size={40} /> : <span className="list-icon"><Icon name="users" size={16} /></span>}
+                {from
+                  ? <Avatar user={from} size={40} />
+                  : <span className="list-icon"><Icon name="users" size={16} /></span>}
                 <span className="list-text">
                   <strong>You are invited to join “{inv.group_title}”</strong>
                   <small>{from ? `${from.first_name} ${from.last_name} invited you` : 'You have a pending invitation'}</small>
@@ -90,36 +105,51 @@ export default function GroupsPage() {
         </section>
       )}
 
-      <div className="browse-bar">
-        <p className="eyebrow section-label">All groups</p>
-        <button className="btn" onClick={() => setShowCreate(true)}>
-          <Icon name="plus" size={16} /> Create a group
-        </button>
-      </div>
-
-      {groups === null && !error && <p className="loading">Loading…</p>}
-
-      {groups !== null && groups.length === 0 && (
-        <div className="empty">
-          <p className="empty-title">No groups yet</p>
-          <p>Be the first: create a group and invite people to it.</p>
-        </div>
+      {groups !== null && (
+        <>
+          <GroupSection
+            label="Your groups"
+            groups={mine}
+            empty="You have not joined a group yet. Pick one below, or create your own."
+            onJoin={join}
+            joiningId={joiningId}
+          />
+          <GroupSection
+            label="Discover"
+            groups={others}
+            empty="Nothing left to discover — you are in every group."
+            onJoin={join}
+            joiningId={joiningId}
+          />
+        </>
       )}
-
-      <div className="card list">
-        {groups?.map(group => (
-          <GroupCard key={group.id} group={group} onJoin={join} joining={joiningId === group.id} />
-        ))}
-      </div>
 
       {showCreate && (
         <CreateGroupModal
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false)
-            load() // the new group shows up in the list (as creator)
+            load() // the new group shows up under "Your groups" (as creator)
           }}
         />
+      )}
+    </>
+  )
+}
+
+// One titled list of groups, or a one-line reason why it is empty.
+function GroupSection({ label, groups, empty, onJoin, joiningId }) {
+  return (
+    <>
+      <p className="eyebrow section-label">{label}</p>
+      {groups.length === 0 ? (
+        <p className="meta section-empty">{empty}</p>
+      ) : (
+        <div className="card list">
+          {groups.map(group => (
+            <GroupCard key={group.id} group={group} onJoin={onJoin} joining={joiningId === group.id} />
+          ))}
+        </div>
       )}
     </>
   )

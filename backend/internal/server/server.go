@@ -17,6 +17,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("GET /me", auth.Authorized(http.HandlerFunc(h.Auth.Me)))
 
 	// user routes
+	mux.Handle("GET /users", auth.Authorized(http.HandlerFunc(h.User.ListUsers)))
 	mux.Handle("GET /user/{id}", auth.Authorized(http.HandlerFunc(h.User.GetUser)))
 	mux.Handle("POST /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowUser)))
 	mux.Handle("DELETE /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.UnfollowUser)))

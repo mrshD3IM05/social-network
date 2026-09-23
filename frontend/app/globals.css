@@ -205,6 +205,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   text-align: center;
   color: var(--muted);
 }
+.empty .btn { margin-top: 14px; }
 .empty-title { margin-bottom: 4px; font-family: var(--font-title), sans-serif; font-weight: 700; font-size: 24px; color: var(--ink); }
 
 /* =========================================================
@@ -437,21 +438,77 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .event-actions { display: flex; gap: 8px; }
 
 /* =========================================================
-   Group page: header bar + bottom composer
+   Group page: identity header + tabs
    ========================================================= */
-.group-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; }
-.group-bar-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
-.group-bar-title strong { font-family: var(--font-title), sans-serif; font-size: 20px; font-weight: 700; }
-.group-bar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.group-bar-actions .btn { flex-shrink: 0; }
-
-.group-composer {
-  margin-top: 32px;
+.group-hero { padding: 24px; }
+.group-hero-top { display: flex; align-items: center; gap: 16px; }
+.group-hero-title { flex: 1; min-width: 0; }
+.group-hero-title h1 { font-size: 28px; line-height: 1.15; word-break: break-word; }
+.group-hero-title .meta { margin-top: 4px; }
+.group-hero-desc { margin-top: 14px; color: var(--ink-soft); }
+.group-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
-.group-composer .composer-bar::after { content: none; }
-.group-composer-event { margin-top: 10px; width: 100%; }
+.group-hero-actions .btn, .group-hero-note { margin-left: auto; }
+.group-hero-note { text-align: right; }
 
-.info-members { max-height: 40vh; overflow-y: auto; }
+/* the faces of the group, overlapping like a deck of cards */
+.avatar-stack { display: flex; align-items: center; }
+.avatar-stack > * + * { margin-left: -10px; }
+.avatar-stack .avatar { border: 2px solid var(--surface); }
+.avatar-stack-more {
+  display: inline-grid;
+  place-items: center;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font: 500 12px var(--font-mono), monospace;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: 500 14px var(--font-sans), sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.tab-count { font-family: var(--font-mono), monospace; font-size: 11px; font-variant-numeric: tabular-nums; }
+.tab.active .tab-count { color: var(--accent); }
+
+/* a label on the left, the action for that section on the right */
+.section-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.section-empty { margin-bottom: 8px; }
 
 /* =========================================================
    Groups (coming soon) and settings
@@ -497,15 +554,9 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 
 .btn-sm { height: 32px; padding: 0 12px; font-size: 13px; }
 
-.browse-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.browse-bar .section-label { margin: 32px 0 14px; }
-
 .invitations { border-color: var(--accent); }
 .invitations h2 { margin-bottom: 6px; font-size: 20px; }
 .invitation-actions { display: flex; gap: 8px; }
-
-.group-head-top { display: flex; align-items: center; gap: 14px; }
-.join-row { display: flex; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 
 .invite-list { max-height: 50vh; overflow-y: auto; }
 
@@ -591,15 +642,15 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .settings-section, .features { grid-template-columns: 1fr; }
   .row { flex-direction: column; gap: 0; }
   .chat { height: calc(100vh - 140px); }
-  .browse-bar { flex-direction: column; align-items: flex-start; gap: 0; }
   .invitation-actions { flex-direction: column; width: 100%; }
   .invitation-actions .btn { width: 100%; }
-  .group-head-top { flex-wrap: wrap; }
-  .group-head-top .list-text { flex: 1; }
-  .group-bar { flex-wrap: wrap; }
-  .group-bar-title { flex: 1; }
-  .group-bar-actions { width: 100%; }
-  .group-bar-actions .btn { flex: 1; }
+  .section-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .group-hero { padding: 20px; }
+  .group-hero-title h1 { font-size: 24px; }
+  .group-hero-actions { flex-wrap: wrap; }
+  .group-hero-actions .btn { width: 100%; margin-left: 0; }
+  .group-hero-note { margin-left: 0; text-align: left; }
+  .tab { flex: none; }
   .event-head { flex-wrap: wrap; }
   .event-when { text-align: left; }
   .event-actions { width: 100%; }
