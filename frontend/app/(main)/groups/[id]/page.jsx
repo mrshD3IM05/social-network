@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiGet, apiPost } from '@/lib/api'
@@ -8,20 +8,30 @@ import { fetchPeople } from '@/lib/people'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
-import PageHeader from '@/components/PageHeader'
 import CharCount from '@/components/CharCount'
+import PostForm from '@/components/PostForm'
+import PostCard from '@/components/PostCard'
+import EventCard from '@/components/EventCard'
+import EventFormModal from '@/components/EventFormModal'
 import { LIMITS } from '@/lib/validate'
 
-// One group: info, member list, invitations (members) and join-request
-// management (creator). The API hides groups you have no relation to (404).
+// One group: header bar with Group Info, posts (members), events (members),
+// and a chat-style bottom bar with the Create Event action. The API hides
+// groups you have no relation to (404) and gates posts/events to members.
 export default function GroupDetailPage() {
   const { id } = useParams()
   const [me, setMe] = useState(null)
   const [group, setGroup] = useState(null)
+  const [posts, setPosts] = useState(null)
+  const [events, setEvents] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showInvite, setShowInvite] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
+  const [showEventForm, setShowEventForm] = useState(false)
+
+  const isMember = group?.is_member || group?.is_creator
 
   async function load() {
     try {
@@ -37,6 +47,22 @@ export default function GroupDetailPage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  // Posts and events are only reachable for members; the API answers 403 for
+  // outsiders and the sections simply stay empty instead of erroring.
+  useEffect(() => {
+    if (!isMember) {
+      setPosts(null)
+      setEvents(null)
+      return
+    }
+    apiGet(`/groups/${id}/posts`).then(setPosts).catch(() => setPosts([]))
+    apiGet(`/groups/${id}/events`).then(setEvents).catch(() => setEvents([]))
+  }, [id, isMember])
+
+  const loadPosts = useCallback(() => {
+    apiGet(`/groups/${id}/posts`).then(setPosts).catch(err => setError(err.message))
   }, [id])
 
   async function respondJoinRequest(request, accept) {
@@ -75,33 +101,38 @@ export default function GroupDetailPage() {
 
   if (!group || !me) return <p className="loading">{error || 'Loading…'}</p>
 
-  const canInvite = group.is_member || group.is_creator
-
   return (
     <>
-      <PageHeader label="Group" title={group.title} subtitle={group.description || 'No description.'} />
+      {/* ------------------------------------------------ header bar */}
+      <div className="group-bar card">
+        <Avatar user={{ avatar: null, first_name: group.title, last_name: '' }} size={44} />
+        <div className="group-bar-title">
+          <strong>{group.title}</strong>
+          <small className="meta">
+            {group.member_count} member{group.member_count === 1 ? '' : 's'}
+            {group.is_creator && <> · you created this group</>}
+          </small>
+        </div>
+        <button className="btn btn-light" onClick={() => setShowInfo(true)}>
+          Group Info
+        </button>
+      </div>
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
 
-      <section className="card group-head">
-        <div className="group-head-top">
-          <span className="list-icon"><Icon name="grid" size={20} /></span>
-          <div className="list-text">
-            <strong>
-              {group.member_count} member{group.member_count === 1 ? '' : 's'}
-              {group.creator && <> · created by {group.creator.first_name} {group.creator.last_name}</>}
-            </strong>
-            {group.is_creator && <small>You created this group.</small>}
+      {/* ------------------------------------------------ outsider view */}
+      {!isMember && (
+        <section className="card group-head">
+          <div className="group-head-top">
+            <span className="list-icon"><Icon name="grid" size={20} /></span>
+            <div className="list-text">
+              <strong>{group.description || 'No description.'}</strong>
+              {group.creator && (
+                <small>Created by {group.creator.first_name} {group.creator.last_name}</small>
+              )}
+            </div>
           </div>
-          {canInvite && (
-            <button className="btn" onClick={() => setShowInvite(true)}>
-              <Icon name="plus" size={16} /> Invite
-            </button>
-          )}
-        </div>
-
-        {!group.is_member && !group.is_creator && (
           <div className="join-row">
             {group.pending_join ? (
               <span className="chip">Requested — waiting for the creator</span>
@@ -111,26 +142,59 @@ export default function GroupDetailPage() {
               <button className="btn" onClick={requestJoin}>Request to join</button>
             )}
           </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      {/* ------------------------------------------------ member view */}
+      {isMember && (
+        <>
+          <p className="eyebrow section-label">Group posts</p>
+
+          {posts === null && <p className="loading">Loading posts…</p>}
+          {posts !== null && posts.length === 0 && (
+            <div className="empty">
+              <p className="empty-title">No posts yet</p>
+              <p>Write the first one with the composer below.</p>
+            </div>
+          )}
+
+          {posts?.map(post => (
+            <PostCard key={post.id} post={post} myId={me.id} onDeleted={loadPosts} />
+          ))}
+
+          <p className="eyebrow section-label">Events</p>
+          {events === null && <p className="loading">Loading events…</p>}
+          {events !== null && events.length === 0 && (
+            <div className="empty">
+              <p className="empty-title">No events scheduled</p>
+              <p>Create one with the + button below.</p>
+            </div>
+          )}
+          {events?.map(event => (
+            <EventCard
+              key={event.id}
+              event={event}
+              onChanged={() => apiGet(`/groups/${id}/events`).then(setEvents).catch(() => {})}
+            />
+          ))}
+
+          {/* chat-style composer at the bottom: the real post form (it
+              publishes group posts) plus the Create Event action. */}
+          <div className="group-composer">
+            <PostForm groupId={id} onPosted={loadPosts} />
+            <button
+              className="btn btn-light group-composer-event"
+              onClick={() => setShowEventForm(true)}
+            >
+              <Icon name="plus" size={16} /> Create Event
+            </button>
+          </div>
+        </>
+      )}
 
       {group.is_creator && (
         <JoinRequestsCard requests={group} onRespond={respondJoinRequest} onLoaded={setGroup} groupId={id} />
       )}
-
-      <p className="eyebrow section-label">Members</p>
-      <div className="card list">
-        {group.members.map(member => (
-          <Link key={member.user_id} href={`/profile/${member.user_id}`} className="list-item">
-            <Avatar user={member} size={44} />
-            <span className="list-text">
-              <strong>{member.first_name} {member.last_name}</strong>
-              <small>@{member.nickname}</small>
-            </span>
-            {member.user_id === group.creator_id && <span className="chip chip-accent">Creator</span>}
-          </Link>
-        ))}
-      </div>
 
       {showInvite && (
         <InviteModal
@@ -140,6 +204,29 @@ export default function GroupDetailPage() {
           onInvited={name => {
             setShowInvite(false)
             setNotice(`Invitation sent to ${name}.`)
+          }}
+        />
+      )}
+
+      {showInfo && (
+        <InfoModal
+          group={group}
+          onClose={() => setShowInfo(false)}
+          onInviteClick={() => {
+            setShowInfo(false)
+            setShowInvite(true)
+          }}
+        />
+      )}
+
+      {showEventForm && (
+        <EventFormModal
+          groupId={id}
+          onClose={() => setShowEventForm(false)}
+          onCreated={event => {
+            setShowEventForm(false)
+            setEvents(list => [...(list || []), event])
+            setNotice(`Event "${event.title}" created. Members have been notified.`)
           }}
         />
       )}
@@ -185,6 +272,49 @@ function JoinRequestsCard({ requests, onRespond, onLoaded, groupId }) {
         ))}
       </div>
     </>
+  )
+}
+
+// Group Info dialog: everything GET /groups/{id} already provides — title,
+// description, creator, members and the caller's own status.
+function InfoModal({ group, onClose, onInviteClick }) {
+  return (
+    <Modal title="Group Info" onClose={onClose}>
+      <dl className="details">
+        <div><dt>Title</dt><dd>{group.title}</dd></div>
+        <div><dt>Description</dt><dd>{group.description || '—'}</dd></div>
+        {group.creator && (
+          <div>
+            <dt>Creator</dt>
+            <dd><Link href={`/profile/${group.creator.id}`}>{group.creator.first_name} {group.creator.last_name}</Link></dd>
+          </div>
+        )}
+        <div><dt>Members</dt><dd>{group.member_count}</dd></div>
+        <div><dt>Created</dt><dd>{new Date(group.created_at).toLocaleDateString()}</dd></div>
+        <div><dt>Your status</dt><dd>{group.is_creator ? 'Creator' : group.is_member ? 'Member' : 'Not a member'}</dd></div>
+      </dl>
+
+      <p className="eyebrow section-label">Members</p>
+      <div className="info-members">
+        {group.members.map(member => (
+          <Link key={member.user_id} href={`/profile/${member.user_id}`} className="list-item">
+            <Avatar user={member} size={36} />
+            <span className="list-text">
+              <strong>{member.first_name} {member.last_name}</strong>
+              <small>@{member.nickname}</small>
+            </span>
+            {member.user_id === group.creator_id && <span className="chip chip-accent">Creator</span>}
+          </Link>
+        ))}
+      </div>
+
+      <div className="composer-bar">
+        {onInviteClick && (
+          <button className="btn btn-light" onClick={onInviteClick}>Invite people</button>
+        )}
+        <button className="btn" onClick={onClose}>Done</button>
+      </div>
+    </Modal>
   )
 }
 
