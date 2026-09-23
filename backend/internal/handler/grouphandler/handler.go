@@ -4,9 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/repository"
+	"sn-backend/internal/service/eventsvc"
 	"sn-backend/internal/service/groupsvc"
 	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
@@ -15,11 +18,12 @@ import (
 type Handler struct {
 	Service *groupsvc.Service
 	Post    *postsvc.Service
+	Events  *eventsvc.Service
 	Session *sessionsvc.Service
 }
 
-func New(service *groupsvc.Service, post *postsvc.Service, session *sessionsvc.Service) *Handler {
-	return &Handler{Service: service, Post: post, Session: session}
+func New(service *groupsvc.Service, post *postsvc.Service, events *eventsvc.Service, session *sessionsvc.Service) *Handler {
+	return &Handler{Service: service, Post: post, Events: events, Session: session}
 }
 
 func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +281,138 @@ func writeGroupPostError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
 		http.Error(w, "could not process group post", http.StatusInternalServerError)
+	}
+}
+
+// ---------------------------------------------------------------- events
+
+// CreateEvent handles POST /groups/{id}/events (members only).
+func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	event, err := h.Events.Create(userID, groupID, r.FormValue("title"), r.FormValue("description"), parseEventDateTime(r.FormValue("date"), r.FormValue("time")))
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusCreated, event)
+}
+
+// ListEvents handles GET /groups/{id}/events (members only).
+func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	events, err := h.Events.List(userID, groupID)
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, events)
+}
+
+// RespondEvent handles POST /events/{id}/response (group members only).
+func (h *Handler) RespondEvent(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	eventID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	choice := strings.TrimSpace(r.FormValue("choice"))
+	going, notGoing, err := h.Events.Respond(userID, eventID, choice)
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, map[string]any{
+		"event_id":        eventID,
+		"my_choice":       choice,
+		"going_count":     going,
+		"not_going_count": notGoing,
+	})
+}
+
+// parseEventDateTime combines the HTML date/time inputs (date "2006-01-02",
+// time "15:04") into a time.Time. The zero time signals "missing", which the
+// service rejects.
+func parseEventDateTime(date, clock string) time.Time {
+	if date == "" || clock == "" {
+		return time.Time{}
+	}
+	value, err := time.ParseInLocation("2006-01-02 15:04", date+" "+clock, time.Local)
+	if err != nil {
+		return time.Time{}
+	}
+	return value
+}
+
+// MyEventResponse handles GET /events/{id}/response: the caller's current
+// going / not-going answer (null before they answer).
+func (h *Handler) MyEventResponse(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	eventID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+	response, err := h.Events.MyResponse(userID, eventID)
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	var choice *string
+	if response != nil {
+		choice = &response.Choice
+	}
+	common.WriteJSON(w, http.StatusOK, map[string]any{"event_id": eventID, "my_choice": choice})
+}
+
+func writeEventError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, eventsvc.ErrInvalidTitle),
+		errors.Is(err, eventsvc.ErrInvalidDescription),
+		errors.Is(err, eventsvc.ErrInvalidDateTime),
+		errors.Is(err, eventsvc.ErrInvalidChoice):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, eventsvc.ErrNotFound),
+		errors.Is(err, repository.ErrNotFound):
+		http.Error(w, "not found", http.StatusNotFound)
+	case errors.Is(err, eventsvc.ErrNotGroupMember):
+		http.Error(w, "only group members can do that", http.StatusForbidden)
+	default:
+		http.Error(w, "could not process event", http.StatusInternalServerError)
 	}
 }
 
