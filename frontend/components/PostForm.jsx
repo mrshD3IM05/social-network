@@ -7,7 +7,9 @@ import CharCount from './CharCount'
 import Icon from './Icon'
 
 // Form to write a new post. onPosted() is called after it is saved.
-export default function PostForm({ onPosted }) {
+// Inside a group, `groupId` is set: the post goes to the group (members only)
+// and the privacy selector disappears — group posts are member-only by design.
+export default function PostForm({ onPosted, groupId }) {
   const [content, setContent] = useState('')
   const [privacy, setPrivacy] = useState('public')
   const [files, setFiles] = useState([])
@@ -46,8 +48,10 @@ export default function PostForm({ onPosted }) {
     setLoading(true)
 
     try {
-      // 1. create the post
-      const post = await apiPost('/posts', { content: content.trim(), privacy })
+      // 1. create the post (in the group when we are inside one)
+      const post = groupId
+        ? await apiPost(`/groups/${groupId}/posts`, { content: content.trim(), privacy: 'public' })
+        : await apiPost('/posts', { content: content.trim(), privacy })
 
       // 2. upload the images and attach them to the post
       if (files.length > 0) {
@@ -55,12 +59,14 @@ export default function PostForm({ onPosted }) {
         for (const file of files) formData.append('files', file)
         formData.append('post_id', post.id)
         await apiUpload('/files', formData)
+        onPosted()
+      } else {
+        onPosted(post)
       }
 
       // 3. reset the form
       setContent('')
       setFiles([])
-      onPosted()
     } catch (err) {
       setError(err.message)
     }
@@ -71,7 +77,7 @@ export default function PostForm({ onPosted }) {
   return (
     <form className="card composer" onSubmit={handleSubmit} noValidate>
       <textarea
-        placeholder="Share something with your followers…"
+        placeholder={groupId ? 'Share something with the group…' : 'Share something with your followers…'}
         value={content}
         maxLength={LIMITS.post}
         onChange={e => setContent(e.target.value)}
@@ -95,11 +101,13 @@ export default function PostForm({ onPosted }) {
           <button type="button" className="tool" onClick={clearFiles}>Remove</button>
         )}
 
-        <select className="tool" value={privacy} onChange={e => setPrivacy(e.target.value)}>
-          <option value="public">Public</option>
-          <option value="almost_private">Followers</option>
-          <option value="private">Only me</option>
-        </select>
+        {!groupId && (
+          <select className="tool" value={privacy} onChange={e => setPrivacy(e.target.value)}>
+            <option value="public">Public</option>
+            <option value="almost_private">Followers</option>
+            <option value="private">Only me</option>
+          </select>
+        )}
 
         <CharCount value={content} max={LIMITS.post} />
 
