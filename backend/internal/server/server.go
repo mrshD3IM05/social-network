@@ -57,6 +57,10 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /group-join-requests/{id}/decline", auth.Authorized(http.HandlerFunc(h.Group.RespondJoinRequest)))
 	mux.Handle("GET /groups/{id}/join-requests", auth.Authorized(http.HandlerFunc(h.Group.PendingJoinRequests)))
 
+	// group post routes (members only, enforced in the services)
+	mux.Handle("GET /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.ListGroupPosts)))
+	mux.Handle("POST /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.CreateGroupPost)))
+
 	// websocket routes
 	mux.Handle("GET /ws", auth.Authorized(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.WebSocket.ServeHTTP(w, r, h.Auth.Session)

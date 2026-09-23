@@ -38,7 +38,7 @@ func New(repo *repository.Repository) *Handlers {
 		Post:      posthandler.New(postService, sessionsvc.New(repo)),
 		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), sessionsvc.New(repo)),
 		File:      filehandler.New(filesvc.New(repo, "uploads"), sessionsvc.New(repo)),
-		Group:     grouphandler.New(groupsvc.New(repo, webSocket), sessionsvc.New(repo)),
+		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, sessionsvc.New(repo)),
 		WebSocket: webSocket,
 	}
 }
