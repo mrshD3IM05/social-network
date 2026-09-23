@@ -61,6 +61,12 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("GET /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.ListGroupPosts)))
 	mux.Handle("POST /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.CreateGroupPost)))
 
+	// group event routes (members only, enforced in the services)
+	mux.Handle("GET /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.ListEvents)))
+	mux.Handle("POST /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.CreateEvent)))
+	mux.Handle("POST /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.RespondEvent)))
+	mux.Handle("GET /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.MyEventResponse)))
+
 	// websocket routes
 	mux.Handle("GET /ws", auth.Authorized(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.WebSocket.ServeHTTP(w, r, h.Auth.Session)

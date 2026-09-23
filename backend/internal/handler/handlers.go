@@ -10,6 +10,7 @@ import (
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/authsvc"
 	"sn-backend/internal/service/commentsvc"
+	"sn-backend/internal/service/eventsvc"
 	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/followsvc"
 	"sn-backend/internal/service/groupsvc"
@@ -38,7 +39,7 @@ func New(repo *repository.Repository) *Handlers {
 		Post:      posthandler.New(postService, sessionsvc.New(repo)),
 		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), sessionsvc.New(repo)),
 		File:      filehandler.New(filesvc.New(repo, "uploads"), sessionsvc.New(repo)),
-		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, sessionsvc.New(repo)),
+		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), sessionsvc.New(repo)),
 		WebSocket: webSocket,
 	}
 }
