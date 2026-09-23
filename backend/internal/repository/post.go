@@ -52,6 +52,9 @@ func (r *Repository) GetPost(postID int64) (*model.Post, error) {
 	if err != nil {
 		return nil, err
 	}
+	if post.CommentCount, err = r.countPostComments(post.ID); err != nil {
+		return nil, err
+	}
 	return post, nil
 }
 
@@ -158,6 +161,20 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	return r.enrichPosts(posts, viewerID)
+}
+
+// enrichPosts attaches images, reaction summaries and comment counts in
+// batched queries (files once per post, reactions and comments grouped).
+func (r *Repository) enrichPosts(posts []*model.Post, viewerID int64) ([]*model.Post, error) {
+	ids := make([]int64, 0, len(posts))
+	for _, post := range posts {
+		ids = append(ids, post.ID)
+	}
+	counts, err := r.CountPostComments(ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, post := range posts {
 		post.Images, err = r.ListPostFileIDs(post.ID)
 		if err != nil {
@@ -166,6 +183,7 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 		if err := r.LoadPostReactions(post, viewerID); err != nil {
 			return nil, err
 		}
+		post.CommentCount = counts[post.ID]
 	}
 	return posts, nil
 }

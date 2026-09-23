@@ -22,5 +22,6 @@ type Post struct {
 	Likes           int       `json:"likes"`
 	Dislikes        int       `json:"dislikes"`
 	MyReaction      string    `json:"my_reaction"`
+	CommentCount    int       `json:"comment_count"`
 	CreatedAt       time.Time `json:"created_at"`
 }
