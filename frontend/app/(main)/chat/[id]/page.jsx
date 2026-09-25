@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
 import { getDraft, setDraft } from '@/lib/draft'
+import { markRead } from '@/lib/unread'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -30,6 +31,9 @@ export default function ConversationPage() {
   useEffect(() => {
     apiGet('/me').then(setMe)
     apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
+
+    // opening the conversation means you read it, so its dot goes away
+    markRead(otherId)
 
     // the conversation is saved, so it is read back on every visit
     apiGet(`/messages/${id}`)
