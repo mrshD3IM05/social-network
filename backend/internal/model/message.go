@@ -8,6 +8,7 @@ type Message struct {
 	ToUserID   *int64    `json:"to_user_id,omitempty"`
 	GroupID    *int64    `json:"group_id,omitempty"`
 	Content    string    `json:"content"`
+	Images     []string  `json:"images"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
