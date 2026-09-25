@@ -663,3 +663,13 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .event-actions .btn { flex: 1; }
   .modal { max-height: calc(100dvh - 32px); }
 }
+
+/* =========================================================
+   Direct messages: images, typing, attachments
+   ========================================================= */
+.bubble-images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bubble-images img { max-width: 220px; max-height: 220px; border-radius: 10px; object-fit: cover; }
+.typing { align-self: flex-start; margin: 2px 0 0; font-size: 13px; font-style: italic; color: var(--muted); }
+.chat-files { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.chat-form label.icon-button { flex-shrink: 0; cursor: pointer; }
