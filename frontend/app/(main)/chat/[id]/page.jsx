@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { apiGet } from '@/lib/api'
-import { LIMITS, checkText } from '@/lib/validate'
+import { apiGet, apiUpload, imageUrl } from '@/lib/api'
+import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -17,9 +17,12 @@ export default function ConversationPage() {
   const [other, setOther] = useState(null)
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
+  const [files, setFiles] = useState([])
   const [error, setError] = useState('')
+  const [sending, setSending] = useState(false)
   const socketRef = useRef(null) // useRef keeps the socket between renders
   const bottomRef = useRef(null)
+  const fileRef = useRef(null)
 
   useEffect(() => {
     apiGet('/me').then(setMe)
@@ -56,20 +59,48 @@ export default function ConversationPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  function send(e) {
+  function pickFiles(e) {
+    const picked = Array.from(e.target.files)
+    const problem = checkImages(picked)
+    setError(problem)
+    setFiles(problem ? [] : picked)
+    if (problem) e.target.value = ''
+  }
+
+  function clearFiles() {
+    setFiles([])
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Sent over the API and not the socket: the message row has to exist before
+  // an upload can point at it, and the other side is told once both are done.
+  async function send(e) {
     e.preventDefault()
 
-    const problem = checkText('Your message', text, LIMITS.message)
+    // a message needs text, a picture, or both
+    const problem = text.trim()
+      ? checkText('Your message', text, LIMITS.message)
+      : files.length === 0 && 'Write something or add an image.'
     if (problem) {
       setError(problem)
       return
     }
 
     setError('')
-    socketRef.current.send(
-      JSON.stringify({ type: 'message', to_user_id: otherId, content: text.trim() }),
-    )
-    setText('')
+    setSending(true)
+    try {
+      const body = new FormData()
+      body.append('to_user_id', otherId)
+      body.append('content', text.trim())
+      for (const file of files) body.append('files', file)
+
+      await apiUpload('/messages', body)
+      setText('')
+      clearFiles()
+    } catch (err) {
+      setError(err.message)
+    }
+    setSending(false)
   }
 
   if (!me || !other) return <p className="loading">Loading…</p>
@@ -89,7 +120,12 @@ export default function ConversationPage() {
         {messages.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
         {messages.map(msg => (
           <div key={msg.id} className={msg.from_user_id === me.id ? 'bubble mine' : 'bubble'}>
-            {msg.content}
+            {msg.content && <span>{msg.content}</span>}
+            {msg.images?.length > 0 && (
+              <span className="bubble-images">
+                {msg.images.map(fileId => <img key={fileId} src={imageUrl(fileId)} alt="" />)}
+              </span>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -97,7 +133,26 @@ export default function ConversationPage() {
 
       {error && <p className="error chat-error">{error}</p>}
 
+      {files.length > 0 && (
+        <p className="chat-files">
+          {files.length} image{files.length > 1 ? 's' : ''} ready
+          <button type="button" className="link-button" onClick={clearFiles}>remove</button>
+        </p>
+      )}
+
       <form className="chat-form" onSubmit={send} noValidate>
+        <label className="icon-button" title="Add a photo or GIF">
+          <Icon name="image" size={16} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept={IMAGE_ACCEPT}
+            multiple
+            hidden
+            onChange={pickFiles}
+          />
+        </label>
+
         <input
           value={text}
           maxLength={LIMITS.message}
@@ -105,7 +160,7 @@ export default function ConversationPage() {
           placeholder="Write a message…"
         />
         <CharCount value={text} max={LIMITS.message} />
-        <button className="btn" title="Send" disabled={!text.trim()}>
+        <button className="btn" title="Send" disabled={sending || (!text.trim() && files.length === 0)}>
           <Icon name="send" size={16} />
         </button>
       </form>
