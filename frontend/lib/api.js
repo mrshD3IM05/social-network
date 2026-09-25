@@ -25,6 +25,11 @@ export function apiPost(path, data = {}) {
   return request(path, { method: 'POST', body: new URLSearchParams(data) })
 }
 
+// Same form encoding as apiPost — the API's ParseForm reads PUT bodies too
+export function apiPut(path, data = {}) {
+  return request(path, { method: 'PUT', body: new URLSearchParams(data) })
+}
+
 export function apiDelete(path) {
   return request(path, { method: 'DELETE' })
 }

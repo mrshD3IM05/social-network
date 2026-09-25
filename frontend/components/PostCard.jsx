@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { apiDelete, apiGet, apiPost, apiUpload, imageUrl } from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
 import Avatar from './Avatar'
 import CharCount from './CharCount'
@@ -19,6 +19,14 @@ export default function PostCard({ post, myId, onDeleted }) {
   const [dislikes, setDislikes] = useState(post.dislikes)
   const [myReaction, setMyReaction] = useState(post.my_reaction)
   const [commentCount, setCommentCount] = useState(post.comment_count ?? 0)
+  // content/privacy are editable, so the card shows its own copy
+  const [content, setContent] = useState(post.content)
+  const [privacy, setPrivacy] = useState(post.privacy)
+  const [editing, setEditing] = useState(false)
+  const [editContent, setEditContent] = useState(post.content)
+  const [editPrivacy, setEditPrivacy] = useState(post.privacy)
+  const [editError, setEditError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [open, setOpen] = useState(false)
   const [comments, setComments] = useState(null) // null = not loaded yet
   const [draft, setDraft] = useState('')
@@ -42,6 +50,39 @@ export default function PostCard({ post, myId, onDeleted }) {
     setLikes(result.likes)
     setDislikes(result.dislikes)
     setMyReaction(result.my_reaction)
+  }
+
+  // Reopening the editor always starts from what is on screen now
+  function startEdit() {
+    setEditContent(content)
+    setEditPrivacy(privacy)
+    setEditError('')
+    setEditing(true)
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    const problem = checkText('Your post', editContent, LIMITS.post)
+    if (problem) {
+      setEditError(problem)
+      return
+    }
+    setEditError('')
+    setSaving(true)
+    try {
+      // The API requires a valid privacy on every update. A group post keeps
+      // the one it was stored with — the group alone decides who can see it.
+      const updated = await apiPut(`/posts/${post.id}`, {
+        content: editContent.trim(),
+        privacy: post.group_id ? privacy : editPrivacy,
+      })
+      setContent(updated.content)
+      setPrivacy(updated.privacy)
+      setEditing(false)
+    } catch (err) {
+      setEditError(err.message)
+    }
+    setSaving(false)
   }
 
   async function remove() {
@@ -111,16 +152,49 @@ export default function PostCard({ post, myId, onDeleted }) {
           <Link href={`/profile/${post.author_id}`} className="post-author">
             {author.first_name} {author.last_name}
           </Link>
-          <span className="meta">{date}{!post.group_id && <> · {privacyNames[post.privacy]}</>}</span>
+          <span className="meta">{date}{!post.group_id && <> · {privacyNames[privacy]}</>}</span>
         </div>
-        {post.author_id === myId && (
-          <button className="icon-button" onClick={remove} title="Delete post">
-            <Icon name="trash" size={16} />
-          </button>
+        {post.author_id === myId && !editing && (
+          <>
+            <button className="icon-button" onClick={startEdit} title="Edit post">
+              <Icon name="edit" size={16} />
+            </button>
+            <button className="icon-button" onClick={remove} title="Delete post">
+              <Icon name="trash" size={16} />
+            </button>
+          </>
         )}
       </header>
 
-      <p className="post-content">{post.content}</p>
+      {editing ? (
+        <form className="post-edit" onSubmit={saveEdit} noValidate>
+          <textarea
+            value={editContent}
+            maxLength={LIMITS.post}
+            onChange={e => setEditContent(e.target.value)}
+            autoFocus
+          />
+          <div className="post-edit-bar">
+            {!post.group_id && (
+              <select className="tool" value={editPrivacy} onChange={e => setEditPrivacy(e.target.value)}>
+                <option value="public">Public</option>
+                <option value="almost_private">Followers</option>
+                <option value="private">Only me</option>
+              </select>
+            )}
+            <CharCount value={editContent} max={LIMITS.post} />
+            <button type="button" className="btn btn-sm btn-light" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-sm" disabled={saving || !editContent.trim()}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {editError && <p className="error">{editError}</p>}
+        </form>
+      ) : (
+        <p className="post-content">{content}</p>
+      )}
 
       {post.images?.length > 0 && (
         <div className="post-images">
