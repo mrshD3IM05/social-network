@@ -18,11 +18,13 @@ export default function ConversationPage() {
   const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [files, setFiles] = useState([])
+  const [typing, setTyping] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null) // useRef keeps the socket between renders
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
+  const lastTyping = useRef(0)
 
   useEffect(() => {
     apiGet('/me').then(setMe)
@@ -38,6 +40,8 @@ export default function ConversationPage() {
     const socket = new WebSocket(`${scheme}//${window.location.host}/api/v1/ws`)
     socketRef.current = socket
 
+    let typingTimer = null
+
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
       if (data.type === 'message') {
@@ -47,17 +51,39 @@ export default function ConversationPage() {
           setMessages(list => (list.some(m => m.id === msg.id) ? list : [...list, msg]))
         }
       }
+      // "typing" only means right now, so it fades on its own
+      if (data.type === 'typing' && data.from_user_id === otherId) {
+        setTyping(true)
+        clearTimeout(typingTimer)
+        typingTimer = setTimeout(() => setTyping(false), 3000)
+      }
+
       if (data.type === 'error') setError(data.error)
     }
 
     // close the connection when we leave the page
-    return () => socket.close()
+    return () => {
+      clearTimeout(typingTimer)
+      socket.close()
+    }
   }, [id, otherId])
 
   // scroll to the newest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, typing])
+
+  // Tell the other side we are writing, at most once every two seconds.
+  function onType(e) {
+    setText(e.target.value)
+
+    const now = Date.now()
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return
+    if (now - lastTyping.current < 2000) return
+
+    lastTyping.current = now
+    socketRef.current.send(JSON.stringify({ type: 'typing', to_user_id: otherId }))
+  }
 
   function pickFiles(e) {
     const picked = Array.from(e.target.files)
@@ -112,7 +138,7 @@ export default function ConversationPage() {
         <Avatar user={other} size={38} />
         <div>
           <strong>{other.first_name} {other.last_name}</strong>
-          <p className="meta">Live conversation</p>
+          <p className="meta">{typing ? 'typing…' : 'Live conversation'}</p>
         </div>
       </header>
 
@@ -128,6 +154,8 @@ export default function ConversationPage() {
             )}
           </div>
         ))}
+        {typing && <p className="typing">{other.first_name} is typing…</p>}
+
         <div ref={bottomRef} />
       </div>
 
@@ -156,7 +184,7 @@ export default function ConversationPage() {
         <input
           value={text}
           maxLength={LIMITS.message}
-          onChange={e => setText(e.target.value)}
+          onChange={onType}
           placeholder="Write a message…"
         />
         <CharCount value={text} max={LIMITS.message} />
