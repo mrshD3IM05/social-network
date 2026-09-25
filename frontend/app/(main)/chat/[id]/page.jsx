@@ -25,8 +25,14 @@ export default function ConversationPage() {
     apiGet('/me').then(setMe)
     apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
 
-    // Connect straight to the Go server (the cookie is sent automatically)
-    const socket = new WebSocket(`ws://${window.location.hostname}:8080/api/v1/ws`)
+    // the conversation is saved, so it is read back on every visit
+    apiGet(`/messages/${id}`)
+      .then(setMessages)
+      .catch(err => setError(err.message))
+
+    // same address as the page, so it also works behind the proxy
+    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const socket = new WebSocket(`${scheme}//${window.location.host}/api/v1/ws`)
     socketRef.current = socket
 
     socket.onmessage = event => {
@@ -35,7 +41,7 @@ export default function ConversationPage() {
         const msg = data.message
         // keep only the messages of this conversation
         if (msg.from_user_id === otherId || msg.to_user_id === otherId) {
-          setMessages(list => [...list, msg])
+          setMessages(list => (list.some(m => m.id === msg.id) ? list : [...list, msg]))
         }
       }
       if (data.type === 'error') setError(data.error)
@@ -80,7 +86,7 @@ export default function ConversationPage() {
       </header>
 
       <div className="chat-messages">
-        <p className="chat-note">Messages are live only and are not saved when you reload.</p>
+        {messages.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
         {messages.map(msg => (
           <div key={msg.id} className={msg.from_user_id === me.id ? 'bubble mine' : 'bubble'}>
             {msg.content}
