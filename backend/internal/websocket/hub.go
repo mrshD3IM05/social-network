@@ -114,6 +114,11 @@ func (c *Client) readPump() {
 		if err := c.connection.ReadJSON(&input); err != nil {
 			return
 		}
+		// "someone is writing" is passed on and not stored
+		if input.Type == "typing" {
+			c.hub.relayTyping(c.userID, input.ToUser)
+			continue
+		}
 		if input.Type != "message" || input.Content == "" || (input.ToUser == nil) == (input.GroupID == nil) {
 			c.sendError(ErrInvalidMessage.Error())
 			continue
