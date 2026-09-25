@@ -673,3 +673,6 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .chat-files { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 .chat-form label.icon-button { flex-shrink: 0; cursor: pointer; }
+
+/* a new message is waiting (the sidebar item is already position: relative) */
+.menu-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 999px; background: var(--accent); }
