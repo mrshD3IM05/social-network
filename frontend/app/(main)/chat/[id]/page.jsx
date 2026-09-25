@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import { getDraft, setDraft } from '@/lib/draft'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -16,7 +17,7 @@ export default function ConversationPage() {
   const [me, setMe] = useState(null)
   const [other, setOther] = useState(null)
   const [messages, setMessages] = useState([])
-  const [text, setText] = useState('')
+  const [text, setText] = useState(getDraft())
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
   const [error, setError] = useState('')
@@ -76,6 +77,7 @@ export default function ConversationPage() {
   // Tell the other side we are writing, at most once every two seconds.
   function onType(e) {
     setText(e.target.value)
+    setDraft(e.target.value)
 
     const now = Date.now()
     if (socketRef.current?.readyState !== WebSocket.OPEN) return
@@ -122,6 +124,7 @@ export default function ConversationPage() {
 
       await apiUpload('/messages', body)
       setText('')
+      setDraft('')
       clearFiles()
     } catch (err) {
       setError(err.message)
