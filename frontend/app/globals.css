@@ -574,7 +574,9 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   place-items: center;
   padding: 20px;
   background: rgba(0, 0, 0, .45);
-  animation: rise .2s var(--ease);
+  /* Opacity-only: a translateY here would also slide the backdrop's solid
+     color into place, which reads as a flicker on the page behind it. */
+  animation: backdrop-in .2s var(--ease);
 }
 .modal {
   width: 100%;
@@ -586,7 +588,13 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  overflow-y: auto; /* tall forms scroll inside the dialog, not under it */
   animation: rise .25s var(--ease);
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .modal-header h2 { font-size: 24px; }

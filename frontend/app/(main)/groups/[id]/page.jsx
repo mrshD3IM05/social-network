@@ -154,7 +154,7 @@ export default function GroupDetailPage() {
         <div className="group-hero-actions">
           <AvatarStack members={group.members} />
           {isMember ? (
-            <button className="btn" onClick={() => setShowInvite(true)}>
+            <button type="button" className="btn" onClick={() => setShowInvite(true)}>
               <Icon name="plus" size={16} /> Invite people
             </button>
           ) : group.pending_join ? (
@@ -162,7 +162,7 @@ export default function GroupDetailPage() {
           ) : group.pending_invite ? (
             <p className="meta group-hero-note">You are invited — answer it from the groups page.</p>
           ) : (
-            <button className="btn" onClick={requestJoin}>Request to join</button>
+            <button type="button" className="btn" onClick={requestJoin}>Request to join</button>
           )}
         </div>
       </header>
@@ -209,7 +209,7 @@ export default function GroupDetailPage() {
             <>
               <div className="section-bar">
                 <p className="eyebrow">Upcoming and past events</p>
-                <button className="btn btn-sm" onClick={() => setShowEventForm(true)}>
+                <button type="button" className="btn btn-sm" onClick={() => setShowEventForm(true)}>
                   <Icon name="plus" size={16} /> Create event
                 </button>
               </div>
@@ -374,11 +374,7 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
             {invited[person.id] ? (
               <span className="chip">Invited</span>
             ) : (
-              <button
-                className="btn btn-light btn-sm"
-                onClick={() => invite(person)}
-                disabled={busyId === person.id}
-              >
+              <button type="button" className="btn btn-light btn-sm" onClick={() => invite(person)} disabled={busyId === person.id}>
                 {busyId === person.id ? '…' : 'Invite'}
               </button>
             )}
@@ -388,7 +384,7 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
 
       <div className="composer-bar">
         <CharCount value={search} max={LIMITS.search} />
-        <button className="btn btn-light" onClick={onClose}>Done</button>
+        <button type="button" className="btn btn-light" onClick={onClose}>Done</button>
       </div>
     </Modal>
   )

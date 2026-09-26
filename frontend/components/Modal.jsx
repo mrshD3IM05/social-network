@@ -1,24 +1,65 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '@/components/Icon'
 
 // Simple centered dialog. Close with the X button, the backdrop, or Escape.
+//
+// It is mounted in a portal on <body> instead of inside the page that opened
+// it. That keeps it out of the page's own animation/stacking context (the
+// `.page > *` entrance animation would otherwise fade and delay the dialog on
+// every render) and keeps it centered on the viewport no matter how far the
+// page behind it is scrolled.
 export default function Modal({ title, onClose, children }) {
+  // Callers pass an inline arrow (`() => setShow(false)`), so onClose is a new
+  // function on every parent render. Reading it through a ref lets the effect
+  // below run exactly once per open: re-running it would toggle the body
+  // scroll lock off and on, which shifts the layout and looks like a refresh.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
-    document.body.style.overflow = 'hidden' // no page scroll behind the modal
+
+    // Lock the page behind the dialog while keeping the scroll position.
+    // Overflow is hidden on <html> as well as <body>: which of the two is the
+    // actual scroller differs between browsers, and leaving one unlocked lets
+    // the page behind the dialog scroll (and jump on close). Hiding the
+    // scrollbar would shift the layout sideways, so pad the freed gap back.
+    const body = document.body
+    const root = document.documentElement
+    const scrollbar = window.innerWidth - root.clientWidth
+    const prevBodyOverflow = body.style.overflow
+    const prevBodyPadding = body.style.paddingRight
+    const prevRootOverflow = root.style.overflow
+    const locked = prevBodyOverflow !== 'hidden' && prevRootOverflow !== 'hidden'
+    const scrollY = locked ? window.scrollY : null
+
+    body.style.overflow = 'hidden'
+    root.style.overflow = 'hidden'
+    if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`
+
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      body.style.overflow = prevBodyOverflow
+      body.style.paddingRight = prevBodyPadding
+      root.style.overflow = prevRootOverflow
+      // Only restore the position if this modal did the locking: restoring
+      // blindly could fight another lock (e.g. a stacked second modal).
+      if (scrollY !== null) window.scrollTo(0, scrollY)
     }
-  }, [onClose])
+  }, [])
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
+  // The server render has no document; the dialog only ever opens on the
+  // client anyway (from a click), so nothing is lost.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="modal-backdrop" onClick={() => onCloseRef.current()}>
       <div
         className="modal"
         role="dialog"
@@ -27,12 +68,18 @@ export default function Modal({ title, onClose, children }) {
       >
         <header className="modal-header">
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose} title="Close">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => onCloseRef.current()}
+            title="Close"
+          >
             <Icon name="x" />
           </button>
         </header>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -74,7 +74,7 @@ export default function GroupsPage() {
         <p className="eyebrow">
           {groups === null ? 'Loading…' : `${mine.length} joined · ${others.length} to discover`}
         </p>
-        <button className="btn" onClick={() => setShowCreate(true)}>
+        <button type="button" className="btn" onClick={() => setShowCreate(true)}>
           <Icon name="plus" size={16} /> Create a group
         </button>
       </div>
