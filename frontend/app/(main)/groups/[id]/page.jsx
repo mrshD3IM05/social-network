@@ -94,6 +94,14 @@ export default function GroupDetailPage() {
     }
   }
 
+  // Deleting a post only touches that one card: drop it from state instead
+  // of refetching, so the page keeps its scroll position and the tab count
+  // stays correct without a reload.
+  const postDeleted = useCallback(
+    postId => setPosts(list => (list ? list.filter(p => p.id !== postId) : list)),
+    [],
+  )
+
   function respondJoinRequest(request, accept) {
     setRequests(list => list.filter(r => r.id !== request.id))
     return run(
@@ -199,7 +207,13 @@ export default function GroupDetailPage() {
                 <Empty title="No posts yet">Write the first one with the box above.</Empty>
               )}
               {posts?.map(post => (
-                <PostCard key={post.id} post={post} myId={me.id} onDeleted={loadPosts} />
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  myId={me.id}
+                  isGroupCreator={group.is_creator}
+                  onDeleted={postDeleted}
+                />
               ))}
             </>
           )}

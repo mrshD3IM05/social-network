@@ -273,10 +273,40 @@ func (h *Handler) ListGroupPosts(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, posts)
 }
 
+// DeleteGroupPost handles DELETE /groups/{id}/posts/{post_id}. The current
+// user always comes from the session (never from the request body); who is
+// allowed to delete is decided in the service.
+func (h *Handler) DeleteGroupPost(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	postID, err := parseID(r, "post_id")
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Post.DeleteGroupPost(userID, groupID, postID); err != nil {
+		writeGroupPostError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func writeGroupPostError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, postsvc.ErrNotFound):
+		http.Error(w, "post not found", http.StatusNotFound)
 	case errors.Is(err, postsvc.ErrNotGroupMember):
 		http.Error(w, "only group members can view or create group posts", http.StatusForbidden)
+	case errors.Is(err, postsvc.ErrForbidden):
+		http.Error(w, "only the post author or the group creator can delete a group post", http.StatusForbidden)
 	case errors.Is(err, postsvc.ErrInvalidPrivacy):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:

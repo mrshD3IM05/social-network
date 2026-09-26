@@ -116,6 +116,8 @@ input.invalid:focus, textarea.invalid:focus {
 .btn:disabled { opacity: .5; cursor: default; }
 .btn-light { background: transparent; color: var(--ink); border-color: var(--line-strong); }
 .btn-light:hover { background: var(--surface); border-color: var(--ink); opacity: 1; }
+.btn-danger { background: var(--accent); border-color: var(--accent); }
+.btn-danger:hover { opacity: .88; }
 .btn-full { width: 100%; height: 46px; margin-top: 24px; }
 
 .icon-button {

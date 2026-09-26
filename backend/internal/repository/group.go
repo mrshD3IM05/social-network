@@ -108,6 +108,17 @@ func (r *Repository) IsGroupMember(groupID, userID int64) (bool, error) {
 	return exists == 1, err
 }
 
+// IsGroupCreator reports whether userID created groupID — the project's
+// group-admin role (the schema has no separate admin column).
+func (r *Repository) IsGroupCreator(groupID, userID int64) (bool, error) {
+	var exists int
+	err := r.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM groups WHERE id = ? AND creator_id = ?)`,
+		groupID, userID,
+	).Scan(&exists)
+	return exists == 1, err
+}
+
 const groupMemberColumns = `gm.group_id, gm.user_id, u.first_name, u.last_name, u.nickname, u.avatar, gm.created_at`
 
 func scanGroupMember(s scanner) (*model.GroupMember, error) {

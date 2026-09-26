@@ -61,6 +61,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// group post routes (members only, enforced in the services)
 	mux.Handle("GET /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.ListGroupPosts)))
 	mux.Handle("POST /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.CreateGroupPost)))
+	mux.Handle("DELETE /groups/{id}/posts/{post_id}", auth.Authorized(http.HandlerFunc(h.Group.DeleteGroupPost)))
 
 	// group event routes (members only, enforced in the services)
 	mux.Handle("GET /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.ListEvents)))
