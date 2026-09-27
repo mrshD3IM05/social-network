@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { apiGet } from '@/lib/api'
+import { apiGet, socketUrl } from '@/lib/api'
 import { LIMITS, checkText } from '@/lib/validate'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
@@ -26,7 +26,7 @@ export default function ConversationPage() {
     apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
 
     // Connect straight to the Go server (the cookie is sent automatically)
-    const socket = new WebSocket(`ws://${window.location.hostname}:8080/api/v1/ws`)
+    const socket = new WebSocket(socketUrl())
     socketRef.current = socket
 
     socket.onmessage = event => {

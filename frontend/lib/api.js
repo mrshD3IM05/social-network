@@ -43,3 +43,12 @@ export function apiUpload(path, formData) {
 export function imageUrl(id) {
   return `${API}/fs/${id}`
 }
+
+// URL of the WebSocket. In dev (next on :3000) we connect straight to the Go
+// server, which serves /ws without the /api/v1 prefix. Behind Caddy the
+// /api/v1 prefix is stripped by the proxy like for every other request.
+export function socketUrl() {
+  const { protocol, hostname, port } = window.location
+  if (port === '3000') return `ws://${hostname}:8080/ws`
+  return `${protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${API}/ws`
+}
