@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, socketUrl } from '@/lib/api'
 import { fetchPeople, searchPeople } from '@/lib/people'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
@@ -14,14 +14,15 @@ import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
-import { LIMITS } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImage, checkText } from '@/lib/validate'
 
 // One group: an identity header (who, what, how many, the actions) and one
-// tab per thing the group holds — posts, events, members, and the creator's
-// join requests. The API hides groups you have no relation to (404) and gates
-// posts, events and members to members.
+// tab per thing the group holds — posts, events, chat, members, and the
+// creator's join requests. Outsiders only see the header; the API gates
+// posts, events, chat and members to members.
 export default function GroupDetailPage() {
   const { id } = useParams()
+  const router = useRouter()
   const [me, setMe] = useState(null)
   const [group, setGroup] = useState(null)
   const [posts, setPosts] = useState(null)
@@ -33,6 +34,7 @@ export default function GroupDetailPage() {
   const [notice, setNotice] = useState('')
   const [showInvite, setShowInvite] = useState(false)
   const [showEventForm, setShowEventForm] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   const isMember = group?.is_member || group?.is_creator
 
@@ -110,6 +112,24 @@ export default function GroupDetailPage() {
     )
   }
 
+  function removeMember(member) {
+    if (!confirm(`Remove ${member.first_name} ${member.last_name} from the group?`)) return
+    return run(
+      () => apiDelete(`/groups/${id}/members/${member.user_id}`),
+      `${member.first_name} was removed from the group.`,
+    )
+  }
+
+  async function deleteGroup() {
+    if (!confirm('Delete this group? Its posts, events and messages are deleted too.')) return
+    try {
+      await apiDelete(`/groups/${id}`)
+      router.push('/groups')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   function requestJoin() {
     return run(
       () => apiPost(`/groups/${id}/join-requests`),
@@ -132,6 +152,7 @@ export default function GroupDetailPage() {
   const tabs = [
     { key: 'posts', label: 'Posts', count: posts?.length },
     { key: 'events', label: 'Events', count: events?.length },
+    { key: 'chat', label: 'Chat' },
     { key: 'members', label: 'Members', count: group.member_count },
     ...(group.is_creator ? [{ key: 'requests', label: 'Requests', count: requests.length }] : []),
   ]
@@ -141,7 +162,7 @@ export default function GroupDetailPage() {
       {/* ------------------------------------------- identity header */}
       <header className="card group-hero">
         <div className="group-hero-top">
-          <Avatar user={{ first_name: group.title, last_name: '' }} size={64} />
+          <Avatar user={{ first_name: group.title, last_name: '', avatar: group.avatar }} size={64} />
           <div className="group-hero-title">
             <h1>{group.title}</h1>
             <p className="meta">
@@ -162,9 +183,21 @@ export default function GroupDetailPage() {
         <div className="group-hero-actions">
           <AvatarStack members={group.members} />
           {isMember ? (
-            <button type="button" className="btn" onClick={() => setShowInvite(true)}>
-              <Icon name="plus" size={16} /> Invite people
-            </button>
+            <div className="group-hero-buttons">
+              {group.is_creator && (
+                <>
+                  <button type="button" className="btn btn-light" onClick={() => setShowEdit(true)}>
+                    <Icon name="edit" size={16} /> Edit
+                  </button>
+                  <button type="button" className="btn btn-light" onClick={deleteGroup}>
+                    <Icon name="trash" size={16} /> Delete
+                  </button>
+                </>
+              )}
+              <button type="button" className="btn" onClick={() => setShowInvite(true)}>
+                <Icon name="plus" size={16} /> Invite people
+              </button>
+            </div>
           ) : group.pending_join ? (
             <p className="meta group-hero-note">Join request sent — waiting for the creator.</p>
           ) : group.pending_invite ? (
@@ -239,6 +272,9 @@ export default function GroupDetailPage() {
             </>
           )}
 
+          {/* -------------------------------------------------- chat */}
+          {tab === 'chat' && <GroupChat groupId={Number(id)} me={me} members={group.members} />}
+
           {/* ----------------------------------------------- members */}
           {tab === 'members' && (
             <div className="card list">
@@ -246,6 +282,17 @@ export default function GroupDetailPage() {
                 <PersonRow key={member.user_id} person={member} href={`/profile/${member.user_id}`}>
                   {member.user_id === group.creator_id ? (
                     <span className="chip chip-accent">Creator</span>
+                  ) : group.is_creator ? (
+                    <button
+                      type="button"
+                      className="btn btn-light btn-sm"
+                      onClick={e => {
+                        e.preventDefault() // don't follow the profile link
+                        removeMember(member)
+                      }}
+                    >
+                      Remove
+                    </button>
                   ) : (
                     <Icon name="arrow" size={16} />
                   )}
@@ -288,6 +335,18 @@ export default function GroupDetailPage() {
         />
       )}
 
+      {showEdit && (
+        <EditGroupModal
+          group={group}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => {
+            setShowEdit(false)
+            setNotice('Group updated.')
+            load()
+          }}
+        />
+      )}
+
       {showEventForm && (
         <EventFormModal
           groupId={id}
@@ -300,6 +359,189 @@ export default function GroupDetailPage() {
         />
       )}
     </>
+  )
+}
+
+// The group chat: the history from the API, then new messages live over the
+// WebSocket (the server sends each group message to every member).
+function GroupChat({ groupId, me, members }) {
+  const [messages, setMessages] = useState(null)
+  const [text, setText] = useState('')
+  const [error, setError] = useState('')
+  const socketRef = useRef(null)
+  const bottomRef = useRef(null)
+
+  // user id → member, to put a name and a face on each message
+  const people = Object.fromEntries(members.map(m => [m.user_id, m]))
+
+  useEffect(() => {
+    apiGet(`/groups/${groupId}/messages`)
+      .then(setMessages)
+      .catch(err => {
+        setMessages([])
+        setError(err.message)
+      })
+
+    const socket = new WebSocket(socketUrl())
+    socketRef.current = socket
+    socket.onmessage = event => {
+      const data = JSON.parse(event.data)
+      if (data.type === 'message' && data.message.group_id === groupId) {
+        setMessages(list => [...(list || []), data.message])
+      }
+      if (data.type === 'error') setError(data.error)
+    }
+    return () => socket.close()
+  }, [groupId])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  function send(e) {
+    e.preventDefault()
+    const problem = checkText('Your message', text, LIMITS.message)
+    if (problem) {
+      setError(problem)
+      return
+    }
+    if (socketRef.current?.readyState !== WebSocket.OPEN) {
+      setError('Not connected to the chat, try again in a moment.')
+      return
+    }
+    setError('')
+    socketRef.current.send(JSON.stringify({ type: 'message', group_id: groupId, content: text.trim() }))
+    setText('')
+  }
+
+  return (
+    <section className="card chat chat-group">
+      <div className="chat-messages">
+        {messages === null && <p className="loading">Loading messages…</p>}
+        {messages?.length === 0 && <p className="chat-note">No messages yet. Say hello!</p>}
+        {messages?.map(msg => {
+          const mine = msg.from_user_id === me.id
+          const author = people[msg.from_user_id]
+          return (
+            <div key={msg.id} className={mine ? 'chat-line mine' : 'chat-line'}>
+              {!mine && <Avatar user={author} size={28} />}
+              <div>
+                {!mine && <small className="meta">{author ? author.first_name : 'Former member'}</small>}
+                <div className={mine ? 'bubble mine' : 'bubble'}>{msg.content}</div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      {error && <p className="error chat-error">{error}</p>}
+
+      <form className="chat-form" onSubmit={send} noValidate>
+        <input
+          value={text}
+          maxLength={LIMITS.message}
+          onChange={e => setText(e.target.value)}
+          placeholder="Write to the group…"
+        />
+        <CharCount value={text} max={LIMITS.message} />
+        <button className="btn" title="Send" disabled={!text.trim()}>
+          <Icon name="send" size={16} />
+        </button>
+      </form>
+    </section>
+  )
+}
+
+// Creator only: change the picture, the title and the description.
+function EditGroupModal({ group, onClose, onSaved }) {
+  const [title, setTitle] = useState(group.title)
+  const [description, setDescription] = useState(group.description)
+  const [picture, setPicture] = useState(null) // the new file, if one was picked
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const titleError = checkText('Title', title, LIMITS.groupTitle)
+  const descriptionError = checkText('Description', description, LIMITS.groupDescription, { required: false })
+
+  function pickPicture(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const problem = checkImage(file)
+    if (problem) {
+      setError(problem)
+      e.target.value = ''
+      return
+    }
+    setError('')
+    setPicture(file)
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    const problem = titleError || descriptionError
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      await apiPut(`/groups/${group.id}`, { title: title.trim(), description: description.trim() })
+      if (picture) {
+        const formData = new FormData()
+        formData.append('avatar', picture)
+        await apiUpload(`/groups/${group.id}/avatar`, formData)
+      }
+      onSaved()
+    } catch (err) {
+      setError(err.message)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="Edit group" onClose={onClose}>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="photo-row">
+          {picture ? (
+            <img className="avatar" style={{ width: 64, height: 64 }} src={URL.createObjectURL(picture)} alt="" />
+          ) : (
+            <Avatar user={{ first_name: group.title, last_name: '', avatar: group.avatar }} size={64} />
+          )}
+          <label className="btn btn-light">
+            <Icon name="camera" size={16} /> Change picture
+            <input type="file" accept={IMAGE_ACCEPT} hidden onChange={pickPicture} />
+          </label>
+        </div>
+
+        <label>Title</label>
+        <input
+          value={title}
+          maxLength={LIMITS.groupTitle}
+          className={error && titleError ? 'invalid' : undefined}
+          onChange={e => setTitle(e.target.value)}
+        />
+
+        <label>Description <small>optional</small></label>
+        <textarea
+          rows={3}
+          value={description}
+          maxLength={LIMITS.groupDescription}
+          className={error && descriptionError ? 'invalid' : undefined}
+          onChange={e => setDescription(e.target.value)}
+        />
+
+        <div className="composer-bar">
+          <CharCount value={description} max={LIMITS.groupDescription} />
+          <button className="btn" disabled={loading || Boolean(titleError) || Boolean(descriptionError)}>
+            {loading ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+
+        {error && <p className="error">{error}</p>}
+      </form>
+    </Modal>
   )
 }
 
