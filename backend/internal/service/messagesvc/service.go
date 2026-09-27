@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	ErrNotAllowed = errors.New("message: you cannot message this user")
+	ErrNotAllowed = errors.New("message: you cannot write here")
 	ErrEmpty      = errors.New("message: write something or add an image")
 	ErrTooLong    = errors.New("message: content is too long")
 )
@@ -59,6 +59,32 @@ func (s *Service) Send(fromID, toID int64, content string, withImages bool) (*mo
 	}
 
 	message := &model.Message{FromUserID: fromID, ToUserID: &toID, Content: content, Images: []string{}}
+	if err := s.repo.CreateMessage(message); err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
+// SendToGroup saves a message in a group chat. Only members may write, which
+// is the same check the websocket makes.
+func (s *Service) SendToGroup(fromID, groupID int64, content string, withImages bool) (*model.Message, error) {
+	allowed, err := s.repo.CanMessage(fromID, nil, &groupID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrNotAllowed
+	}
+
+	content = strings.TrimSpace(content)
+	if content == "" && !withImages {
+		return nil, ErrEmpty
+	}
+	if len(content) > MaxContentLength {
+		return nil, ErrTooLong
+	}
+
+	message := &model.Message{FromUserID: fromID, GroupID: &groupID, Content: content, Images: []string{}}
 	if err := s.repo.CreateMessage(message); err != nil {
 		return nil, err
 	}
