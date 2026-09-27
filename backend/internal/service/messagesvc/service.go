@@ -34,8 +34,12 @@ func New(repo Repository) *Service { return &Service{repo: repo} }
 // websocket applies before accepting a message guards it, so history cannot be
 // read by someone who could not have taken part in it.
 func (s *Service) History(viewerID, otherID int64, limit int) ([]*model.Message, error) {
-	if err := s.check(viewerID, otherID); err != nil {
+	allowed, err := s.repo.CanMessage(viewerID, &otherID, nil)
+	if err != nil {
 		return nil, err
+	}
+	if !allowed {
+		return nil, ErrNotAllowed
 	}
 	if limit < 1 || limit > MaxLimit {
 		limit = DefaultLimit
@@ -43,32 +47,11 @@ func (s *Service) History(viewerID, otherID int64, limit int) ([]*model.Message,
 	return s.repo.ListMessages(viewerID, otherID, limit)
 }
 
-// Send saves a private message. withImages says whether pictures will be
-// attached afterwards, which is what allows a message with no text.
-func (s *Service) Send(fromID, toID int64, content string, withImages bool) (*model.Message, error) {
-	if err := s.check(fromID, toID); err != nil {
-		return nil, err
-	}
-
-	content = strings.TrimSpace(content)
-	if content == "" && !withImages {
-		return nil, ErrEmpty
-	}
-	if len(content) > MaxContentLength {
-		return nil, ErrTooLong
-	}
-
-	message := &model.Message{FromUserID: fromID, ToUserID: &toID, Content: content, Images: []string{}}
-	if err := s.repo.CreateMessage(message); err != nil {
-		return nil, err
-	}
-	return message, nil
-}
-
-// SendToGroup saves a message in a group chat. Only members may write, which
-// is the same check the websocket makes.
-func (s *Service) SendToGroup(fromID, groupID int64, content string, withImages bool) (*model.Message, error) {
-	allowed, err := s.repo.CanMessage(fromID, nil, &groupID)
+// Send saves a message, either to one person or to a group chat.
+// withImages says whether pictures will be attached afterwards, which is what
+// allows a message with no text.
+func (s *Service) Send(fromID int64, toUserID, groupID *int64, content string, withImages bool) (*model.Message, error) {
+	allowed, err := s.repo.CanMessage(fromID, toUserID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +67,13 @@ func (s *Service) SendToGroup(fromID, groupID int64, content string, withImages 
 		return nil, ErrTooLong
 	}
 
-	message := &model.Message{FromUserID: fromID, GroupID: &groupID, Content: content, Images: []string{}}
+	message := &model.Message{
+		FromUserID: fromID,
+		ToUserID:   toUserID,
+		GroupID:    groupID,
+		Content:    content,
+		Images:     []string{},
+	}
 	if err := s.repo.CreateMessage(message); err != nil {
 		return nil, err
 	}
@@ -98,16 +87,5 @@ func (s *Service) LoadImages(message *model.Message) error {
 		return err
 	}
 	message.Images = images
-	return nil
-}
-
-func (s *Service) check(fromID, toID int64) error {
-	allowed, err := s.repo.CanMessage(fromID, &toID, nil)
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return ErrNotAllowed
-	}
 	return nil
 }

@@ -74,24 +74,18 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// the message goes either to one person or to a group chat
-	toGroup := r.FormValue("group_id") != ""
-
-	var message *model.Message
-	if toGroup {
-		groupID, parseErr := strconv.ParseInt(r.FormValue("group_id"), 10, 64)
-		if parseErr != nil || groupID < 1 {
-			http.Error(w, "invalid group id", http.StatusBadRequest)
-			return
-		}
-		message, err = h.Service.SendToGroup(fromID, groupID, r.FormValue("content"), len(headers) > 0)
-	} else {
-		toID, parseErr := strconv.ParseInt(r.FormValue("to_user_id"), 10, 64)
-		if parseErr != nil || toID < 1 {
-			http.Error(w, "invalid user id", http.StatusBadRequest)
-			return
-		}
-		message, err = h.Service.Send(fromID, toID, r.FormValue("content"), len(headers) > 0)
+	toUserID, err := optionalID(r.FormValue("to_user_id"))
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
 	}
+	groupID, err := optionalID(r.FormValue("group_id"))
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	message, err := h.Service.Send(fromID, toUserID, groupID, r.FormValue("content"), len(headers) > 0)
 	if err != nil {
 		writeError(w, err, "could not send the message")
 		return
@@ -135,6 +129,18 @@ func readForm(w http.ResponseWriter, r *http.Request) ([]*multipart.FileHeader, 
 		return nil, nil
 	}
 	return r.MultipartForm.File["files"], nil
+}
+
+// optionalID reads a form field that holds an id, or nil when it is not there.
+func optionalID(value string) (*int64, error) {
+	if value == "" {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id < 1 {
+		return nil, strconv.ErrSyntax
+	}
+	return &id, nil
 }
 
 func uploadStatus(err error) int {
