@@ -116,11 +116,7 @@ func (c *Client) readPump() {
 		}
 		// "someone is writing" is passed on and not stored
 		if input.Type == "typing" {
-			if input.GroupID != nil {
-				c.hub.relayGroupTyping(c.userID, input.GroupID)
-			} else {
-				c.hub.relayTyping(c.userID, input.ToUser)
-			}
+			c.hub.relayTyping(c.userID, input.ToUser, input.GroupID)
 			continue
 		}
 		if input.Type != "message" || input.Content == "" || (input.ToUser == nil) == (input.GroupID == nil) {
