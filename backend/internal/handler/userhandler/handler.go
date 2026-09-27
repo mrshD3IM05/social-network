@@ -96,6 +96,26 @@ func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusCreated, follow)
 }
+// FollowStatus handles GET /users/{id}/follow: {"status": "accepted" | "pending" | ""}
+// so the profile page knows which button to show.
+func (h *Handler) FollowStatus(w http.ResponseWriter, r *http.Request) {
+	viewerID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	targetID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	status, err := h.Follow.Status(viewerID, targetID)
+	if err != nil {
+		http.Error(w, "could not get follow status", http.StatusInternalServerError)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, map[string]string{"status": status})
+}
 func (h *Handler) UnfollowUser(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

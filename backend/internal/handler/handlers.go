@@ -33,13 +33,14 @@ type Handlers struct {
 func New(repo *repository.Repository) *Handlers {
 	webSocket := ws.NewHub(repo)
 	postService := postsvc.New(repo)
+	fileService := filesvc.New(repo, "uploads")
 	return &Handlers{
 		Auth:      authhandler.New(authsvc.New(repo), sessionsvc.New(repo), webSocket),
 		User:      userhandler.New(usersvc.New(repo), sessionsvc.New(repo), followsvc.New(repo)),
 		Post:      posthandler.New(postService, sessionsvc.New(repo)),
 		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), sessionsvc.New(repo)),
-		File:      filehandler.New(filesvc.New(repo, "uploads"), sessionsvc.New(repo)),
-		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), sessionsvc.New(repo)),
+		File:      filehandler.New(fileService, sessionsvc.New(repo)),
+		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), fileService, sessionsvc.New(repo)),
 		WebSocket: webSocket,
 	}
 }
