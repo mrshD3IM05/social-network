@@ -19,14 +19,14 @@ func (r *Repository) CreateMessage(message *model.Message) error {
 func (r *Repository) CanMessage(fromUserID int64, toUserID, groupID *int64) (bool, error) {
 	if toUserID != nil {
 		var allowed int
+		// At least one of the two must follow the other.
+		// A public profile is not enough on its own.
 		err := r.QueryRow(`SELECT EXISTS(
 			SELECT 1 FROM users target
-			WHERE target.id = ? AND (
-				 target.private = 0 OR EXISTS (
-					SELECT 1 FROM follow_requests f
-					WHERE (f.from_user_id = ? AND f.to_user_id = target.id OR f.from_user_id = target.id AND f.to_user_id = ?)
-					AND f.status = 'accepted'
-				)
+			WHERE target.id = ? AND EXISTS (
+				SELECT 1 FROM follow_requests f
+				WHERE (f.from_user_id = ? AND f.to_user_id = target.id OR f.from_user_id = target.id AND f.to_user_id = ?)
+				AND f.status = 'accepted'
 			)
 		)`, *toUserID, fromUserID, fromUserID).Scan(&allowed)
 		return allowed == 1, err
