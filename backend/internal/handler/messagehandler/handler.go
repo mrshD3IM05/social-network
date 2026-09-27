@@ -17,6 +17,7 @@ import (
 // Publisher is the websocket hub: a sent message is pushed to both sides.
 type Publisher interface {
 	PublishMessage(*model.Message)
+	PublishGroupMessage(*model.Message)
 }
 
 type Handler struct {
@@ -73,13 +74,25 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toID, err := strconv.ParseInt(r.FormValue("to_user_id"), 10, 64)
-	if err != nil || toID < 1 {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
-	}
+	// the message goes either to one person or to a group chat
+	toGroup := r.FormValue("group_id") != ""
 
-	message, err := h.Service.Send(fromID, toID, r.FormValue("content"), len(headers) > 0)
+	var message *model.Message
+	if toGroup {
+		groupID, parseErr := strconv.ParseInt(r.FormValue("group_id"), 10, 64)
+		if parseErr != nil || groupID < 1 {
+			http.Error(w, "invalid group id", http.StatusBadRequest)
+			return
+		}
+		message, err = h.Service.SendToGroup(fromID, groupID, r.FormValue("content"), len(headers) > 0)
+	} else {
+		toID, parseErr := strconv.ParseInt(r.FormValue("to_user_id"), 10, 64)
+		if parseErr != nil || toID < 1 {
+			http.Error(w, "invalid user id", http.StatusBadRequest)
+			return
+		}
+		message, err = h.Service.Send(fromID, toID, r.FormValue("content"), len(headers) > 0)
+	}
 	if err != nil {
 		writeError(w, err, "could not send the message")
 		return
@@ -96,7 +109,11 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.WebSocket.PublishMessage(message)
+	if toGroup {
+		h.WebSocket.PublishGroupMessage(message)
+	} else {
+		h.WebSocket.PublishMessage(message)
+	}
 	common.WriteJSON(w, http.StatusCreated, message)
 }
 
