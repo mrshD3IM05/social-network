@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { socketUrl } from '@/lib/api'
 import { getUnread, markUnread, onUnreadChange } from '@/lib/unread'
 
 // A small dot next to Messages while somebody's message is still unread.
@@ -16,8 +17,7 @@ export default function MessageDot({ myId }) {
   useEffect(() => onUnreadChange(setUnread), [])
 
   useEffect(() => {
-    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socket = new WebSocket(`${scheme}//${window.location.host}/api/v1/ws`)
+    const socket = new WebSocket(socketUrl())
 
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
