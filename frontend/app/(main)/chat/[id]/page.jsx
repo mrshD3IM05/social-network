@@ -21,6 +21,7 @@ export default function ConversationPage() {
   const [text, setText] = useState(getDraft())
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
+  const [blocked, setBlocked] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null) // useRef keeps the socket between renders
@@ -38,7 +39,11 @@ export default function ConversationPage() {
     // the conversation is saved, so it is read back on every visit
     apiGet(`/messages/${id}`)
       .then(setMessages)
-      .catch(err => setError(err.message))
+      .catch(err => {
+        // the API refuses when neither of you follows the other
+        if (err.status === 403) setBlocked(true)
+        else setError(err.message)
+      })
 
     // Connect straight to the Go server (the cookie is sent automatically)
     const socket = new WebSocket(socketUrl())
@@ -136,6 +141,19 @@ export default function ConversationPage() {
   }
 
   if (!me || !other) return <p className="loading">Loading…</p>
+
+  if (blocked) {
+    return (
+      <div className="card locked">
+        <span className="locked-icon"><Icon name="lock" size={22} /></span>
+        <h2>You cannot message {other.first_name} yet</h2>
+        <p className="subtitle">
+          One of you has to follow the other before you can write to each other.
+        </p>
+        <Link href={`/profile/${otherId}`} className="btn">Open their profile</Link>
+      </div>
+    )
+  }
 
   return (
     <section className="card chat">
