@@ -17,7 +17,6 @@ import (
 // Publisher is the websocket hub: a sent message is pushed to both sides.
 type Publisher interface {
 	PublishMessage(*model.Message)
-	PublishGroupMessage(*model.Message)
 }
 
 type Handler struct {
@@ -109,11 +108,7 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if toGroup {
-		h.WebSocket.PublishGroupMessage(message)
-	} else {
-		h.WebSocket.PublishMessage(message)
-	}
+	h.WebSocket.PublishMessage(message)
 	common.WriteJSON(w, http.StatusCreated, message)
 }
 
