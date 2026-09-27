@@ -12,3 +12,18 @@ func (h *Hub) PublishMessage(message *model.Message) {
 	}
 	h.publish(message.FromUserID, event)
 }
+
+// PublishGroupMessage pushes a group message to every member of the group.
+func (h *Hub) PublishGroupMessage(message *model.Message) {
+	if message.GroupID == nil {
+		return
+	}
+	members, err := h.repo.GroupMemberIDs(*message.GroupID)
+	if err != nil {
+		return
+	}
+	event := map[string]any{"type": "message", "message": message}
+	for _, memberID := range members {
+		h.publish(memberID, event)
+	}
+}
