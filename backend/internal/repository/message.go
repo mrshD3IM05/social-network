@@ -87,6 +87,11 @@ func (r *Repository) ListGroupMessages(groupID int64) ([]*model.Message, error) 
 		if err := rows.Scan(&message.ID, &message.FromUserID, &message.GroupID, &message.Content, &message.CreatedAt); err != nil {
 			return nil, err
 		}
+		// a group message can carry pictures, like a private one
+		message.Images, err = r.ListMessageFileIDs(message.ID)
+		if err != nil {
+			return nil, err
+		}
 		messages = append(messages, message)
 	}
 	return messages, rows.Err()
