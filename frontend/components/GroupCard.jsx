@@ -9,7 +9,11 @@ import Icon from '@/components/Icon'
 export default function GroupCard({ group, onJoin, joining }) {
   return (
     <Link href={`/groups/${group.id}`} className="list-item group-item">
-      <span className="list-icon"><Icon name="grid" size={18} /></span>
+      {group.avatar ? (
+        <Avatar user={group} size={40} />
+      ) : (
+        <span className="list-icon"><Icon name="grid" size={18} /></span>
+      )}
       <span className="list-text">
         <strong>{group.title}</strong>
         {group.description && <small>{group.description}</small>}

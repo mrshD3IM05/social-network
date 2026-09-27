@@ -116,6 +116,8 @@ input.invalid:focus, textarea.invalid:focus {
 .btn:disabled { opacity: .5; cursor: default; }
 .btn-light { background: transparent; color: var(--ink); border-color: var(--line-strong); }
 .btn-light:hover { background: var(--surface); border-color: var(--ink); opacity: 1; }
+.btn-danger { background: var(--accent); border-color: var(--accent); }
+.btn-danger:hover { opacity: .88; }
 .btn-full { width: 100%; height: 46px; margin-top: 24px; }
 
 .icon-button {
@@ -388,6 +390,12 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .chat-error { padding: 0 16px; }
 .chat-form { display: flex; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 .chat-form .btn { width: 44px; padding: 0; }
+/* the group chat lives in a tab, under the group header */
+.chat-group { height: 520px; }
+.chat-line { display: flex; align-items: flex-end; gap: 8px; max-width: 80%; }
+.chat-line.mine { align-self: flex-end; }
+.chat-line .bubble { max-width: 100%; }
+.chat-line small { display: block; margin: 0 0 2px 4px; }
 
 /* =========================================================
    Comments (inside PostCard)
@@ -462,6 +470,8 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 }
 .group-hero-actions .btn, .group-hero-note { margin-left: auto; }
 .group-hero-note { text-align: right; }
+.group-hero-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.group-hero-buttons .btn { margin-left: 0; }
 
 /* the faces of the group, overlapping like a deck of cards */
 .avatar-stack { display: flex; align-items: center; }
@@ -574,7 +584,9 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   place-items: center;
   padding: 20px;
   background: rgba(0, 0, 0, .45);
-  animation: rise .2s var(--ease);
+  /* Opacity-only: a translateY here would also slide the backdrop's solid
+     color into place, which reads as a flicker on the page behind it. */
+  animation: backdrop-in .2s var(--ease);
 }
 .modal {
   width: 100%;
@@ -586,7 +598,13 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  overflow-y: auto; /* tall forms scroll inside the dialog, not under it */
   animation: rise .25s var(--ease);
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .modal-header h2 { font-size: 24px; }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { socketUrl } from '@/lib/api'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 
@@ -10,7 +11,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([])
 
   useEffect(() => {
-    const socket = new WebSocket(`ws://${window.location.hostname}:8080/api/v1/ws`)
+    const socket = new WebSocket(socketUrl())
 
     socket.onmessage = event => {
       const data = JSON.parse(event.data)

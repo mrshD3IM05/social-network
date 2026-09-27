@@ -10,6 +10,7 @@ import (
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/eventsvc"
+	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/groupsvc"
 	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
@@ -19,11 +20,12 @@ type Handler struct {
 	Service *groupsvc.Service
 	Post    *postsvc.Service
 	Events  *eventsvc.Service
+	File    *filesvc.Service
 	Session *sessionsvc.Service
 }
 
-func New(service *groupsvc.Service, post *postsvc.Service, events *eventsvc.Service, session *sessionsvc.Service) *Handler {
-	return &Handler{Service: service, Post: post, Events: events, Session: session}
+func New(service *groupsvc.Service, post *postsvc.Service, events *eventsvc.Service, file *filesvc.Service, session *sessionsvc.Service) *Handler {
+	return &Handler{Service: service, Post: post, Events: events, File: file, Session: session}
 }
 
 func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +82,138 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.WriteJSON(w, http.StatusOK, detail)
+}
+
+// UpdateGroup handles PUT /groups/{id} (creator only): new title and description.
+func (h *Handler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	group, err := h.Service.Update(userID, groupID, r.FormValue("title"), r.FormValue("description"))
+	if err != nil {
+		writeError(w, err, "could not update group")
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, group)
+}
+
+// SetGroupAvatar handles POST /groups/{id}/avatar (creator only), multipart
+// field "avatar", same image rules as the user avatar.
+func (h *Handler) SetGroupAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Service.CheckCreator(userID, groupID); err != nil {
+		writeError(w, err, "could not set group picture")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, filesvc.MaxImageSize+1<<20)
+	if err := r.ParseMultipartForm(filesvc.MaxImageSize + 1<<20); err != nil {
+		http.Error(w, "upload is too large or invalid", http.StatusBadRequest)
+		return
+	}
+	headers := r.MultipartForm.File["avatar"]
+	if len(headers) != 1 {
+		http.Error(w, "exactly one image is required", http.StatusBadRequest)
+		return
+	}
+	file, err := h.File.Upload(userID, headers[0], nil, nil, nil)
+	if err != nil {
+		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, "could not set group picture", http.StatusInternalServerError)
+		}
+		return
+	}
+	group, err := h.Service.SetAvatar(userID, groupID, file.ID)
+	if err != nil {
+		writeError(w, err, "could not set group picture")
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, group)
+}
+
+// DeleteGroup handles DELETE /groups/{id} (creator only).
+func (h *Handler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Service.Delete(userID, groupID); err != nil {
+		writeError(w, err, "could not delete group")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RemoveMember handles DELETE /groups/{id}/members/{userID} (creator only).
+func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	memberID, err := parseID(r, "userID")
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Service.RemoveMember(userID, groupID, memberID); err != nil {
+		writeError(w, err, "could not remove member")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListMessages handles GET /groups/{id}/messages (members only): the chat
+// history, new messages then arrive over the websocket.
+func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	messages, err := h.Service.Messages(userID, groupID)
+	if err != nil {
+		writeError(w, err, "could not list messages")
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, messages)
 }
 
 func (h *Handler) GetGroupMembers(w http.ResponseWriter, r *http.Request) {
@@ -273,10 +407,40 @@ func (h *Handler) ListGroupPosts(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, posts)
 }
 
+// DeleteGroupPost handles DELETE /groups/{id}/posts/{post_id}. The current
+// user always comes from the session (never from the request body); who is
+// allowed to delete is decided in the service.
+func (h *Handler) DeleteGroupPost(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	groupID, err := parseID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	postID, err := parseID(r, "post_id")
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Post.DeleteGroupPost(userID, groupID, postID); err != nil {
+		writeGroupPostError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func writeGroupPostError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, postsvc.ErrNotFound):
+		http.Error(w, "post not found", http.StatusNotFound)
 	case errors.Is(err, postsvc.ErrNotGroupMember):
 		http.Error(w, "only group members can view or create group posts", http.StatusForbidden)
+	case errors.Is(err, postsvc.ErrForbidden):
+		http.Error(w, "only the post author or the group creator can delete a group post", http.StatusForbidden)
 	case errors.Is(err, postsvc.ErrInvalidPrivacy):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
@@ -424,7 +588,8 @@ func writeError(w http.ResponseWriter, err error, fallback string) {
 	case errors.Is(err, groupsvc.ErrInvalidTitle),
 		errors.Is(err, groupsvc.ErrInvalidDescription),
 		errors.Is(err, groupsvc.ErrSelfInvite),
-		errors.Is(err, groupsvc.ErrSelfRequest):
+		errors.Is(err, groupsvc.ErrSelfRequest),
+		errors.Is(err, groupsvc.ErrRemoveCreator):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, groupsvc.ErrNotFound),
 		errors.Is(err, repository.ErrNotFound):

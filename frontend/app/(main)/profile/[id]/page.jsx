@@ -14,12 +14,17 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null)
   const [posts, setPosts] = useState([])
   const [isPrivate, setIsPrivate] = useState(false)
+  const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
   const [message, setMessage] = useState('')
 
   async function load() {
     setMe(await apiGet('/me'))
+    apiGet(`/users/${id}/follow`)
+      .then(result => setFollowStatus(result.status))
+      .catch(() => {})
     try {
       setUser(await apiGet(`/user/${id}`))
+      setIsPrivate(false)
       // no "posts of one user" endpoint yet, so we filter the feed
       const feed = await apiGet('/posts')
       setPosts(feed.filter(post => post.author_id === Number(id)))
@@ -36,16 +41,35 @@ export default function ProfilePage() {
   async function follow() {
     try {
       const result = await apiPost(`/users/${id}/follow`)
+      setFollowStatus(result.status)
       setMessage(result.status === 'pending' ? 'Follow request sent.' : 'You are now following.')
+      load() // a new follower may now see more posts
     } catch (err) {
       setMessage(err.message)
     }
   }
 
+  // also used to cancel a pending request
   async function unfollow() {
-    await apiDelete(`/users/${id}/follow`)
-    setMessage('Unfollowed.')
+    try {
+      await apiDelete(`/users/${id}/follow`)
+      setMessage(followStatus === 'pending' ? 'Follow request cancelled.' : 'Unfollowed.')
+      setFollowStatus('')
+      load()
+    } catch (err) {
+      setMessage(err.message)
+    }
   }
+
+  // One button that changes with the relation: Follow → Requested / Unfollow
+  const followButton =
+    followStatus === 'accepted' ? (
+      <button className="btn btn-light" onClick={unfollow}>Unfollow</button>
+    ) : followStatus === 'pending' ? (
+      <button className="btn btn-light" onClick={unfollow} title="Cancel the request">Requested</button>
+    ) : (
+      <button className="btn" onClick={follow}>{isPrivate ? 'Request to follow' : 'Follow'}</button>
+    )
 
   if (isPrivate) {
     return (
@@ -53,7 +77,7 @@ export default function ProfilePage() {
         <span className="locked-icon"><Icon name="lock" size={22} /></span>
         <h2>This profile is private</h2>
         <p className="subtitle">Send a follow request to see their profile and posts.</p>
-        <button className="btn" onClick={follow}>Request to follow</button>
+        {followButton}
         {message && <p className="notice">{message}</p>}
       </div>
     )
@@ -81,8 +105,7 @@ export default function ProfilePage() {
                 <Link href="/settings" className="btn btn-light">Edit settings</Link>
               ) : (
                 <>
-                  <button className="btn" onClick={follow}>Follow</button>
-                  <button className="btn btn-light" onClick={unfollow}>Unfollow</button>
+                  {followButton}
                   <Link href={`/chat/${user.id}`} className="btn btn-light">Message</Link>
                 </>
               )}

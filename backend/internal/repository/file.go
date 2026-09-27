@@ -37,6 +37,7 @@ func (r *Repository) CanViewFile(viewerID int64, fileID string) (bool, error) {
 			WHERE f.id = ? AND (
 				f.owner_user_id = ? OR
 				EXISTS (SELECT 1 FROM users u WHERE u.avatar = f.id) OR
+				EXISTS (SELECT 1 FROM groups gr WHERE gr.avatar = f.id) OR
 				EXISTS (SELECT 1 FROM posts p2 WHERE p2.id = f.post_id AND p2.group_id IS NOT NULL AND EXISTS (
 					SELECT 1 FROM group_members gmp
 					WHERE gmp.group_id = p2.group_id AND gmp.user_id = ?

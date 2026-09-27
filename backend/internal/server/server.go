@@ -19,6 +19,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// user routes
 	mux.Handle("GET /users", auth.Authorized(http.HandlerFunc(h.User.ListUsers)))
 	mux.Handle("GET /user/{id}", auth.Authorized(http.HandlerFunc(h.User.GetUser)))
+	mux.Handle("GET /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowStatus)))
 	mux.Handle("POST /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowUser)))
 	mux.Handle("DELETE /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.UnfollowUser)))
 	mux.Handle("POST /follow-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
@@ -48,7 +49,12 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /groups", auth.Authorized(http.HandlerFunc(h.Group.CreateGroup)))
 	mux.Handle("GET /groups", auth.Authorized(http.HandlerFunc(h.Group.ListGroups)))
 	mux.Handle("GET /groups/{id}", auth.Authorized(http.HandlerFunc(h.Group.GetGroup)))
+	mux.Handle("PUT /groups/{id}", auth.Authorized(http.HandlerFunc(h.Group.UpdateGroup)))
+	mux.Handle("DELETE /groups/{id}", auth.Authorized(http.HandlerFunc(h.Group.DeleteGroup)))
+	mux.Handle("POST /groups/{id}/avatar", auth.Authorized(http.HandlerFunc(h.Group.SetGroupAvatar)))
 	mux.Handle("GET /groups/{id}/members", auth.Authorized(http.HandlerFunc(h.Group.GetGroupMembers)))
+	mux.Handle("DELETE /groups/{id}/members/{userID}", auth.Authorized(http.HandlerFunc(h.Group.RemoveMember)))
+	mux.Handle("GET /groups/{id}/messages", auth.Authorized(http.HandlerFunc(h.Group.ListMessages)))
 	mux.Handle("POST /groups/{id}/invitations", auth.Authorized(http.HandlerFunc(h.Group.InviteUser)))
 	mux.Handle("POST /group-invitations/{id}/accept", auth.Authorized(http.HandlerFunc(h.Group.RespondInvitation)))
 	mux.Handle("POST /group-invitations/{id}/decline", auth.Authorized(http.HandlerFunc(h.Group.RespondInvitation)))
@@ -61,6 +67,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// group post routes (members only, enforced in the services)
 	mux.Handle("GET /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.ListGroupPosts)))
 	mux.Handle("POST /groups/{id}/posts", auth.Authorized(http.HandlerFunc(h.Group.CreateGroupPost)))
+	mux.Handle("DELETE /groups/{id}/posts/{post_id}", auth.Authorized(http.HandlerFunc(h.Group.DeleteGroupPost)))
 
 	// group event routes (members only, enforced in the services)
 	mux.Handle("GET /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.ListEvents)))

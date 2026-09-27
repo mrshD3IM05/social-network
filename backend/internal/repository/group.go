@@ -8,7 +8,7 @@ import (
 	"sn-backend/internal/model"
 )
 
-const groupColumns = `g.id, g.creator_id, g.title, g.description, g.created_at`
+const groupColumns = `g.id, g.creator_id, g.title, g.description, g.avatar, g.created_at`
 
 func scanGroup(s scanner) (*model.Group, error) {
 	group := new(model.Group)
@@ -17,6 +17,7 @@ func scanGroup(s scanner) (*model.Group, error) {
 		&group.CreatorID,
 		&group.Title,
 		&group.Description,
+		&group.Avatar,
 		&group.CreatedAt,
 	); err != nil {
 		return nil, err
@@ -30,10 +31,11 @@ func (r *Repository) CreateGroup(group *model.Group) error {
 	}
 
 	result, err := r.db.Exec(
-		`INSERT INTO groups (creator_id, title, description) VALUES (?, ?, ?)`,
+		`INSERT INTO groups (creator_id, title, description, avatar) VALUES (?, ?, ?, ?)`,
 		group.CreatorID,
 		group.Title,
 		group.Description,
+		group.Avatar,
 	)
 	if err != nil {
 		return err
@@ -78,15 +80,19 @@ func (r *Repository) UpdateGroup(group *model.Group) error {
 	}
 
 	_, err := r.db.Exec(
-		`UPDATE groups SET creator_id = ?, title = ?, description = ? WHERE id = ?`,
+		`UPDATE groups SET creator_id = ?, title = ?, description = ?, avatar = ? WHERE id = ?`,
 		group.CreatorID,
 		group.Title,
 		group.Description,
+		group.Avatar,
 		group.ID,
 	)
 	return err
 }
 
+// DeleteGroup removes the group. The foreign keys cascade to members,
+// invitations, join requests, posts (and their comments), events, messages
+// and notifications.
 func (r *Repository) DeleteGroup(id int64) error {
 	_, err := r.db.Exec("DELETE FROM groups WHERE id = ?", id)
 	return err
@@ -99,10 +105,36 @@ func (r *Repository) AddGroupMember(groupID, userID int64) error {
 	return err
 }
 
+// RemoveGroupMember deletes the membership and the old invitation / join
+// request rows, so the user can be invited or ask to join again later.
+func (r *Repository) RemoveGroupMember(groupID, userID int64) error {
+	return r.withTx(func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM group_invitations WHERE group_id = ? AND to_user_id = ?`, groupID, userID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`DELETE FROM group_join_requests WHERE group_id = ? AND user_id = ?`, groupID, userID)
+		return err
+	})
+}
+
 func (r *Repository) IsGroupMember(groupID, userID int64) (bool, error) {
 	var exists int
 	err := r.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?)`,
+		groupID, userID,
+	).Scan(&exists)
+	return exists == 1, err
+}
+
+// IsGroupCreator reports whether userID created groupID — the project's
+// group-admin role (the schema has no separate admin column).
+func (r *Repository) IsGroupCreator(groupID, userID int64) (bool, error) {
+	var exists int
+	err := r.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM groups WHERE id = ? AND creator_id = ?)`,
 		groupID, userID,
 	).Scan(&exists)
 	return exists == 1, err
@@ -267,6 +299,11 @@ func (r *Repository) GetPendingInvitationsForGroup(groupID int64) ([]*model.Grou
 	return invitations, rows.Err()
 }
 
+func (r *Repository) DeleteGroupInvitation(id int64) error {
+	_, err := r.db.Exec(`DELETE FROM group_invitations WHERE id = ?`, id)
+	return err
+}
+
 func (r *Repository) UpdateGroupInvitationStatus(id int64, status string) error {
 	_, err := r.db.Exec(`UPDATE group_invitations SET status = ? WHERE id = ?`, status, id)
 	return err
@@ -366,6 +403,11 @@ func (r *Repository) GetPendingJoinRequestsForGroup(groupID int64) ([]*model.Gro
 		requests = append(requests, request)
 	}
 	return requests, rows.Err()
+}
+
+func (r *Repository) DeleteGroupJoinRequest(id int64) error {
+	_, err := r.db.Exec(`DELETE FROM group_join_requests WHERE id = ?`, id)
+	return err
 }
 
 func (r *Repository) UpdateGroupJoinRequestStatus(id int64, status string) error {

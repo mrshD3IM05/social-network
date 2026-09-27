@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { apiGet, apiUpload, imageUrl } from '@/lib/api'
+import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
 import { getDraft, setDraft } from '@/lib/draft'
 import { markRead } from '@/lib/unread'
@@ -40,9 +40,8 @@ export default function ConversationPage() {
       .then(setMessages)
       .catch(err => setError(err.message))
 
-    // same address as the page, so it also works behind the proxy
-    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socket = new WebSocket(`${scheme}//${window.location.host}/api/v1/ws`)
+    // Connect straight to the Go server (the cookie is sent automatically)
+    const socket = new WebSocket(socketUrl())
     socketRef.current = socket
 
     let typingTimer = null

@@ -22,6 +22,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 |---|---|---|---|
 | GET | /users | - | not implemented yet (501) |
 | GET | /user/{id} | - | public profile, 403 if the profile is private and you don't follow them |
+| GET | /users/{id}/follow | - | {"status": "accepted" \| "pending" \| ""} your follow relation to that user |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
 | POST | /follow-requests/{id}/accept | - | 204 |
@@ -44,8 +45,13 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 |---|---|---|---|
 | POST | /groups | form: title, description | 201 + group json, creator joins the group automatically |
 | GET | /groups | - | all groups with member_count, is_member, pending_join, is_creator for you |
-| GET | /groups/{id} | - | group + creator + members + your status; only members/creators see detail, invited users get a flag, outsiders get 404 |
+| GET | /groups/{id} | - | group (with avatar) + creator + members + your status; outsiders get the header with an empty member list |
+| PUT | /groups/{id} | form: title, description | 200 + group json, creator only |
+| DELETE | /groups/{id} | - | 204, creator only; members, invitations, requests, posts, comments, events, messages and notifications are deleted by the database cascade |
+| POST | /groups/{id}/avatar | multipart: avatar | 200 + group json, creator only, same image rules as /avatar |
 | GET | /groups/{id}/members | - | member list, members only (403 otherwise) |
+| DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
+| GET | /groups/{id}/messages | - | last 100 group chat messages, members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
 | GET | /group-invitations | - | your pending invitations |
 | POST | /group-invitations/{id}/accept | - | 204, recipient only, joins atomically |

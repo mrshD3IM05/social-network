@@ -27,12 +27,17 @@ var (
 	ErrNotRecipient       = errors.New("group: user is not the invitation recipient")
 	ErrSelfInvite         = errors.New("group: cannot invite yourself")
 	ErrSelfRequest        = errors.New("group: cannot request to join your own group")
+	ErrRemoveCreator      = errors.New("group: the creator cannot be removed")
 )
 
 // Repository is the subset of repository.Repository the group service needs.
 type Repository interface {
 	CreateGroup(*model.Group) error
 	GetGroup(int64) (*model.Group, error)
+	UpdateGroup(*model.Group) error
+	DeleteGroup(int64) error
+	RemoveGroupMember(int64, int64) error
+	ListGroupMessages(int64) ([]*model.Message, error)
 	ListGroups() ([]*model.Group, error)
 	GetGroupMembers(int64) ([]*model.GroupMember, error)
 	IsGroupMember(int64, int64) (bool, error)
@@ -47,12 +52,14 @@ type Repository interface {
 	GetPendingInvitationsForUser(int64) ([]*model.GroupInvitation, error)
 	GetPendingInvitationsForGroup(int64) ([]*model.GroupInvitation, error)
 	UpdateGroupInvitationStatus(int64, string) error
+	DeleteGroupInvitation(int64) error
 
 	CreateGroupJoinRequest(*model.GroupJoinRequest) (*model.GroupJoinRequest, error)
 	GetGroupJoinRequestByID(int64) (*model.GroupJoinRequest, error)
 	PendingGroupJoinRequest(int64, int64) (*model.GroupJoinRequest, error)
 	GetPendingJoinRequestsForGroup(int64) ([]*model.GroupJoinRequest, error)
 	UpdateGroupJoinRequestStatus(int64, string) error
+	DeleteGroupJoinRequest(int64) error
 
 	GroupDetailPayload(int64, int64) (*model.GroupDetail, error)
 	GroupListPayload(int64) ([]*model.GroupListItem, error)
@@ -77,13 +84,9 @@ func New(repo Repository, hub *ws.Hub) *Service {
 }
 
 func (s *Service) Create(creatorID int64, title, description string) (*model.Group, error) {
-	title = strings.TrimSpace(title)
-	description = strings.TrimSpace(description)
-	if title == "" || len(title) > maxTitleLen {
-		return nil, ErrInvalidTitle
-	}
-	if len(description) > maxDescriptionLen {
-		return nil, ErrInvalidDescription
+	title, description, err := checkGroupInfo(title, description)
+	if err != nil {
+		return nil, err
 	}
 
 	group := &model.Group{CreatorID: creatorID, Title: title, Description: description}
@@ -97,27 +100,111 @@ func (s *Service) Create(creatorID int64, title, description string) (*model.Gro
 	return group, nil
 }
 
+// Update changes the title and description. Only the creator can do it.
+func (s *Service) Update(creatorID, groupID int64, title, description string) (*model.Group, error) {
+	group, err := s.creatorGroup(creatorID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	group.Title, group.Description, err = checkGroupInfo(title, description)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateGroup(group); err != nil {
+		return nil, err
+	}
+	return group, nil
+}
+
+// SetAvatar stores an uploaded file id as the group picture (creator only).
+func (s *Service) SetAvatar(creatorID, groupID int64, fileID string) (*model.Group, error) {
+	group, err := s.creatorGroup(creatorID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	group.Avatar = fileID
+	if err := s.repo.UpdateGroup(group); err != nil {
+		return nil, err
+	}
+	return group, nil
+}
+
+// Delete removes the group and, through the database cascade, everything in
+// it. Only the creator can do it.
+func (s *Service) Delete(creatorID, groupID int64) error {
+	if _, err := s.creatorGroup(creatorID, groupID); err != nil {
+		return err
+	}
+	return s.repo.DeleteGroup(groupID)
+}
+
+// RemoveMember lets the creator kick a member out of the group.
+func (s *Service) RemoveMember(creatorID, groupID, userID int64) error {
+	group, err := s.creatorGroup(creatorID, groupID)
+	if err != nil {
+		return err
+	}
+	if userID == creatorID {
+		return ErrRemoveCreator
+	}
+	isMember, err := s.repo.IsGroupMember(groupID, userID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return ErrNotFound
+	}
+	if err := s.repo.RemoveGroupMember(groupID, userID); err != nil {
+		return err
+	}
+	s.notify(&model.Notification{
+		UserID:  userID,
+		Type:    model.NotificationGroupRemoved,
+		ActorID: creatorID,
+		Content: "you were removed from \"" + group.Title + "\"",
+		GroupID: &group.ID,
+	})
+	return nil
+}
+
+// Messages returns the group chat history, members only.
+func (s *Service) Messages(viewerID, groupID int64) ([]*model.Message, error) {
+	isMember, err := s.repo.IsGroupMember(groupID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, ErrNotGroupMember
+	}
+	return s.repo.ListGroupMessages(groupID)
+}
+
+// CheckCreator reports ErrNotGroupCreator (or ErrNotFound) when userID does
+// not own the group; the handler calls it before storing an upload.
+func (s *Service) CheckCreator(userID, groupID int64) error {
+	_, err := s.creatorGroup(userID, groupID)
+	return err
+}
+
 func (s *Service) List(viewerID int64) ([]*model.GroupListItem, error) {
 	return s.repo.GroupListPayload(viewerID)
 }
 
-// Detail returns one group for a viewer. Membership of the group gates the
-// response: users who are neither members nor creators only see groups they
-// could still join or were invited to, everything else is 404 to the client.
+// Detail returns one group for a viewer. Every group is listed on the groups
+// page, so outsiders can open it too, but they only see the header (title,
+// description, creator, member count): the member list stays members only.
 func (s *Service) Detail(viewerID, groupID int64) (*model.GroupDetail, error) {
 	detail, err := s.repo.GroupDetailPayload(groupID, viewerID)
 	if err != nil {
 		return nil, err
 	}
 	if !detail.IsMember && !detail.IsCreator {
+		detail.Members = []model.GroupMember{}
 		pendingInvitation, err := s.repo.PendingGroupInvitation(groupID, viewerID)
 		if err == nil {
 			detail.PendingInvite = pendingInvitation.Status == model.GroupInvitationPending
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return nil, err
-		}
-		if !detail.PendingInvite && !detail.PendingJoin {
-			return nil, ErrNotFound
 		}
 	}
 	return detail, nil
@@ -169,11 +256,11 @@ func (s *Service) Invite(memberID, groupID, toUserID int64) (*model.GroupInvitat
 		if existing.Status == model.GroupInvitationPending {
 			return nil, ErrInvitationExists
 		}
-		// A processed invitation (accepted/declined) stays as history and a
-		// fresh one is only possible if we could delete it; the schema keeps
-		// one row per (group, user), so re-inviting after decline is not
-		// possible. Surface it as a duplicate.
-		return nil, ErrInvitationExists
+		// The schema keeps one row per (group, user): drop the old answered
+		// invitation so the user can be invited again.
+		if err := s.repo.DeleteGroupInvitation(existing.ID); err != nil {
+			return nil, err
+		}
 	case errors.Is(err, repository.ErrNotFound):
 		// no previous invitation for this (group, user) pair
 	default:
@@ -261,9 +348,10 @@ func (s *Service) RequestJoin(userID, groupID int64) (*model.GroupJoinRequest, e
 		if existing.Status == model.GroupJoinPending {
 			return nil, ErrRequestExists
 		}
-		// Same as invitations: one row per (group, user) means a processed
-		// request blocks a new one.
-		return nil, ErrRequestExists
+		// Same as invitations: drop the old answered request first.
+		if err := s.repo.DeleteGroupJoinRequest(existing.ID); err != nil {
+			return nil, err
+		}
 	case errors.Is(err, repository.ErrNotFound):
 		// no previous request for this (group, user) pair
 	default:
@@ -343,6 +431,30 @@ func (s *Service) PendingJoinRequests(viewerID, groupID int64) ([]*model.GroupJo
 		return nil, ErrNotGroupCreator
 	}
 	return s.repo.GetPendingJoinRequestsForGroup(groupID)
+}
+
+// creatorGroup loads the group and checks userID is its creator.
+func (s *Service) creatorGroup(userID, groupID int64) (*model.Group, error) {
+	group, err := s.repo.GetGroup(groupID)
+	if err != nil {
+		return nil, err
+	}
+	if group.CreatorID != userID {
+		return nil, ErrNotGroupCreator
+	}
+	return group, nil
+}
+
+func checkGroupInfo(title, description string) (string, string, error) {
+	title = strings.TrimSpace(title)
+	description = strings.TrimSpace(description)
+	if title == "" || len(title) > maxTitleLen {
+		return "", "", ErrInvalidTitle
+	}
+	if len(description) > maxDescriptionLen {
+		return "", "", ErrInvalidDescription
+	}
+	return title, description, nil
 }
 
 func requesterName(request *model.GroupJoinRequest) string {

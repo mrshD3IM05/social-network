@@ -15,6 +15,7 @@ const (
 	NotificationGroupJoinReq    = "group_join_request"
 	NotificationGroupInviteResp = "group_invite_response"
 	NotificationGroupJoinResp   = "group_join_response"
+	NotificationGroupRemoved    = "group_removed"
 )
 
 type Group struct {
@@ -22,6 +23,7 @@ type Group struct {
 	CreatorID   int64     `json:"creator_id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
+	Avatar      string    `json:"avatar"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 

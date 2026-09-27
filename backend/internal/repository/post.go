@@ -104,6 +104,33 @@ func (r *Repository) DeletePostOwned(postID, ownerID int64) error {
 	return nil
 }
 
+// GetPostAuthor returns the author of one post. ErrNotFound when the post
+// does not exist.
+func (r *Repository) GetPostAuthor(postID int64) (int64, error) {
+	var authorID int64
+	if err := r.QueryRow(`SELECT author_id FROM posts WHERE id = ?`, postID).Scan(&authorID); err != nil {
+		return 0, notFound(err)
+	}
+	return authorID, nil
+}
+
+// DeletePost removes one post regardless of who wrote it. Ownership and
+// authorization are decided by the service layer; the database handles the
+// related rows (comments and post_visibility cascade, files keep their rows
+// with post_id cleared by ON DELETE SET NULL).
+func (r *Repository) DeletePost(postID int64) error {
+	result, err := r.db.Exec(`DELETE FROM posts WHERE id = ?`, postID)
+	if err != nil {
+		return err
+	}
+	if count, err := result.RowsAffected(); err != nil {
+		return err
+	} else if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // postVisibleCondition is the single source of truth for "viewer can see this
 // post row". Group posts bypass the privacy columns entirely: only members of
 // the post's group can see them, no matter which privacy value the row
