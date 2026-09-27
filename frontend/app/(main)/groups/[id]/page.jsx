@@ -368,11 +368,13 @@ function GroupChat({ groupId, me, members }) {
   const [messages, setMessages] = useState(null)
   const [text, setText] = useState('')
   const [files, setFiles] = useState([])
+  const [typing, setTyping] = useState('')
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
+  const lastTyping = useRef(0)
 
   // user id → member, to put a name and a face on each message
   const people = Object.fromEntries(members.map(m => [m.user_id, m]))
@@ -387,20 +389,44 @@ function GroupChat({ groupId, me, members }) {
 
     const socket = new WebSocket(socketUrl())
     socketRef.current = socket
+    let typingTimer = null
+
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
       if (data.type === 'message' && data.message.group_id === groupId) {
         const msg = data.message
         setMessages(list => ((list || []).some(m => m.id === msg.id) ? list : [...(list || []), msg]))
       }
+      // "someone is writing" only means right now, so it fades on its own
+      if (data.type === 'typing' && data.group_id === groupId) {
+        setTyping(data.from_user_id)
+        clearTimeout(typingTimer)
+        typingTimer = setTimeout(() => setTyping(''), 3000)
+      }
+
       if (data.type === 'error') setError(data.error)
     }
-    return () => socket.close()
+    return () => {
+      clearTimeout(typingTimer)
+      socket.close()
+    }
   }, [groupId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, typing])
+
+  // Tell the group we are writing, at most once every two seconds.
+  function onType(e) {
+    setText(e.target.value)
+
+    const now = Date.now()
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return
+    if (now - lastTyping.current < 2000) return
+
+    lastTyping.current = now
+    socketRef.current.send(JSON.stringify({ type: 'typing', group_id: groupId }))
+  }
 
   function pickFiles(e) {
     const picked = Array.from(e.target.files)
@@ -471,6 +497,12 @@ function GroupChat({ groupId, me, members }) {
             </div>
           )
         })}
+        {typing && (
+          <p className="typing">
+            {people[typing] ? people[typing].first_name : 'Someone'} is typing…
+          </p>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -499,7 +531,7 @@ function GroupChat({ groupId, me, members }) {
         <input
           value={text}
           maxLength={LIMITS.message}
-          onChange={e => setText(e.target.value)}
+          onChange={onType}
           placeholder="Write to the group…"
         />
         <CharCount value={text} max={LIMITS.message} />
