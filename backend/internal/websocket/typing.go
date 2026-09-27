@@ -15,3 +15,27 @@ func (h *Hub) relayTyping(fromUserID int64, toUserID *int64) {
 	}
 	h.publish(*toUserID, map[string]any{"type": "typing", "from_user_id": fromUserID})
 }
+
+// relayGroupTyping tells the other members of a group that somebody is writing.
+// The sender is skipped, and only members are told.
+func (h *Hub) relayGroupTyping(fromUserID int64, groupID *int64) {
+	if groupID == nil {
+		return
+	}
+	allowed, err := h.repo.CanMessage(fromUserID, nil, groupID)
+	if err != nil || !allowed {
+		return
+	}
+	members, err := h.repo.GroupMemberIDs(*groupID)
+	if err != nil {
+		return
+	}
+	for _, memberID := range members {
+		if memberID == fromUserID {
+			continue
+		}
+		h.publish(memberID, map[string]any{
+			"type": "typing", "from_user_id": fromUserID, "group_id": *groupID,
+		})
+	}
+}
