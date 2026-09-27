@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, socketUrl } from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { fetchPeople, searchPeople } from '@/lib/people'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
@@ -14,7 +14,7 @@ import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
-import { IMAGE_ACCEPT, LIMITS, checkImage, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImage, checkImages, checkText } from '@/lib/validate'
 
 // One group: an identity header (who, what, how many, the actions) and one
 // tab per thing the group holds — posts, events, chat, members, and the
@@ -367,9 +367,12 @@ export default function GroupDetailPage() {
 function GroupChat({ groupId, me, members }) {
   const [messages, setMessages] = useState(null)
   const [text, setText] = useState('')
+  const [files, setFiles] = useState([])
   const [error, setError] = useState('')
+  const [sending, setSending] = useState(false)
   const socketRef = useRef(null)
   const bottomRef = useRef(null)
+  const fileRef = useRef(null)
 
   // user id → member, to put a name and a face on each message
   const people = Object.fromEntries(members.map(m => [m.user_id, m]))
@@ -387,7 +390,8 @@ function GroupChat({ groupId, me, members }) {
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
       if (data.type === 'message' && data.message.group_id === groupId) {
-        setMessages(list => [...(list || []), data.message])
+        const msg = data.message
+        setMessages(list => ((list || []).some(m => m.id === msg.id) ? list : [...(list || []), msg]))
       }
       if (data.type === 'error') setError(data.error)
     }
@@ -398,20 +402,48 @@ function GroupChat({ groupId, me, members }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  function send(e) {
+  function pickFiles(e) {
+    const picked = Array.from(e.target.files)
+    const problem = checkImages(picked)
+    setError(problem)
+    setFiles(problem ? [] : picked)
+    if (problem) e.target.value = ''
+  }
+
+  function clearFiles() {
+    setFiles([])
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  // Sent over the API and not the socket: the message row has to exist before
+  // an upload can point at it, and the group is told once both are done.
+  async function send(e) {
     e.preventDefault()
-    const problem = checkText('Your message', text, LIMITS.message)
+
+    // a message needs text, a picture, or both
+    const problem = text.trim()
+      ? checkText('Your message', text, LIMITS.message)
+      : files.length === 0 && 'Write something or add an image.'
     if (problem) {
       setError(problem)
       return
     }
-    if (socketRef.current?.readyState !== WebSocket.OPEN) {
-      setError('Not connected to the chat, try again in a moment.')
-      return
-    }
+
     setError('')
-    socketRef.current.send(JSON.stringify({ type: 'message', group_id: groupId, content: text.trim() }))
-    setText('')
+    setSending(true)
+    try {
+      const body = new FormData()
+      body.append('group_id', groupId)
+      body.append('content', text.trim())
+      for (const file of files) body.append('files', file)
+
+      await apiUpload('/messages', body)
+      setText('')
+      clearFiles()
+    } catch (err) {
+      setError(err.message)
+    }
+    setSending(false)
   }
 
   return (
@@ -427,7 +459,14 @@ function GroupChat({ groupId, me, members }) {
               {!mine && <Avatar user={author} size={28} />}
               <div>
                 {!mine && <small className="meta">{author ? author.first_name : 'Former member'}</small>}
-                <div className={mine ? 'bubble mine' : 'bubble'}>{msg.content}</div>
+                <div className={mine ? 'bubble mine' : 'bubble'}>
+                  {msg.content && <span>{msg.content}</span>}
+                  {msg.images?.length > 0 && (
+                    <span className="bubble-images">
+                      {msg.images.map(fileId => <img key={fileId} src={imageUrl(fileId)} alt="" />)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )
@@ -437,7 +476,26 @@ function GroupChat({ groupId, me, members }) {
 
       {error && <p className="error chat-error">{error}</p>}
 
+      {files.length > 0 && (
+        <p className="chat-files">
+          {files.length} image{files.length > 1 ? 's' : ''} ready
+          <button type="button" className="link-button" onClick={clearFiles}>remove</button>
+        </p>
+      )}
+
       <form className="chat-form" onSubmit={send} noValidate>
+        <label className="icon-button" title="Add a photo or GIF">
+          <Icon name="image" size={16} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept={IMAGE_ACCEPT}
+            multiple
+            hidden
+            onChange={pickFiles}
+          />
+        </label>
+
         <input
           value={text}
           maxLength={LIMITS.message}
@@ -445,7 +503,7 @@ function GroupChat({ groupId, me, members }) {
           placeholder="Write to the group…"
         />
         <CharCount value={text} max={LIMITS.message} />
-        <button className="btn" title="Send" disabled={!text.trim()}>
+        <button className="btn" title="Send" disabled={sending || (!text.trim() && files.length === 0)}>
           <Icon name="send" size={16} />
         </button>
       </form>
