@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +52,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	connection, err := (&websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}).Upgrade(w, r, nil)
+	connection, err := (&websocket.Upgrader{CheckOrigin: checkOrigin}).Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
@@ -59,6 +61,40 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trackClient(cookie.Value, client)
 	go client.writePump()
 	client.readPump()
+}
+
+// allowedOrigins are the pages on another host that may open the socket. In
+// dev the Next.js server (:3000) connects straight to :8080. ALLOWED_ORIGINS
+// (comma separated) replaces the default list.
+var allowedOrigins = loadAllowedOrigins()
+
+func loadAllowedOrigins() []string {
+	if value := os.Getenv("ALLOWED_ORIGINS"); value != "" {
+		return strings.Split(value, ",")
+	}
+	return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+}
+
+// checkOrigin stops another website from opening a socket with the visitor's
+// cookie: the page must come from this host or from an allowed origin.
+func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // not a browser, so no cookie of someone else to borrow
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(parsed.Host, r.Host) {
+		return true
+	}
+	for _, allowed := range allowedOrigins {
+		if strings.EqualFold(strings.TrimSpace(allowed), origin) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Hub) PublishNotification(notification *model.Notification) {
