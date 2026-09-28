@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
@@ -15,9 +16,23 @@ import (
 
 var (
 	ErrEmailTaken         = errors.New("auth: email already registered")
+	ErrNicknameTaken      = errors.New("auth: nickname already taken")
 	ErrInvalidCredentials = errors.New("auth: invalid credentials")
 	ErrInvalidInput       = errors.New("auth: invalid registration input")
 )
+
+// Same limits as the frontend (frontend/lib/validate.js).
+const (
+	maxNameLen    = 50
+	maxEmailLen   = 254
+	maxAboutMeLen = 500
+	minPassword   = 8
+	maxPassword   = 72 // bcrypt only reads the first 72 bytes
+)
+
+// dummyHash is compared against when the account does not exist, so a failed
+// login takes as long whether or not the email is registered.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy password"), bcrypt.DefaultCost)
 
 type Repository interface {
 	CreateUser(*model.User) error
@@ -36,6 +51,7 @@ func (s *Service) Login(identifier, password string) (*model.User, error) {
 	var user *model.User
 	var err error
 
+	identifier = strings.ToLower(strings.TrimSpace(identifier))
 	if isValidEmail(identifier) {
 		user, err = s.users.GetUserByEmail(identifier)
 	} else if isValidNickname(identifier) {
@@ -45,6 +61,7 @@ func (s *Service) Login(identifier, password string) (*model.User, error) {
 	}
 
 	if err != nil || user == nil {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return nil, ErrInvalidCredentials
 	}
 
@@ -64,11 +81,22 @@ type RegisterInput struct {
 }
 
 func (s *Service) Register(input RegisterInput) (*model.User, error) {
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	input.Nickname = strings.ToLower(strings.TrimSpace(input.Nickname))
+	input.FirstName = strings.TrimSpace(input.FirstName)
+	input.LastName = strings.TrimSpace(input.LastName)
+	input.AboutMe = strings.TrimSpace(input.AboutMe)
 	if err := validateRegisterInput(input); err != nil {
 		return nil, err
 	}
 	if _, err := s.users.GetUserByEmail(input.Email); err == nil {
 		return nil, ErrEmailTaken
+	} else if !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
+	// login accepts a nickname too, so two accounts cannot share one
+	if _, err := s.users.GetUserByNickname(input.Nickname); err == nil {
+		return nil, ErrNicknameTaken
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
@@ -87,7 +115,7 @@ func validateRegisterInput(input RegisterInput) error {
 	if strings.TrimSpace(input.Email) == "" {
 		return fmt.Errorf("%w: email is required", ErrInvalidInput)
 	}
-	if !isValidEmail(input.Email) {
+	if len(input.Email) > maxEmailLen || !isValidEmail(input.Email) {
 		return fmt.Errorf("%w: invalid email address", ErrInvalidInput)
 	}
 
@@ -101,10 +129,18 @@ func validateRegisterInput(input RegisterInput) error {
 	if strings.TrimSpace(input.Password) == "" {
 		return fmt.Errorf("%w: password is required", ErrInvalidInput)
 	}
+	if len(input.Password) < minPassword || len(input.Password) > maxPassword {
+		return fmt.Errorf("%w: password must be %d to %d characters", ErrInvalidInput, minPassword, maxPassword)
+	}
 
-	if strings.TrimSpace(input.FirstName) == "" ||
-		strings.TrimSpace(input.LastName) == "" {
+	if input.FirstName == "" || input.LastName == "" {
 		return fmt.Errorf("%w: first and last name are required", ErrInvalidInput)
+	}
+	if utf8.RuneCountInString(input.FirstName) > maxNameLen || utf8.RuneCountInString(input.LastName) > maxNameLen {
+		return fmt.Errorf("%w: names must be %d characters or less", ErrInvalidInput, maxNameLen)
+	}
+	if utf8.RuneCountInString(input.AboutMe) > maxAboutMeLen {
+		return fmt.Errorf("%w: about me must be %d characters or less", ErrInvalidInput, maxAboutMeLen)
 	}
 
 	birthDate, err := time.Parse("2006-01-02", input.DateOfBirth)
