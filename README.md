@@ -173,7 +173,7 @@ websocket hub ────────────────┘ (publishes eve
 
 | Layer | Folder | Job |
 |---|---|---|
-| middleware | `internal/middleware` | `RateLimit` (per IP, sliding window of 1000 requests/minute, answers 429 with `Retry-After`). `Guest` / `Authorized` read the `session` cookie and put the user ID in the request context. |
+| middleware | `internal/middleware` | `RateLimit` (per IP, 1000 requests/minute; `/login` and `/register` also have their own limit of 10/minute; answers 429 with `Retry-After`). `SecurityHeaders` (nosniff, no framing, same-origin referrer). `Guest` / `Authorized` read the `session` cookie and put the user ID in the request context. |
 | handler | `internal/handler/*handler` | Parses path, form and multipart input, calls the service, writes the JSON and status code |
 | service | `internal/service/*svc` | Business rules: privacy, follow checks, group membership, validation |
 | repository | `internal/repository` | All SQL. One file per area. |
@@ -196,7 +196,9 @@ websocket hub ────────────────┘ (publishes eve
 
 ### File uploads
 
-- `POST /files` takes up to 3 images of at most 10 MB each, of type JPEG, PNG or GIF. The type is detected from the first 512 bytes, not from the file extension.
+- `POST /files` takes up to 3 images of at most 10 MB each, of type JPEG, PNG or GIF. A post, comment or message can hold at most 3 images in total.
+- Every image is checked before any of them is saved: the type is detected from the first 512 bytes (never from the file name), then the image header is decoded to prove it really is that format, and pictures wider or taller than 8000 px are refused. The frontend runs the same checks when a file is picked.
+- Images can only be attached to your own post, comment or message.
 - An upload can be attached to a post (`post_id`) or a chat message (`message_id`).
 - The original file is saved to `uploads/<id>`, and its metadata goes into the `files` table.
 - `GET /fs/{id}` serves the file only if you are allowed to see the post, message, avatar or group it belongs to. The response is cached privately with `immutable`.
@@ -335,11 +337,15 @@ Scripts: `npm run dev`, `npm run build`, `npm run start`, `npm run lint`.
 
 ## Security notes
 
-- Every route except register and login needs a session, and every read goes through a visibility check: post privacy, private profiles, group membership and file ownership.
+- Every route except register and login needs a session, and every read goes through a visibility check: post privacy, private profiles, group membership and file ownership. Group post images are for members only.
 - All SQL uses parameterized queries.
-- Uploads are limited by size, count and detected content type, and are never served as a public static folder.
-- The session cookie is `HttpOnly` and `SameSite=Lax`.
-- Each IP is rate-limited.
+- Register checks every field (lengths, 8–72 character password, unique email and nickname). The avatar can only be set by uploading one.
+- A failed login takes the same time whether the account exists or not.
+- Uploads are limited by size, count, detected type and pixel size, and are never served as a public static folder. `GET /fs/{id}` answers with `nosniff` and a sandbox CSP, so a file can never run as a page.
+- The session cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` when the site is served over https.
+- The WebSocket only accepts pages from the same host, or from `ALLOWED_ORIGINS` (default: the Next dev server on port 3000). Chat messages are limited to 1000 characters on both HTTP and the socket.
+- Each IP is rate-limited: 1000 requests/minute, and 10/minute on login and register. Behind Caddy the real client IP is read from `X-Forwarded-For`.
+- The server has read and idle timeouts, and both the API and the frontend send `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy` headers.
 
 ---
 
