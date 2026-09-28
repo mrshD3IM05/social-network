@@ -20,13 +20,16 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 ### users & follows
 | method | path | request | response |
 |---|---|---|---|
-| GET | /users | - | not implemented yet (501) |
+| GET | /users | - | everyone except you, public shape, ordered by name |
 | GET | /user/{id} | - | public profile, 403 if the profile is private and you don't follow them |
+| GET | /users/{id}/followers | - | users following them, same privacy gate as the profile |
+| GET | /users/{id}/following | - | users they follow, same privacy gate as the profile |
 | GET | /users/{id}/follow | - | {"status": "accepted" \| "pending" \| ""} your follow relation to that user |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
 | POST | /follow-requests/{id}/accept | - | 204 |
 | POST | /follow-requests/{id}/decline | - | 204 |
+| PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private |
 
 ### posts
 | method | path | request | response |
@@ -37,6 +40,9 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | DELETE | /posts/{id} | - | 204, only the owner can delete |
 | POST | /posts/{id}/reactions | form: reaction = like \| dislike | 200 + summary, toggles: same reaction removes it, other switches; invisible post = 404 |
 | DELETE | /posts/{id}/reactions | - | 200 + summary after removing your reaction |
+| GET | /posts/{id} | - | one post, 404 if you cannot see it |
+| GET | /posts/{id}/comments | - | comments on the post, visibility follows the post |
+| POST | /posts/{id}/comments | form: content | 201 + comment json |
 
 Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`like`, `dislike`, or empty) for the requesting user.
 
@@ -60,8 +66,23 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | GET | /groups/{id}/join-requests | - | pending requests, creator only |
 | POST | /group-join-requests/{id}/accept | - | 204, group creator only, joins atomically |
 | POST | /group-join-requests/{id}/decline | - | 204, group creator only |
+| GET | /groups/{id}/posts | - | group posts, members only |
+| POST | /groups/{id}/posts | form: content | 201 + post json, members only |
+| DELETE | /groups/{id}/posts/{post_id} | - | 204, the post author or the group creator |
+| GET | /groups/{id}/events | - | group events, members only |
+| POST | /groups/{id}/events | form: title, description, event_time | 201 + event json, members only |
+| POST | /events/{id}/response | form: response = going \| not_going | 200, changeable, one response per user |
+| GET | /events/{id}/response | - | your response to that event |
 
 Groups notifications (group_invitation, group_join_request, group_invite_response, group_join_response) are stored in the notifications table and pushed live over /ws with the standard `{"type":"notification", ...}` event.
+
+### messages
+| method | path | request | response |
+|---|---|---|---|
+| GET | /messages/{id} | - | your stored conversation with that user |
+| POST | /messages | form: to_user_id, content | 201 + message json, pushed to both sides over /ws |
+
+At least one of the two users must follow the other, otherwise the message is rejected.
 
 ### files
 | method | path | request | response |

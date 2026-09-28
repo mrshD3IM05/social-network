@@ -3,7 +3,6 @@ package repository
 import (
 	"database/sql"
 	"errors"
-	"strings"
 
 	"sn-backend/internal/model"
 )
@@ -823,13 +822,4 @@ func (r *Repository) withTx(fn func(tx *sql.Tx) error) error {
 		return err
 	}
 	return tx.Commit()
-}
-
-// isUniqueConstraint reports whether err is a SQLite UNIQUE violation, used
-// to translate duplicate inserts into ErrExists for the service layer.
-func isUniqueConstraint(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }

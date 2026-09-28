@@ -554,11 +554,6 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 /* =========================================================
    Groups (coming soon) and settings
    ========================================================= */
-.features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.feature { display: flex; flex-direction: column; gap: 6px; margin: 0; }
-.feature p { font-size: 14px; color: var(--muted); }
-.feature-number { margin-bottom: 18px; font-family: var(--font-mono), monospace; font-size: 12px; color: var(--accent); }
-
 .settings-section { display: grid; grid-template-columns: 200px 1fr; gap: 24px; }
 .settings-label p { margin-top: 4px; font-size: 13px; color: var(--muted); }
 .photo-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -688,7 +683,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .auth { grid-template-columns: 1fr; }
   .auth-aside { display: none; }
   .auth-main { padding: 28px 20px; }
-  .settings-section, .features { grid-template-columns: 1fr; }
+  .settings-section { grid-template-columns: 1fr; }
   .row { flex-direction: column; gap: 0; }
   .chat { height: calc(100vh - 140px); }
   .invitation-actions { flex-direction: column; width: 100%; }

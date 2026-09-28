@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"database/sql"
 
 	"sn-backend/internal/model"
 )
@@ -113,12 +112,4 @@ func (r *Repository) EventResponseCounts(eventID int64) (going, notGoing int, er
 		model.EventChoiceGoing, model.EventChoiceNotGoing, eventID,
 	).Scan(&going, &notGoing)
 	return going, notGoing, err
-}
-
-// CountEventResponseTx is used by the event service to fan out notifications
-// to members other than the creator.
-func (r *Repository) CountGroupMembersTx(tx *sql.Tx, groupID int64) (int, error) {
-	var count int
-	err := tx.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ?`, groupID).Scan(&count)
-	return count, err
 }

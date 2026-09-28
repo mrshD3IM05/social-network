@@ -134,11 +134,6 @@ func (r *Repository) SetUserPrivate(id int64, private bool) error {
 	return err
 }
 
-func (r *Repository) DeleteUser(id int64) error {
-	_, err := r.db.Exec("DELETE FROM users WHERE id = ?", id)
-	return err
-}
-
 func boolToInt(value bool) int {
 	if value {
 		return 1
