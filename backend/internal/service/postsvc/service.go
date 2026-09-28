@@ -2,12 +2,15 @@ package postsvc
 
 import (
 	"errors"
+	"strings"
+	"unicode/utf8"
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
 )
 
 var (
 	ErrInvalidPrivacy  = errors.New("post: invalid privacy")
+	ErrInvalidContent  = errors.New("post: content is required (max 1000 chars)")
 	ErrInvalidReaction = errors.New("post: invalid reaction")
 	ErrNotFound        = errors.New("post: not found")
 	ErrNotGroupMember  = errors.New("post: only group members can do that")
@@ -36,6 +39,17 @@ type Repository interface {
 type Service struct{ repo Repository }
 
 func New(repo Repository) *Service { return &Service{repo: repo} }
+// same limit as the frontend (LIMITS.post in frontend/lib/validate.js)
+const maxContentLen = 1000
+
+func checkContent(content string) (string, error) {
+	content = strings.TrimSpace(content)
+	if content == "" || utf8.RuneCountInString(content) > maxContentLen {
+		return "", ErrInvalidContent
+	}
+	return content, nil
+}
+
 func validPrivacy(privacy string) bool {
 	return privacy == model.PostPublic || privacy == model.PostFollowersOnly || privacy == model.PostSelected
 }
@@ -46,6 +60,10 @@ func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, 
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
 	}
+	content, err := checkContent(content)
+	if err != nil {
+		return nil, err
+	}
 	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy}
 	if err := s.repo.CreatePost(post); err != nil {
 		return nil, err
@@ -55,6 +73,10 @@ func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, 
 func (s *Service) Update(ownerID, postID int64, content, privacy string) (*model.Post, error) {
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
+	}
+	content, err := checkContent(content)
+	if err != nil {
+		return nil, err
 	}
 	post := &model.Post{ID: postID, Content: content, Privacy: privacy}
 	if err := s.repo.UpdatePostOwned(post, ownerID); err != nil {
@@ -116,6 +138,10 @@ func (s *Service) CreateGroupPost(authorID, groupID int64, content, privacy stri
 	}
 	if !member {
 		return nil, ErrNotGroupMember
+	}
+	content, err = checkContent(content)
+	if err != nil {
+		return nil, err
 	}
 	if !validPrivacy(privacy) {
 		privacy = model.PostPublic

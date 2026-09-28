@@ -441,7 +441,7 @@ func writeGroupPostError(w http.ResponseWriter, err error) {
 		http.Error(w, "only group members can view or create group posts", http.StatusForbidden)
 	case errors.Is(err, postsvc.ErrForbidden):
 		http.Error(w, "only the post author or the group creator can delete a group post", http.StatusForbidden)
-	case errors.Is(err, postsvc.ErrInvalidPrivacy):
+	case errors.Is(err, postsvc.ErrInvalidPrivacy), errors.Is(err, postsvc.ErrInvalidContent):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
 		http.Error(w, "could not process group post", http.StatusInternalServerError)
