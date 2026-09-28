@@ -23,8 +23,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, filesvc.MaxImageSize+1<<20)
-	if err := r.ParseMultipartForm(filesvc.MaxImageSize + 1<<20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, filesvc.MaxRequestSize)
+	if err := r.ParseMultipartForm(filesvc.MaxRequestSize); err != nil {
 		http.Error(w, "upload is too large or invalid", http.StatusBadRequest)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	stored, err := h.Service.UploadMany(ownerID, headers, postID, messageID, commentID)
 	if err != nil {
-		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge || err == filesvc.ErrTooManyImages {
+		if filesvc.IsBadImage(err) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else if err == repository.ErrNotFound {
 			http.Error(w, "post, comment or message not found", http.StatusNotFound)
@@ -110,7 +110,7 @@ func (h *Handler) SetAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.Service.SetAvatar(userID, headers[0])
 	if err != nil {
-		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge {
+		if filesvc.IsBadImage(err) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			http.Error(w, "could not set avatar", http.StatusInternalServerError)
@@ -138,5 +138,8 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", file.MIMEType)
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	// the browser must treat it as the stored image type and never run it
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	http.ServeFile(w, r, file.StoragePath)
 }

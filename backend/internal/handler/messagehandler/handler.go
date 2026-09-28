@@ -68,8 +68,9 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if len(headers) > filesvc.MaxImages {
-		http.Error(w, filesvc.ErrTooManyImages.Error(), http.StatusBadRequest)
+	// check the images first, so a bad one never leaves an empty message behind
+	if err := filesvc.CheckImages(headers); err != nil {
+		http.Error(w, err.Error(), uploadStatus(err))
 		return
 	}
 
@@ -120,7 +121,7 @@ func readForm(w http.ResponseWriter, r *http.Request) ([]*multipart.FileHeader, 
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		return nil, r.ParseForm()
 	}
-	limit := filesvc.MaxImageSize*filesvc.MaxImages + 1<<20
+	limit := filesvc.MaxRequestSize
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	if err := r.ParseMultipartForm(limit); err != nil {
 		return nil, err
@@ -144,7 +145,7 @@ func optionalID(value string) (*int64, error) {
 }
 
 func uploadStatus(err error) int {
-	if errors.Is(err, filesvc.ErrInvalidImage) || errors.Is(err, filesvc.ErrFileTooLarge) || errors.Is(err, filesvc.ErrTooManyImages) {
+	if filesvc.IsBadImage(err) {
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError

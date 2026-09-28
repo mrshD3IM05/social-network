@@ -137,7 +137,7 @@ func (h *Handler) SetGroupAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 	file, err := h.File.Upload(userID, headers[0], nil, nil, nil)
 	if err != nil {
-		if err == filesvc.ErrInvalidImage || err == filesvc.ErrFileTooLarge {
+		if filesvc.IsBadImage(err) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			http.Error(w, "could not set group picture", http.StatusInternalServerError)
