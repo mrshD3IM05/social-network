@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { fetchPeople, searchPeople } from '@/lib/people'
 import { LIMITS } from '@/lib/validate'
+import { useDebouncedValue } from '@/lib/timing'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
@@ -18,7 +19,9 @@ export default function PeoplePage() {
       .catch(err => setError(err.message))
   }, [])
 
-  const shown = searchPeople(people || [], search)
+  // filter once typing pauses, not on every keystroke
+  const query = useDebouncedValue(search, 250)
+  const shown = searchPeople(people || [], query)
 
   return (
     <>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { fetchPeople, searchPeople } from '@/lib/people'
+import { useDebouncedValue, useThrottle } from '@/lib/timing'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -374,7 +375,6 @@ function GroupChat({ groupId, me, members }) {
   const socketRef = useRef(null)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
-  const lastTyping = useRef(0)
 
   // user id → member, to put a name and a face on each message
   const people = Object.fromEntries(members.map(m => [m.user_id, m]))
@@ -417,15 +417,15 @@ function GroupChat({ groupId, me, members }) {
   }, [messages, typing])
 
   // Tell the group we are writing, at most once every two seconds.
+  // The trailing call keeps "typing…" alive until the last keystroke.
+  const sendTyping = useThrottle(() => {
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return
+    socketRef.current.send(JSON.stringify({ type: 'typing', group_id: groupId }))
+  }, 2000)
+
   function onType(e) {
     setText(e.target.value)
-
-    const now = Date.now()
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return
-    if (now - lastTyping.current < 2000) return
-
-    lastTyping.current = now
-    socketRef.current.send(JSON.stringify({ type: 'typing', group_id: groupId }))
+    sendTyping()
   }
 
   function pickFiles(e) {
@@ -455,6 +455,8 @@ function GroupChat({ groupId, me, members }) {
       return
     }
 
+    // the message is on its way, so a late "typing…" would be wrong
+    sendTyping.cancel()
     setError('')
     setSending(true)
     try {
@@ -687,7 +689,9 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
   }
 
   const candidates = (people || []).filter(person => !memberIds.has(person.id))
-  const shown = searchPeople(candidates, search)
+  // filter once typing pauses, not on every keystroke
+  const query = useDebouncedValue(search, 250)
+  const shown = searchPeople(candidates, query)
 
   return (
     <Modal title="Invite people" onClose={onClose}>

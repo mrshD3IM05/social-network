@@ -7,6 +7,7 @@ import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
 import { getDraft, setDraft } from '@/lib/draft'
 import { markRead } from '@/lib/unread'
+import { useThrottle } from '@/lib/timing'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -27,7 +28,6 @@ export default function ConversationPage() {
   const socketRef = useRef(null) // useRef keeps the socket between renders
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
-  const lastTyping = useRef(0)
 
   useEffect(() => {
     apiGet('/me').then(setMe)
@@ -83,16 +83,16 @@ export default function ConversationPage() {
   }, [messages, typing])
 
   // Tell the other side we are writing, at most once every two seconds.
+  // The trailing call keeps "typing…" alive until the last keystroke.
+  const sendTyping = useThrottle(() => {
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return
+    socketRef.current.send(JSON.stringify({ type: 'typing', to_user_id: otherId }))
+  }, 2000)
+
   function onType(e) {
     setText(e.target.value)
     setDraft(e.target.value)
-
-    const now = Date.now()
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return
-    if (now - lastTyping.current < 2000) return
-
-    lastTyping.current = now
-    socketRef.current.send(JSON.stringify({ type: 'typing', to_user_id: otherId }))
+    sendTyping()
   }
 
   function pickFiles(e) {
@@ -122,6 +122,8 @@ export default function ConversationPage() {
       return
     }
 
+    // the message is on its way, so a late "typing…" would be wrong
+    sendTyping.cancel()
     setError('')
     setSending(true)
     try {
