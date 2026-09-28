@@ -10,6 +10,7 @@ type Repository interface {
 	GetUserByID(int64) (*model.User, error)
 	ListUsers(int64) ([]*model.User, error)
 	IsFollowing(int64, int64) (bool, error)
+	SetUserPrivate(int64, bool) error
 }
 
 type Service struct{ users Repository }
@@ -31,5 +32,13 @@ func (s *Service) CanViewProfile(viewerID int64, user *model.User) (bool, error)
 		return false, nil
 	}
 	return s.users.IsFollowing(viewerID, user.ID)
+}
+// SetPrivacy turns the caller's own profile public or private and answers with
+// the stored user, so the client never has to guess what was saved.
+func (s *Service) SetPrivacy(userID int64, private bool) (*model.User, error) {
+	if err := s.users.SetUserPrivate(userID, private); err != nil {
+		return nil, err
+	}
+	return s.users.GetUserByID(userID)
 }
 func IsNotFound(err error) bool { return errors.Is(err, repository.ErrNotFound) }

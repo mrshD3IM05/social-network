@@ -5,6 +5,7 @@ import (
 	"sn-backend/internal/handler/commenthandler"
 	"sn-backend/internal/handler/filehandler"
 	"sn-backend/internal/handler/grouphandler"
+	"sn-backend/internal/handler/messagehandler"
 	"sn-backend/internal/handler/posthandler"
 	"sn-backend/internal/handler/userhandler"
 	"sn-backend/internal/repository"
@@ -14,6 +15,7 @@ import (
 	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/followsvc"
 	"sn-backend/internal/service/groupsvc"
+	"sn-backend/internal/service/messagesvc"
 	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
 	"sn-backend/internal/service/usersvc"
@@ -27,20 +29,25 @@ type Handlers struct {
 	Comment   *commenthandler.Handler
 	File      *filehandler.Handler
 	Group     *grouphandler.Handler
+	Message   *messagehandler.Handler
 	WebSocket *ws.Hub
 }
 
+// New builds every handler once, so RegisterRoutes only has to wire paths to
+// methods. Each service is created a single time and shared.
 func New(repo *repository.Repository) *Handlers {
-	webSocket := ws.NewHub(repo)
+	session := sessionsvc.New(repo)
+	webSocket := ws.NewHub(repo, session)
 	postService := postsvc.New(repo)
 	fileService := filesvc.New(repo, "uploads")
 	return &Handlers{
-		Auth:      authhandler.New(authsvc.New(repo), sessionsvc.New(repo), webSocket),
-		User:      userhandler.New(usersvc.New(repo), sessionsvc.New(repo), followsvc.New(repo)),
-		Post:      posthandler.New(postService, sessionsvc.New(repo)),
-		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), sessionsvc.New(repo)),
-		File:      filehandler.New(fileService, sessionsvc.New(repo)),
-		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), fileService, sessionsvc.New(repo)),
+		Auth:      authhandler.New(authsvc.New(repo), session, webSocket),
+		User:      userhandler.New(usersvc.New(repo), session, followsvc.New(repo)),
+		Post:      posthandler.New(postService, session),
+		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), session),
+		File:      filehandler.New(fileService, session),
+		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), fileService, session),
+		Message:   messagehandler.New(messagesvc.New(repo), fileService, session, webSocket),
 		WebSocket: webSocket,
 	}
 }

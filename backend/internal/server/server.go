@@ -19,11 +19,14 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// user routes
 	mux.Handle("GET /users", auth.Authorized(http.HandlerFunc(h.User.ListUsers)))
 	mux.Handle("GET /user/{id}", auth.Authorized(http.HandlerFunc(h.User.GetUser)))
+	mux.Handle("GET /users/{id}/followers", auth.Authorized(http.HandlerFunc(h.User.Followers)))
+	mux.Handle("GET /users/{id}/following", auth.Authorized(http.HandlerFunc(h.User.Following)))
 	mux.Handle("GET /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowStatus)))
 	mux.Handle("POST /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowUser)))
 	mux.Handle("DELETE /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.UnfollowUser)))
 	mux.Handle("POST /follow-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
 	mux.Handle("POST /follow-requests/{id}/decline", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
+	mux.Handle("PUT /me/privacy", auth.Authorized(http.HandlerFunc(h.User.SetPrivacy)))
 
 	// post routes
 	mux.Handle("GET /posts", auth.Authorized(http.HandlerFunc(h.Post.ListPosts)))
@@ -75,8 +78,10 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.RespondEvent)))
 	mux.Handle("GET /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.MyEventResponse)))
 
+	// direct message routes (the sender must follow, or be followed by, the recipient)
+	mux.Handle("GET /messages/{id}", auth.Authorized(http.HandlerFunc(h.Message.History)))
+	mux.Handle("POST /messages", auth.Authorized(http.HandlerFunc(h.Message.Send)))
+
 	// websocket routes
-	mux.Handle("GET /ws", auth.Authorized(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.WebSocket.ServeHTTP(w, r, h.Auth.Session)
-	})))
+	mux.Handle("GET /ws", auth.Authorized(h.WebSocket))
 }

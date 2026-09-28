@@ -20,6 +20,8 @@ type Repository interface {
 	CreateFollowRequest(int64, int64, string) (*model.FollowRequest, error)
 	UpdateFollowStatus(int64, string) error
 	DeleteFollow(int64, int64) error
+	ListFollowers(int64) ([]*model.User, error)
+	ListFollowing(int64) ([]*model.User, error)
 }
 type Service struct{ repo Repository }
 
@@ -80,4 +82,13 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 		return ErrExists
 	}
 	return s.repo.UpdateFollowStatus(requestID, status)
+}
+
+// Followers are the users who follow userID, Following the ones userID follows.
+// Both only count accepted requests, so a pending one shows up in neither.
+func (s *Service) Followers(userID int64) ([]*model.User, error) {
+	return s.repo.ListFollowers(userID)
+}
+func (s *Service) Following(userID int64) ([]*model.User, error) {
+	return s.repo.ListFollowing(userID)
 }

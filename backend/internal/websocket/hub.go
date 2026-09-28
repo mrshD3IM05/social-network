@@ -21,22 +21,26 @@ type Repository interface {
 }
 
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[int64]map[*Client]struct{}
-	repo    Repository
+	mu       sync.RWMutex
+	clients  map[int64]map[*Client]struct{}
+	repo     Repository
+	sessions *sessionsvc.Service
 }
 
-func NewHub(repo Repository) *Hub {
-	return &Hub{clients: make(map[int64]map[*Client]struct{}), repo: repo}
+func NewHub(repo Repository, sessions *sessionsvc.Service) *Hub {
+	return &Hub{clients: make(map[int64]map[*Client]struct{}), repo: repo, sessions: sessions}
 }
 
-func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, sessions *sessionsvc.Service) {
+// ServeHTTP upgrades GET /ws to a websocket. The Hub is a plain http.Handler, so
+// it is routed like any other endpoint. The connection is tied to the session
+// that opened it, which is how logging out closes the socket straight away.
+func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionsvc.CookieName)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	session, err := sessions.Get(cookie.Value)
+	session, err := h.sessions.Get(cookie.Value)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -47,6 +51,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request, sessions *sessio
 	}
 	client := &Client{hub: h, connection: connection, userID: session.UserID, send: make(chan []byte, 16)}
 	h.add(client)
+	trackClient(cookie.Value, client)
 	go client.writePump()
 	client.readPump()
 }
@@ -105,7 +110,7 @@ type incomingMessage struct {
 }
 
 func (c *Client) readPump() {
-	defer func() { c.hub.remove(c); c.connection.Close() }()
+	defer func() { c.hub.remove(c); untrackClient(c); c.connection.Close() }()
 	c.connection.SetReadLimit(64 << 10)
 	_ = c.connection.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.connection.SetPongHandler(func(string) error { return c.connection.SetReadDeadline(time.Now().Add(60 * time.Second)) })

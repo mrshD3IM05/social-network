@@ -8,6 +8,9 @@ import (
 
 const userColumns = "id, email, password, first_name, last_name, date_of_birth, avatar, nickname, about_me, private, created_at"
 
+// Same columns, qualified with the users alias, for queries that join another table.
+const userColumnsPrefixed = "u.id, u.email, u.password, u.first_name, u.last_name, u.date_of_birth, u.avatar, u.nickname, u.about_me, u.private, u.created_at"
+
 type scanner interface {
 	Scan(dest ...any) error
 }
@@ -121,6 +124,13 @@ func (r *Repository) UpdateUser(user *model.User) error {
 		boolToInt(user.Private),
 		user.ID,
 	)
+	return err
+}
+
+// SetUserPrivate flips only the privacy column, so turning a profile
+// public or private cannot touch any other field.
+func (r *Repository) SetUserPrivate(id int64, private bool) error {
+	_, err := r.db.Exec(`UPDATE users SET private = ? WHERE id = ?`, boolToInt(private), id)
 	return err
 }
 

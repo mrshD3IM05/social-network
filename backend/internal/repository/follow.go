@@ -62,3 +62,47 @@ func (r *Repository) IsFollowing(fromUserID, toUserID int64) (bool, error) {
 	).Scan(&exists)
 	return exists == 1, err
 }
+
+// ListFollowers returns the users who follow userID, ListFollowing the users
+// userID follows. Only accepted requests count — a pending one is not a follow.
+// Both order by name like the people directory, so the lists read the same on
+// every call.
+func (r *Repository) ListFollowers(userID int64) ([]*model.User, error) {
+	return r.listFollowUsers(
+		`SELECT `+userColumnsPrefixed+`
+		 FROM follow_requests f
+		 JOIN users u ON u.id = f.from_user_id
+		 WHERE f.to_user_id = ? AND f.status = ?
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
+		userID,
+	)
+}
+
+func (r *Repository) ListFollowing(userID int64) ([]*model.User, error) {
+	return r.listFollowUsers(
+		`SELECT `+userColumnsPrefixed+`
+		 FROM follow_requests f
+		 JOIN users u ON u.id = f.to_user_id
+		 WHERE f.from_user_id = ? AND f.status = ?
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
+		userID,
+	)
+}
+
+func (r *Repository) listFollowUsers(query string, userID int64) ([]*model.User, error) {
+	rows, err := r.db.Query(query, userID, model.FollowAccepted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*model.User{}
+	for rows.Next() {
+		user, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, rows.Err()
+}

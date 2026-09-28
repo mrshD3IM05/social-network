@@ -15,10 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	repo := repository.New(sqlite.DB)
-	handlers := handler.New(repo)
-	server.RegisterRoutes(mux, handlers)
-	server.RegisterMessageRoutes(mux, repo, handlers)
+	server.RegisterRoutes(mux, handler.New(repository.New(sqlite.DB)))
 	err := http.ListenAndServe(":8080", middleware.RateLimit(mux))
 	if err != nil {
 		panic(err)

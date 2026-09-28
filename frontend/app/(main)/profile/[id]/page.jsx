@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { apiDelete, apiGet, apiPost } from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
+import PersonRow from '@/components/PersonRow'
 import PostCard from '@/components/PostCard'
 
 export default function ProfilePage() {
@@ -15,7 +16,11 @@ export default function ProfilePage() {
   const [posts, setPosts] = useState([])
   const [isPrivate, setIsPrivate] = useState(false)
   const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
+  const [followers, setFollowers] = useState([])
+  const [following, setFollowing] = useState([])
+  const [tab, setTab] = useState('posts') // 'posts' | 'followers' | 'following'
   const [message, setMessage] = useState('')
+  const [savingPrivacy, setSavingPrivacy] = useState(false)
 
   async function load() {
     setMe(await apiGet('/me'))
@@ -28,6 +33,10 @@ export default function ProfilePage() {
       // no "posts of one user" endpoint yet, so we filter the feed
       const feed = await apiGet('/posts')
       setPosts(feed.filter(post => post.author_id === Number(id)))
+      // who follows them and who they follow — the API gates both exactly like
+      // the profile, so a private profile answers 403 and we never get here
+      setFollowers(await apiGet(`/users/${id}/followers`))
+      setFollowing(await apiGet(`/users/${id}/following`))
     } catch (err) {
       if (err.status === 403) setIsPrivate(true) // private profile you don't follow
       else setMessage(err.message)
@@ -59,6 +68,23 @@ export default function ProfilePage() {
     } catch (err) {
       setMessage(err.message)
     }
+  }
+
+  // The switch on your own profile. The API answers with the saved user, so the
+  // label always matches what is stored.
+  async function togglePrivacy() {
+    setSavingPrivacy(true)
+    try {
+      const updated = await apiPut('/me/privacy', { private: !user.private })
+      setUser(updated)
+      setMe(updated)
+      setMessage(updated.private
+        ? 'Your profile is private — only your followers can see it.'
+        : 'Your profile is public — everyone can see it.')
+    } catch (err) {
+      setMessage(err.message)
+    }
+    setSavingPrivacy(false)
   }
 
   // One button that changes with the relation: Follow → Requested / Unfollow
@@ -102,7 +128,13 @@ export default function ProfilePage() {
 
             <div className="profile-buttons">
               {isMe ? (
-                <Link href="/settings" className="btn btn-light">Edit settings</Link>
+                <>
+                  <button className="btn btn-light" onClick={togglePrivacy} disabled={savingPrivacy}>
+                    <Icon name="lock" size={15} />
+                    {savingPrivacy ? 'Saving…' : user.private ? 'Make public' : 'Make private'}
+                  </button>
+                  <Link href="/settings" className="btn btn-light">Edit settings</Link>
+                </>
               ) : (
                 <>
                   {followButton}
@@ -116,6 +148,8 @@ export default function ProfilePage() {
 
           <div className="profile-stats">
             <span><strong>{posts.length}</strong> posts</span>
+            <span><strong>{followers.length}</strong> followers</span>
+            <span><strong>{following.length}</strong> following</span>
             <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
             {isMe && <span>{me.email}</span>}
           </div>
@@ -124,16 +158,61 @@ export default function ProfilePage() {
 
       {message && <p className="notice">{message}</p>}
 
-      <p className="eyebrow section-label">Posts</p>
-      {posts.length === 0 && (
-        <div className="empty">
-          <p className="empty-title">No posts to show</p>
-          <p>Posts you are allowed to see will appear here.</p>
-        </div>
+      <div className="profile-tabs">
+        {[
+          ['posts', 'Posts', posts.length],
+          ['followers', 'Followers', followers.length],
+          ['following', 'Following', following.length],
+        ].map(([key, label, count]) => (
+          <button
+            key={key}
+            className={tab === key ? 'profile-tab active' : 'profile-tab'}
+            onClick={() => setTab(key)}
+          >
+            {label} <span>{count}</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'posts' && (
+        posts.length === 0 ? (
+          <div className="empty">
+            <p className="empty-title">No posts to show</p>
+            <p>Posts you are allowed to see will appear here.</p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <PostCard key={post.id} post={post} myId={me.id} onDeleted={load} />
+          ))
+        )
       )}
-      {posts.map(post => (
-        <PostCard key={post.id} post={post} myId={me.id} onDeleted={load} />
-      ))}
+
+      {tab !== 'posts' && (() => {
+        const people = tab === 'followers' ? followers : following
+        if (people.length === 0) {
+          return (
+            <div className="empty">
+              <p className="empty-title">
+                {tab === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
+              </p>
+              <p>
+                {tab === 'followers'
+                  ? 'People who follow this profile will appear here.'
+                  : 'People this profile follows will appear here.'}
+              </p>
+            </div>
+          )
+        }
+        return (
+          <div className="card list">
+            {people.map(person => (
+              <PersonRow key={person.id} person={person} href={`/profile/${person.id}`}>
+                <Icon name="arrow" size={16} />
+              </PersonRow>
+            ))}
+          </div>
+        )
+      })()}
     </>
   )
 }
