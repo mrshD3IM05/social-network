@@ -56,16 +56,12 @@ func (r *Repository) GroupMemberIDs(groupID int64) ([]int64, error) {
 	return members, rows.Err()
 }
 
+// CanAttachToMessage: only the sender may add images to their own message.
 func (r *Repository) CanAttachToMessage(messageID, userID int64) (bool, error) {
 	var allowed int
 	err := r.QueryRow(`SELECT EXISTS(
-		SELECT 1 FROM messages m
-		WHERE m.id = ? AND (
-			m.from_user_id = ?
-			OR m.to_user_id = ?
-			OR EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = m.group_id AND gm.user_id = ?)
-		)
-	)`, messageID, userID, userID, userID).Scan(&allowed)
+		SELECT 1 FROM messages m WHERE m.id = ? AND m.from_user_id = ?
+	)`, messageID, userID).Scan(&allowed)
 	return allowed == 1, err
 }
 

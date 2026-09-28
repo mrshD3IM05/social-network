@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
 	"sn-backend/internal/model"
@@ -13,6 +15,9 @@ import (
 )
 
 var ErrInvalidMessage = errors.New("websocket: invalid message")
+
+// same limit as messagesvc.MaxContentLength (the HTTP send endpoint)
+const maxContentLength = 1000
 
 type Repository interface {
 	CreateMessage(*model.Message) error
@@ -124,7 +129,8 @@ func (c *Client) readPump() {
 			c.hub.relayTyping(c.userID, input.ToUser, input.GroupID)
 			continue
 		}
-		if input.Type != "message" || input.Content == "" || (input.ToUser == nil) == (input.GroupID == nil) {
+		input.Content = strings.TrimSpace(input.Content)
+		if input.Type != "message" || input.Content == "" || utf8.RuneCountInString(input.Content) > maxContentLength || (input.ToUser == nil) == (input.GroupID == nil) {
 			c.sendError(ErrInvalidMessage.Error())
 			continue
 		}

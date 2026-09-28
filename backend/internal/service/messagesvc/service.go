@@ -3,6 +3,7 @@ package messagesvc
 import (
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"sn-backend/internal/model"
 )
@@ -63,7 +64,7 @@ func (s *Service) Send(fromID int64, toUserID, groupID *int64, content string, w
 	if content == "" && !withImages {
 		return nil, ErrEmpty
 	}
-	if len(content) > MaxContentLength {
+	if utf8.RuneCountInString(content) > MaxContentLength {
 		return nil, ErrTooLong
 	}
 
