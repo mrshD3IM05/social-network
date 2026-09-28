@@ -62,10 +62,16 @@ func (s *Service) Get(token string) (*model.Session, error) {
 
 func (s *Service) Delete(token string) error { return s.repo.DeleteSession(token) }
 
-func (s *Service) SetCookie(w http.ResponseWriter, session *model.Session) {
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: session.ID, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: session.ExpiresAt})
+func (s *Service) SetCookie(w http.ResponseWriter, r *http.Request, session *model.Session) {
+	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: session.ID, Path: "/", HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteLaxMode, Expires: session.ExpiresAt})
 }
 
-func (s *Service) ClearCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: CookieName, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+func (s *Service) ClearCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: CookieName, Path: "/", HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteLaxMode, MaxAge: -1})
+}
+
+// isHTTPS: the cookie is marked Secure (never sent over plain http) whenever
+// the visitor uses https, directly or through Caddy. Plain http in dev still works.
+func isHTTPS(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
