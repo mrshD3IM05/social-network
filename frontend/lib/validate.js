@@ -17,6 +17,7 @@ export const LIMITS = {
   minAge: 13,
   images: 3, // a post can carry at most 3 images
   imageBytes: 10 * 1024 * 1024, // 10 MB, like the API
+  imageSide: 8000, // widest / tallest picture in pixels, like the API
   imageTypes: ['image/jpeg', 'image/png', 'image/gif'],
 }
 
@@ -110,12 +111,57 @@ export function checkImages(files) {
 
 // One image: format and size (avatars go through this one)
 export function checkImage(file) {
-  if (!LIMITS.imageTypes.includes(file.type)) {
+  if (!LIMITS.imageTypes.includes(file.type) || file.size === 0) {
     return `"${file.name}" is not a JPEG, PNG or GIF image.`
   }
   if (file.size > LIMITS.imageBytes) {
     const mb = Math.round(LIMITS.imageBytes / (1024 * 1024))
     return `"${file.name}" is larger than ${mb} MB.`
+  }
+  return ''
+}
+
+// Width and height of a picture. Fails when the browser cannot open it,
+// which also catches a file that only pretends to be an image.
+async function readImageSize(file) {
+  const url = URL.createObjectURL(file)
+  try {
+    const image = new Image()
+    image.src = url
+    await image.decode()
+    return { width: image.naturalWidth, height: image.naturalHeight }
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+// checkImage, then the picture is opened to prove it is a real image and to
+// check its size in pixels. Used when the user picks a file.
+export async function checkImageFile(file) {
+  const error = checkImage(file)
+  if (error) return error
+
+  let size
+  try {
+    size = await readImageSize(file)
+  } catch {
+    return `"${file.name}" is not a valid image.`
+  }
+  if (size.width > LIMITS.imageSide || size.height > LIMITS.imageSide) {
+    return `"${file.name}" is larger than ${LIMITS.imageSide}×${LIMITS.imageSide} pixels.`
+  }
+  return ''
+}
+
+// checkImages with the pixel check of checkImageFile
+export async function checkImageFiles(files) {
+  if (files.length > LIMITS.images) {
+    return `You can add up to ${LIMITS.images} images per post.`
+  }
+
+  for (const file of files) {
+    const error = await checkImageFile(file)
+    if (error) return error
   }
   return ''
 }

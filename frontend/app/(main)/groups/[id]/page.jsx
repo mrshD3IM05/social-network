@@ -15,7 +15,7 @@ import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
-import { IMAGE_ACCEPT, LIMITS, checkImage, checkImages, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFile, checkImageFiles, checkText } from '@/lib/validate'
 
 // One group: an identity header (who, what, how many, the actions) and one
 // tab per thing the group holds — posts, events, chat, members, and the
@@ -428,9 +428,9 @@ function GroupChat({ groupId, me, members }) {
     sendTyping()
   }
 
-  function pickFiles(e) {
+  async function pickFiles(e) {
     const picked = Array.from(e.target.files)
-    const problem = checkImages(picked)
+    const problem = await checkImageFiles(picked)
     setError(problem)
     setFiles(problem ? [] : picked)
     if (problem) e.target.value = ''
@@ -556,10 +556,10 @@ function EditGroupModal({ group, onClose, onSaved }) {
   const titleError = checkText('Title', title, LIMITS.groupTitle)
   const descriptionError = checkText('Description', description, LIMITS.groupDescription, { required: false })
 
-  function pickPicture(e) {
+  async function pickPicture(e) {
     const file = e.target.files[0]
     if (!file) return
-    const problem = checkImage(file)
+    const problem = await checkImageFile(file)
     if (problem) {
       setError(problem)
       e.target.value = ''

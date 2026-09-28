@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiGet, apiUpload } from '@/lib/api'
-import { IMAGE_ACCEPT, checkImage } from '@/lib/validate'
+import { IMAGE_ACCEPT, checkImageFile } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
@@ -19,8 +19,8 @@ export default function SettingsPage() {
     const file = e.target.files[0]
     if (!file) return
 
-    // format and size are checked here so a bad photo never leaves the browser
-    const problem = checkImage(file)
+    // format, size and pixels are checked here so a bad photo never leaves the browser
+    const problem = await checkImageFile(file)
     if (problem) {
       setMessage(problem)
       e.target.value = '' // let the user pick another one

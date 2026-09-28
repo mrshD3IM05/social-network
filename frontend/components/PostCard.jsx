@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
-import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
 import Avatar from './Avatar'
 import CharCount from './CharCount'
 import Icon from './Icon'
@@ -171,9 +171,9 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
     setSending(false)
   }
 
-  function pickFiles(e) {
+  async function pickFiles(e) {
     const picked = Array.from(e.target.files)
-    const imageError = checkImages(picked)
+    const imageError = await checkImageFiles(picked)
     setError(imageError)
     setFiles(imageError ? [] : picked)
     if (imageError) e.target.value = ''

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
-import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
 import { getDraft, setDraft } from '@/lib/draft'
 import { markRead } from '@/lib/unread'
 import { useThrottle } from '@/lib/timing'
@@ -95,9 +95,9 @@ export default function ConversationPage() {
     sendTyping()
   }
 
-  function pickFiles(e) {
+  async function pickFiles(e) {
     const picked = Array.from(e.target.files)
-    const problem = checkImages(picked)
+    const problem = await checkImageFiles(picked)
     setError(problem)
     setFiles(problem ? [] : picked)
     if (problem) e.target.value = ''

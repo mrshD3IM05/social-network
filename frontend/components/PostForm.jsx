@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { apiPost, apiUpload } from '@/lib/api'
-import { IMAGE_ACCEPT, LIMITS, checkImages, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
 import CharCount from './CharCount'
 import Icon from './Icon'
 
@@ -20,9 +20,9 @@ export default function PostForm({ onPosted, groupId }) {
   const contentError = checkText('Your post', content, LIMITS.post)
 
   // Keep the picked images only if there are at most 3 valid ones
-  function pickFiles(e) {
+  async function pickFiles(e) {
     const picked = Array.from(e.target.files)
-    const imageError = checkImages(picked)
+    const imageError = await checkImageFiles(picked)
 
     setError(imageError)
     setFiles(imageError ? [] : picked)
