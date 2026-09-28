@@ -2,6 +2,19 @@
 const nextConfig = {
   // stops Next from writing extra generated files into the repo
   agentRules: false,
+  // no MIME sniffing, no framing (clickjacking), no referrer to other sites
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'same-origin' },
+        ],
+      },
+    ]
+  },
   async rewrites() {
     return [
       {
