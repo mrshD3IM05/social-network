@@ -60,7 +60,7 @@ func (s *Service) Login(identifier, password string) (*model.User, error) {
 
 type RegisterInput struct {
 	Email, Password, FirstName, LastName, DateOfBirth string
-	Avatar, Nickname, AboutMe                         string
+	Nickname, AboutMe                                 string
 }
 
 func (s *Service) Register(input RegisterInput) (*model.User, error) {
@@ -76,7 +76,7 @@ func (s *Service) Register(input RegisterInput) (*model.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	user := &model.User{Email: input.Email, Password: string(hash), FirstName: input.FirstName, LastName: input.LastName, DateOfBirth: input.DateOfBirth, Avatar: input.Avatar, Nickname: input.Nickname, AboutMe: input.AboutMe}
+	user := &model.User{Email: input.Email, Password: string(hash), FirstName: input.FirstName, LastName: input.LastName, DateOfBirth: input.DateOfBirth, Nickname: input.Nickname, AboutMe: input.AboutMe}
 	if err := s.users.CreateUser(user); err != nil {
 		return nil, err
 	}
