@@ -11,8 +11,8 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	auth := middleware.NewAuth(h.Auth.Session)
 
 	//Auth routes
-	mux.Handle("POST /register", auth.Guest(http.HandlerFunc(h.Auth.Register)))
-	mux.Handle("POST /login", auth.Guest(http.HandlerFunc(h.Auth.Login)))
+	mux.Handle("POST /register", middleware.AuthRateLimit(auth.Guest(http.HandlerFunc(h.Auth.Register))))
+	mux.Handle("POST /login", middleware.AuthRateLimit(auth.Guest(http.HandlerFunc(h.Auth.Login))))
 	mux.Handle("POST /logout", auth.Authorized(http.HandlerFunc(h.Auth.Logout)))
 	mux.Handle("GET /me", auth.Authorized(http.HandlerFunc(h.Auth.Me)))
 

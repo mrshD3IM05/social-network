@@ -4,14 +4,9 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-)
-
-const (
-	// made it 1000 to not limit images reading and keep it global
-	rateLimitRequests = 1000
-	rateLimitWindow   = time.Minute
 )
 
 type clientRate struct {
@@ -19,39 +14,36 @@ type clientRate struct {
 	requests    int
 }
 
-var rateLimitState = struct {
+// limiter counts requests per client IP in fixed windows.
+type limiter struct {
 	sync.Mutex
-	clients map[string]clientRate
-}{
-	clients: make(map[string]clientRate),
+	requests  int
+	window    time.Duration
+	clients   map[string]clientRate
+	lastSweep time.Time
 }
 
-func RateLimit(next http.Handler) http.Handler {
+func newLimiter(requests int, window time.Duration) *limiter {
+	return &limiter{requests: requests, window: window, clients: make(map[string]clientRate)}
+}
+
+// global: made it 1000 to not limit images reading
+var globalLimiter = newLimiter(1000, time.Minute)
+
+// auth: login and register, to slow down password guessing
+var authLimiter = newLimiter(10, time.Minute)
+
+func RateLimit(next http.Handler) http.Handler { return globalLimiter.middleware(next) }
+
+func AuthRateLimit(next http.Handler) http.Handler { return authLimiter.middleware(next) }
+
+func (l *limiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		client := clientIP(r)
-		now := time.Now()
+		allowed, remaining, retryAfter := l.take(clientIP(r), time.Now())
 
-		rateLimitState.Lock()
-		state := rateLimitState.clients[client]
-		if state.windowStart.IsZero() || now.Sub(state.windowStart) >= rateLimitWindow {
-			state = clientRate{windowStart: now}
-		}
-		state.requests++
-		rateLimitState.clients[client] = state
-		allowed := state.requests <= rateLimitRequests
-		remaining := rateLimitRequests - state.requests
-		if remaining < 0 {
-			remaining = 0
-		}
-		rateLimitState.Unlock()
-
-		w.Header().Set("X-RateLimit-Limit", "100")
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(l.requests))
 		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		if !allowed {
-			retryAfter := int(time.Until(state.windowStart.Add(rateLimitWindow)).Seconds())
-			if retryAfter < 1 {
-				retryAfter = 1
-			}
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
@@ -61,13 +53,51 @@ func RateLimit(next http.Handler) http.Handler {
 	})
 }
 
+func (l *limiter) take(client string, now time.Time) (allowed bool, remaining, retryAfter int) {
+	l.Lock()
+	defer l.Unlock()
+
+	// forget clients whose window is over, so the map does not grow forever
+	if now.Sub(l.lastSweep) >= l.window {
+		for key, state := range l.clients {
+			if now.Sub(state.windowStart) >= l.window {
+				delete(l.clients, key)
+			}
+		}
+		l.lastSweep = now
+	}
+
+	state := l.clients[client]
+	if state.windowStart.IsZero() || now.Sub(state.windowStart) >= l.window {
+		state = clientRate{windowStart: now}
+	}
+	state.requests++
+	l.clients[client] = state
+
+	remaining = max(l.requests-state.requests, 0)
+	retryAfter = max(int(state.windowStart.Add(l.window).Sub(now).Seconds()), 1)
+	return state.requests <= l.requests, remaining, retryAfter
+}
+
+// clientIP is the address of the visitor. Behind Caddy every request comes
+// from the proxy, so the real address is the last one Caddy added to
+// X-Forwarded-For. That header is only read when the request comes from a
+// private or loopback address (the proxy); anyone else could write it.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
+	if err != nil {
+		host = r.RemoteAddr
 	}
-	if r.RemoteAddr == "" {
+	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsPrivate()) {
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			parts := strings.Split(forwarded, ",")
+			if last := strings.TrimSpace(parts[len(parts)-1]); net.ParseIP(last) != nil {
+				return last
+			}
+		}
+	}
+	if host == "" {
 		return "unknown"
 	}
-	return r.RemoteAddr
+	return host
 }
