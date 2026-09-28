@@ -62,14 +62,16 @@ func (r *Repository) CanViewFile(viewerID int64, fileID string) (bool, error) {
 						))
 					)
 				)) OR
-				p.author_id = ? OR p.privacy = ? OR
-				(p.privacy = ? AND EXISTS (
-					SELECT 1 FROM follow_requests fr
-					WHERE fr.from_user_id = ? AND fr.to_user_id = p.author_id AND fr.status = ?
-				)) OR
-				(p.privacy = ? AND EXISTS (
-					SELECT 1 FROM post_visibility pv
-					WHERE pv.post_id = p.id AND pv.user_id = ?
+				(p.group_id IS NULL AND (
+					p.author_id = ? OR p.privacy = ? OR
+					(p.privacy = ? AND EXISTS (
+						SELECT 1 FROM follow_requests fr
+						WHERE fr.from_user_id = ? AND fr.to_user_id = p.author_id AND fr.status = ?
+					)) OR
+					(p.privacy = ? AND EXISTS (
+						SELECT 1 FROM post_visibility pv
+						WHERE pv.post_id = p.id AND pv.user_id = ?
+					))
 				)) OR
 				(m.from_user_id = ? OR m.to_user_id = ? OR (m.group_id IS NOT NULL AND EXISTS (
 					SELECT 1 FROM group_members gm
