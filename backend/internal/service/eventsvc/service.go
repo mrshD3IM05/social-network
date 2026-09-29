@@ -176,4 +176,3 @@ func (s *Service) notifyMembers(event *model.GroupEvent) {
 		})
 	}
 }
-

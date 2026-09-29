@@ -91,4 +91,3 @@ func (s *Service) reload(commentID, postID int64) (*model.Comment, error) {
 	}
 	return nil, repository.ErrNotFound
 }
-

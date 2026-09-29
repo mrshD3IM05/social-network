@@ -431,7 +431,6 @@ func requesterName(request *model.GroupJoinRequest) string {
 	return name
 }
 
-
 // isUnique reports SQLite UNIQUE-constraint violations from the driver so
 // races between the pre-check and the insert stay safe.
 func isUnique(err error) bool {
