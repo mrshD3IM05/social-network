@@ -15,6 +15,7 @@ var (
 	ErrNotFound        = errors.New("post: not found")
 	ErrNotGroupMember  = errors.New("post: only group members can do that")
 	ErrForbidden       = errors.New("post: only the author or the group creator can delete a group post")
+	ErrInvalidViewers  = errors.New("post: a private post needs at least one of your followers chosen")
 )
 
 type Service struct{ repo *repository.Repository }
@@ -38,27 +39,65 @@ func validPrivacy(privacy string) bool {
 func validReaction(reaction string) bool {
 	return reaction == model.ReactionLike || reaction == model.ReactionDislike
 }
-func (s *Service) Create(authorID int64, content, privacy string) (*model.Post, error) {
+
+// Create makes a post. A "private" post is only seen by the followers chosen
+// in viewers (and its author).
+func (s *Service) Create(authorID int64, content, privacy string, viewers []int64) (*model.Post, error) {
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
 	}
 	content, err := checkContent(content)
 	if err != nil {
 		return nil, err
+	}
+	if privacy == model.PostSelected {
+		if err := s.checkViewers(authorID, viewers); err != nil {
+			return nil, err
+		}
 	}
 	post := &model.Post{AuthorID: authorID, Content: content, Privacy: privacy}
 	if err := s.repo.CreatePost(post); err != nil {
 		return nil, err
 	}
+	if privacy == model.PostSelected {
+		if err := s.repo.SetPostViewers(post.ID, viewers); err != nil {
+			return nil, err
+		}
+	}
 	return post, nil
 }
-func (s *Service) Update(ownerID, postID int64, content, privacy string) (*model.Post, error) {
+
+// checkViewers makes sure every chosen viewer follows the author.
+func (s *Service) checkViewers(authorID int64, viewers []int64) error {
+	if len(viewers) == 0 {
+		return ErrInvalidViewers
+	}
+	for _, viewer := range viewers {
+		following, err := s.repo.IsFollowing(viewer, authorID)
+		if err != nil {
+			return err
+		}
+		if !following {
+			return ErrInvalidViewers
+		}
+	}
+	return nil
+}
+
+// Update changes a post. Sending viewers replaces who sees a "private" post;
+// leaving it out keeps the ones chosen before.
+func (s *Service) Update(ownerID, postID int64, content, privacy string, viewers []int64) (*model.Post, error) {
 	if !validPrivacy(privacy) {
 		return nil, ErrInvalidPrivacy
 	}
 	content, err := checkContent(content)
 	if err != nil {
 		return nil, err
+	}
+	if privacy == model.PostSelected && len(viewers) > 0 {
+		if err := s.checkViewers(ownerID, viewers); err != nil {
+			return nil, err
+		}
 	}
 	post := &model.Post{ID: postID, Content: content, Privacy: privacy}
 	if err := s.repo.UpdatePostOwned(post, ownerID); err != nil {
@@ -66,6 +105,14 @@ func (s *Service) Update(ownerID, postID int64, content, privacy string) (*model
 			return nil, ErrNotFound
 		}
 		return nil, err
+	}
+	if privacy != model.PostSelected {
+		viewers = nil // the list only matters for private posts
+	}
+	if privacy != model.PostSelected || len(viewers) > 0 {
+		if err := s.repo.SetPostViewers(postID, viewers); err != nil {
+			return nil, err
+		}
 	}
 	updated, err := s.repo.GetPost(postID)
 	if err != nil {

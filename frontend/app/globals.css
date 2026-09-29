@@ -301,6 +301,12 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   cursor: pointer;
   transition: border-color .15s, color .15s;
 }
+/* the followers who can see a "private" post */
+.viewer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.viewer-picker .hint { width: 100%; margin: 0; }
+.viewer-chip { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.viewer-chip input { margin: 0; }
+.viewer-chip.active { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
 .tool:hover { border-color: var(--ink); color: var(--ink); }
 
 .post { padding: 20px 20px 12px; transition: border-color .2s, box-shadow .25s var(--ease); }

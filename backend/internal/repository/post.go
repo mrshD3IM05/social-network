@@ -14,6 +14,24 @@ func (r *Repository) CreatePost(post *model.Post) error {
 	return err
 }
 
+// SetPostViewers replaces the users allowed to see a "private" post.
+func (r *Repository) SetPostViewers(postID int64, userIDs []int64) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM post_visibility WHERE post_id = ?`, postID); err != nil {
+		return err
+	}
+	for _, userID := range userIDs {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO post_visibility (post_id, user_id) VALUES (?, ?)`, postID, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 const postColumns = `
 	p.id, p.author_id, p.content, p.privacy, p.group_id, p.created_at,
 	u.first_name, u.last_name, u.nickname, u.avatar`

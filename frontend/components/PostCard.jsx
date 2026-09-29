@@ -9,7 +9,7 @@ import CharCount from './CharCount'
 import Icon from './Icon'
 import Modal from './Modal'
 
-const privacyNames = { public: 'Public', almost_private: 'Followers', private: 'Only me' }
+const privacyNames = { public: 'Public', almost_private: 'Followers', private: 'Chosen followers' }
 
 // One post in a list. myId is the logged-in user's id; isGroupCreator marks
 // the viewer as the group's creator (its admin), who may delete any post in
@@ -216,7 +216,7 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
               <select className="tool" value={editPrivacy} onChange={e => setEditPrivacy(e.target.value)}>
                 <option value="public">Public</option>
                 <option value="almost_private">Followers</option>
-                <option value="private">Only me</option>
+                <option value="private">Chosen followers</option>
               </select>
             )}
             <CharCount value={editContent} max={LIMITS.post} />

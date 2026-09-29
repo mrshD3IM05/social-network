@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { apiPost, apiUpload } from '@/lib/api'
+import { apiGet, apiPost, apiUpload } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
 import CharCount from './CharCount'
 import Icon from './Icon'
@@ -13,6 +13,8 @@ export default function PostForm({ onPosted, groupId }) {
   const [content, setContent] = useState('')
   const [privacy, setPrivacy] = useState('public')
   const [files, setFiles] = useState([])
+  const [followers, setFollowers] = useState(null) // loaded when "Chosen followers" is picked
+  const [viewers, setViewers] = useState([]) // ids of the followers who can see a private post
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -29,6 +31,22 @@ export default function PostForm({ onPosted, groupId }) {
     if (imageError) e.target.value = '' // let the user pick again
   }
 
+  async function changePrivacy(e) {
+    setPrivacy(e.target.value)
+    if (e.target.value === 'private' && followers === null) {
+      try {
+        const me = await apiGet('/me')
+        setFollowers(await apiGet(`/users/${me.id}/followers`))
+      } catch (err) {
+        setError(err.message)
+      }
+    }
+  }
+
+  function toggleViewer(id) {
+    setViewers(list => (list.includes(id) ? list.filter(v => v !== id) : [...list, id]))
+  }
+
   function clearFiles() {
     setFiles([])
     setError('')
@@ -38,7 +56,8 @@ export default function PostForm({ onPosted, groupId }) {
     e.preventDefault()
 
     // check everything once more before calling the API
-    const problem = contentError || checkImages(files)
+    const noViewers = !groupId && privacy === 'private' && viewers.length === 0
+    const problem = contentError || checkImages(files) || (noViewers ? 'Choose at least one follower.' : '')
     if (problem) {
       setError(problem)
       return
@@ -51,7 +70,7 @@ export default function PostForm({ onPosted, groupId }) {
       // 1. create the post (in the group when we are inside one)
       const post = groupId
         ? await apiPost(`/groups/${groupId}/posts`, { content: content.trim(), privacy: 'public' })
-        : await apiPost('/posts', { content: content.trim(), privacy })
+        : await apiPost('/posts', { content: content.trim(), privacy, viewers: privacy === 'private' ? viewers : [] })
 
       // 2. upload the images and attach them to the post
       if (files.length > 0) {
@@ -67,6 +86,7 @@ export default function PostForm({ onPosted, groupId }) {
       // 3. reset the form
       setContent('')
       setFiles([])
+      setViewers([])
     } catch (err) {
       setError(err.message)
     }
@@ -102,10 +122,10 @@ export default function PostForm({ onPosted, groupId }) {
         )}
 
         {!groupId && (
-          <select className="tool" value={privacy} onChange={e => setPrivacy(e.target.value)}>
+          <select className="tool" value={privacy} onChange={changePrivacy}>
             <option value="public">Public</option>
             <option value="almost_private">Followers</option>
-            <option value="private">Only me</option>
+            <option value="private">Chosen followers</option>
           </select>
         )}
 
@@ -115,6 +135,19 @@ export default function PostForm({ onPosted, groupId }) {
           {loading ? 'Publishing…' : 'Publish'}
         </button>
       </div>
+
+      {!groupId && privacy === 'private' && followers !== null && (
+        <div className="viewer-picker">
+          <p className="hint">Who can see this post?</p>
+          {followers.length === 0 && <p className="hint">You have no followers yet.</p>}
+          {followers.map(person => (
+            <label key={person.id} className={viewers.includes(person.id) ? 'viewer-chip active' : 'viewer-chip'}>
+              <input type="checkbox" checked={viewers.includes(person.id)} onChange={() => toggleViewer(person.id)} />
+              {person.first_name} {person.last_name}
+            </label>
+          ))}
+        </div>
+      )}
 
       <p className="hint">Up to {LIMITS.images} images, JPEG, PNG or GIF, 10 MB each.</p>
 

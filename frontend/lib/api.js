@@ -20,14 +20,23 @@ export function apiGet(path) {
   return request(path)
 }
 
-// The API reads form fields, so we send URLSearchParams (like a normal form)
+// The API reads form fields, so we send them like a normal form.
+// An array becomes the same field repeated: { viewers: [2, 5] } → viewers=2&viewers=5
+function formBody(data) {
+  const body = new URLSearchParams()
+  for (const [name, value] of Object.entries(data)) {
+    for (const item of [].concat(value)) body.append(name, item)
+  }
+  return body
+}
+
 export function apiPost(path, data = {}) {
-  return request(path, { method: 'POST', body: new URLSearchParams(data) })
+  return request(path, { method: 'POST', body: formBody(data) })
 }
 
 // Same form encoding as apiPost — the API's ParseForm reads PUT bodies too
 export function apiPut(path, data = {}) {
-  return request(path, { method: 'PUT', body: new URLSearchParams(data) })
+  return request(path, { method: 'PUT', body: formBody(data) })
 }
 
 export function apiDelete(path) {

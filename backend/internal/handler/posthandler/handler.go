@@ -5,6 +5,7 @@ import (
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
+	"strconv"
 )
 
 type Handler struct {
@@ -25,9 +26,14 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	post, err := h.Service.Create(userID, r.FormValue("content"), r.FormValue("privacy"))
+	viewers, err := formIDs(r, "viewers")
 	if err != nil {
-		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrInvalidContent {
+		http.Error(w, "invalid viewers", http.StatusBadRequest)
+		return
+	}
+	post, err := h.Service.Create(userID, r.FormValue("content"), r.FormValue("privacy"), viewers)
+	if err != nil {
+		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrInvalidContent || err == postsvc.ErrInvalidViewers {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			http.Error(w, "could not create post", http.StatusInternalServerError)
@@ -140,9 +146,14 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	post, err := h.Service.Update(userID, id, r.FormValue("content"), r.FormValue("privacy"))
+	viewers, err := formIDs(r, "viewers")
 	if err != nil {
-		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrInvalidContent {
+		http.Error(w, "invalid viewers", http.StatusBadRequest)
+		return
+	}
+	post, err := h.Service.Update(userID, id, r.FormValue("content"), r.FormValue("privacy"), viewers)
+	if err != nil {
+		if err == postsvc.ErrInvalidPrivacy || err == postsvc.ErrInvalidContent || err == postsvc.ErrInvalidViewers {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else if err == postsvc.ErrNotFound {
 			http.Error(w, "post not found", http.StatusNotFound)
@@ -173,4 +184,18 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// formIDs reads a list of user ids sent as the same form field repeated
+// (viewers=2&viewers=5).
+func formIDs(r *http.Request, name string) ([]int64, error) {
+	ids := []int64{}
+	for _, value := range r.Form[name] {
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || id < 1 {
+			return nil, strconv.ErrSyntax
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
