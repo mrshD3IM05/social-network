@@ -43,7 +43,9 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	common.WriteJSON(w, http.StatusOK, common.PublicUser(user))
+	// the subject wants every register field on the profile (never the
+	// password), and visibleUser already checked the caller may see it
+	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
 
 // Followers handles GET /users/{id}/followers and Following GET

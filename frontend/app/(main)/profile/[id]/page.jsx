@@ -151,7 +151,8 @@ export default function ProfilePage() {
             <span><strong>{followers.length}</strong> followers</span>
             <span><strong>{following.length}</strong> following</span>
             <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
-            {isMe && <span>{me.email}</span>}
+            <span>{user.email}</span>
+            {user.date_of_birth && <span>Born {new Date(user.date_of_birth + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
           </div>
         </div>
       </section>
