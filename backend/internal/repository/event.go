@@ -88,6 +88,11 @@ func (r *Repository) SetEventResponse(eventID, userID int64, choice string) erro
 
 // GetEventResponse returns the user's current response to an event,
 // ErrNotFound when they have not responded yet.
+func (r *Repository) DeleteEventResponse(eventID, userID int64) error {
+	_, err := r.db.Exec(`DELETE FROM event_responses WHERE event_id = ? AND user_id = ?`, eventID, userID)
+	return err
+}
+
 func (r *Repository) GetEventResponse(eventID, userID int64) (*model.EventResponse, error) {
 	response := new(model.EventResponse)
 	err := r.QueryRow(

@@ -7,8 +7,8 @@ import Icon from './Icon'
 const choiceLabels = { going: 'Going', not_going: 'Not going' }
 
 // One group event: title, description, date/time, going counts and the
-// Going / Not going buttons. The answer updates in place — the API answers
-// with the new counts and the stored choice.
+// Going / Not going buttons. Clicking the chosen button again removes the
+// answer. It updates in place — the API answers with the new counts and choice.
 export default function EventCard({ event, onChanged }) {
   const [going, setGoing] = useState(event.going_count)
   const [notGoing, setNotGoing] = useState(event.not_going_count)
@@ -74,14 +74,16 @@ export default function EventCard({ event, onChanged }) {
           <button
             className={myChoice === 'going' ? 'btn btn-sm' : 'btn btn-light btn-sm'}
             disabled={busy}
-            onClick={() => respond('going')}
+            onClick={() => respond(myChoice === 'going' ? '' : 'going')}
+            title={myChoice === 'going' ? 'Click again to remove your answer' : undefined}
           >
             Going
           </button>
           <button
             className={myChoice === 'not_going' ? 'btn btn-sm' : 'btn btn-light btn-sm'}
             disabled={busy}
-            onClick={() => respond('not_going')}
+            onClick={() => respond(myChoice === 'not_going' ? '' : 'not_going')}
+            title={myChoice === 'not_going' ? 'Click again to remove your answer' : undefined}
           >
             Not going
           </button>

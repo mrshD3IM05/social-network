@@ -93,8 +93,10 @@ func (s *Service) List(viewerID, groupID int64) ([]*model.EventListItem, error) 
 // Respond sets or changes the viewer's going / not-going answer. One row per
 // (event, user) is guaranteed by the event_responses UNIQUE constraint and
 // the upsert, so changing the answer replaces the old one.
+// Respond saves the viewer's answer to an event. An empty choice removes it,
+// so a member can take back a "going" or "not going".
 func (s *Service) Respond(viewerID, eventID int64, choice string) (going, notGoing int, err error) {
-	if choice != model.EventChoiceGoing && choice != model.EventChoiceNotGoing {
+	if choice != "" && choice != model.EventChoiceGoing && choice != model.EventChoiceNotGoing {
 		return 0, 0, ErrInvalidChoice
 	}
 	groupID, err := s.repo.GetGroupIDForEvent(eventID)
@@ -112,7 +114,12 @@ func (s *Service) Respond(viewerID, eventID int64, choice string) (going, notGoi
 		return 0, 0, ErrNotGroupMember
 	}
 
-	if err := s.repo.SetEventResponse(eventID, viewerID, choice); err != nil {
+	if choice == "" {
+		err = s.repo.DeleteEventResponse(eventID, viewerID)
+	} else {
+		err = s.repo.SetEventResponse(eventID, viewerID, choice)
+	}
+	if err != nil {
 		return 0, 0, err
 	}
 	going, notGoing, err = s.repo.EventResponseCounts(eventID)
