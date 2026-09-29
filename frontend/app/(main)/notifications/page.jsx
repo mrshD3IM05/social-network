@@ -1,50 +1,145 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { socketUrl } from '@/lib/api'
+import Link from 'next/link'
+import { apiGet, apiPost, socketUrl } from '@/lib/api'
+import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
+import PersonRow from '@/components/PersonRow'
 
-// Notifications arrive in real time over the WebSocket while this page is open.
-// (The API has no endpoint to list old notifications yet.)
+// notifications that come with something to accept or decline
+const REQUEST_TYPES = ['follow_request', 'group_invitation', 'group_join_request']
+
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState([])
+  const [notifications, setNotifications] = useState(null)
+  const [followRequests, setFollowRequests] = useState([])
+  const [invitations, setInvitations] = useState([])
+  const [joinRequests, setJoinRequests] = useState([])
+  const [error, setError] = useState('')
+
+  function loadRequests() {
+    apiGet('/follow-requests').then(setFollowRequests).catch(() => {})
+    apiGet('/group-invitations').then(setInvitations).catch(() => {})
+    apiGet('/group-join-requests').then(setJoinRequests).catch(() => {})
+  }
 
   useEffect(() => {
-    const socket = new WebSocket(socketUrl())
+    // keep the "read" flags we got, so the new ones can be highlighted,
+    // then mark everything as seen
+    apiGet('/notifications')
+      .then(list => {
+        setNotifications(list)
+        apiPost('/notifications/read').catch(() => {})
+      })
+      .catch(err => setError(err.message))
+    loadRequests()
 
+    // new ones arrive in real time while the page is open
+    const socket = new WebSocket(socketUrl())
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
-      if (data.type === 'notification') {
-        setNotifications(list => [data.notification, ...list])
-      }
+      if (data.type !== 'notification') return
+      setNotifications(list => [data.notification, ...(list || [])])
+      apiPost('/notifications/read').catch(() => {})
+      if (REQUEST_TYPES.includes(data.notification.type)) loadRequests()
     }
-
     return () => socket.close()
   }, [])
 
+  // answer a request, then drop it from its list
+  async function respond(path, accept, id, setList) {
+    setError('')
+    try {
+      await apiPost(`${path}/${id}/${accept ? 'accept' : 'decline'}`)
+      setList(list => list.filter(item => item.id !== id))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  function actions(path, id, setList) {
+    return (
+      <div className="invitation-actions">
+        <button className="btn btn-sm" onClick={() => respond(path, true, id, setList)}>Accept</button>
+        <button className="btn btn-light btn-sm" onClick={() => respond(path, false, id, setList)}>Decline</button>
+      </div>
+    )
+  }
+
+  const requestCount = followRequests.length + invitations.length + joinRequests.length
+
   return (
     <>
-      <PageHeader label="Activity" title="Notifications" subtitle="New activity appears here in real time." />
+      <PageHeader label="Activity" title="Notifications" subtitle="Requests to answer and what happened lately." />
 
-      {notifications.length === 0 && (
+      {error && <p className="error">{error}</p>}
+
+      {requestCount > 0 && (
+        <section className="card invitations">
+          <h2>Requests</h2>
+
+          {followRequests.map(request => (
+            <PersonRow key={`f${request.id}`} person={request.user}>
+              <small className="meta">wants to follow you</small>
+              {actions('/follow-requests', request.id, setFollowRequests)}
+            </PersonRow>
+          ))}
+
+          {invitations.map(inv => (
+            <div key={`i${inv.id}`} className="list-item">
+              <span className="list-icon"><Icon name="users" size={16} /></span>
+              <span className="list-text">
+                <strong>You are invited to join “{inv.group_title}”</strong>
+                <small>Group invitation</small>
+              </span>
+              {actions('/group-invitations', inv.id, setInvitations)}
+            </div>
+          ))}
+
+          {joinRequests.map(request => (
+            <div key={`j${request.id}`} className="list-item">
+              <Avatar user={request} size={40} />
+              <span className="list-text">
+                <strong>{request.first_name} {request.last_name} wants to join “{request.group_title}”</strong>
+                <small>@{request.nickname}</small>
+              </span>
+              {actions('/group-join-requests', request.id, setJoinRequests)}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {notifications === null && !error && <p className="loading">Loading…</p>}
+
+      {notifications?.length === 0 && requestCount === 0 && (
         <div className="empty">
           <p className="empty-title">You are all caught up</p>
-          <p>Follow requests and invitations will show up here.</p>
+          <p>Follow requests, invitations and group events will show up here.</p>
         </div>
       )}
 
-      <div className="card list">
-        {notifications.map(n => (
-          <div key={n.id} className="list-item">
-            <span className="list-icon"><Icon name="bell" size={16} /></span>
-            <span className="list-text">
-              <strong>{n.content || n.type.replaceAll('_', ' ')}</strong>
-              <small>{new Date(n.created_at).toLocaleString()}</small>
-            </span>
-          </div>
-        ))}
-      </div>
+      {notifications?.length > 0 && (
+        <div className="card list">
+          {notifications.map(n => {
+            const actor = { first_name: n.actor_first_name, last_name: n.actor_last_name, avatar: n.actor_avatar }
+            return (
+              <Link
+                key={n.id}
+                href={n.group_id ? `/groups/${n.group_id}` : `/profile/${n.actor_id}`}
+                className="list-item"
+              >
+                <Avatar user={actor} size={40} />
+                <span className="list-text">
+                  <strong>{n.content || n.type.replaceAll('_', ' ')}</strong>
+                  <small>{new Date(n.created_at).toLocaleString()}</small>
+                </span>
+                {!n.read && <span className="menu-dot" title="New" />}
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }

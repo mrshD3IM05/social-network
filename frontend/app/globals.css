@@ -675,6 +675,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   .brand { padding: 0; font-size: 24px; }
   .menu { flex-direction: row; gap: 2px; overflow-x: auto; }
   .menu-item span { display: none; }
+  .menu-item .menu-count { display: block; position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; }
   .menu-item.active::before { display: none; }
   .sidebar-user { padding: 0; border: 0; }
   .user-chip span { display: none; }
@@ -714,6 +715,8 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 
 /* a new message is waiting (the sidebar item is already position: relative) */
 .menu-dot { flex-shrink: 0; width: 8px; height: 8px; margin-left: auto; border-radius: 999px; background: var(--accent); }
+/* unread notifications: a number, so it never looks like the message dot */
+.menu-count { flex-shrink: 0; min-width: 20px; height: 20px; margin-left: auto; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
 /* in a list row the dot sits before the trailing icon, not pinned to the edge */
 .list-item .menu-dot { margin-left: auto; margin-right: 4px; }
 

@@ -6,6 +6,7 @@ import { apiPost } from '@/lib/api'
 import Avatar from './Avatar'
 import Icon from './Icon'
 import MessageDot from './MessageDot'
+import NotificationBadge from './NotificationBadge'
 
 const links = [
   { href: '/home', label: 'Feed', icon: 'home' },
@@ -40,6 +41,7 @@ export default function Navbar({ user }) {
             <Icon name={link.icon} />
             <span>{link.label}</span>
             {link.href === '/chat' && <MessageDot myId={user.id} />}
+            {link.href === '/notifications' && <NotificationBadge />}
           </Link>
         ))}
       </nav>
