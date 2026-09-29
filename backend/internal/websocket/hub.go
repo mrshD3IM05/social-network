@@ -63,9 +63,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client.readPump()
 }
 
-// allowedOrigins are the pages on another host that may open the socket. In
-// dev the Next.js server (:3000) connects straight to :8080. ALLOWED_ORIGINS
-// (comma separated) replaces the default list.
+// allowedOrigins are the pages on another host that may open the socket.
+// ALLOWED_ORIGINS (comma separated) replaces the default list. Any port on
+// this machine is accepted too, see checkOrigin.
 var allowedOrigins = loadAllowedOrigins()
 
 func loadAllowedOrigins() []string {
@@ -87,6 +87,12 @@ func checkOrigin(r *http.Request) bool {
 		return false
 	}
 	if strings.EqualFold(parsed.Host, r.Host) {
+		return true
+	}
+	// the frontend in dev runs on this machine, on whichever port is free;
+	// a page that attacks a visitor is never served from their own computer
+	switch parsed.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
 		return true
 	}
 	for _, allowed := range allowedOrigins {
