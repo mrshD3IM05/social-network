@@ -185,6 +185,55 @@ func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Notifications handles GET /notifications: the caller's latest notifications.
+func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	notifications, err := h.Service.Notifications(userID)
+	if err != nil {
+		http.Error(w, "could not list notifications", http.StatusInternalServerError)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, notifications)
+}
+
+// ReadNotifications handles POST /notifications/read: marks them all as seen.
+func (h *Handler) ReadNotifications(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	if err := h.Service.MarkNotificationsRead(userID); err != nil {
+		http.Error(w, "could not update notifications", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// FollowRequests handles GET /follow-requests: the requests waiting for the
+// caller to accept or decline, each with the public profile of its sender.
+func (h *Handler) FollowRequests(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	requests, err := h.Follow.PendingRequests(userID)
+	if err != nil {
+		http.Error(w, "could not list follow requests", http.StatusInternalServerError)
+		return
+	}
+	list := make([]map[string]any, 0, len(requests))
+	for _, request := range requests {
+		list = append(list, map[string]any{"id": request.ID, "created_at": request.CreatedAt, "user": common.PublicUser(request.From)})
+	}
+	common.WriteJSON(w, http.StatusOK, list)
+}
+
 // visibleUser resolves the {id} in the path and checks the caller may see that
 // profile: a private one only opens up to its followers. It writes the error
 // itself and answers false once the caller should stop.

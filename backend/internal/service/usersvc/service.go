@@ -35,4 +35,14 @@ func (s *Service) SetPrivacy(userID int64, private bool) (*model.User, error) {
 	}
 	return s.users.GetUserByID(userID)
 }
+
+// Notifications are the latest notifications of the user, newest first.
+func (s *Service) Notifications(userID int64) ([]*model.Notification, error) {
+	return s.users.ListNotifications(userID)
+}
+
+func (s *Service) MarkNotificationsRead(userID int64) error {
+	return s.users.MarkNotificationsRead(userID)
+}
+
 func IsNotFound(err error) bool { return errors.Is(err, repository.ErrNotFound) }
