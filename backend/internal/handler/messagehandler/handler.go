@@ -32,8 +32,8 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	otherID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || otherID < 1 {
+	otherID, err := common.PathID(r, "id")
+	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}

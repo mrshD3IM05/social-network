@@ -71,7 +71,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -91,7 +91,7 @@ func (h *Handler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -116,7 +116,7 @@ func (h *Handler) SetGroupAvatar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -159,7 +159,7 @@ func (h *Handler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -178,12 +178,12 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	memberID, err := parseID(r, "userID")
+	memberID, err := common.PathID(r, "userID")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
@@ -203,7 +203,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -222,7 +222,7 @@ func (h *Handler) GetGroupMembers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -245,7 +245,7 @@ func (h *Handler) InviteUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -273,7 +273,7 @@ func (h *Handler) RespondInvitation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	invitationID, err := parseID(r, "id")
+	invitationID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid invitation id", http.StatusBadRequest)
 		return
@@ -292,7 +292,7 @@ func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -311,7 +311,7 @@ func (h *Handler) RespondJoinRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	requestID, err := parseID(r, "id")
+	requestID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid join request id", http.StatusBadRequest)
 		return
@@ -344,7 +344,7 @@ func (h *Handler) PendingJoinRequests(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -370,7 +370,7 @@ func (h *Handler) CreateGroupPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -394,7 +394,7 @@ func (h *Handler) ListGroupPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -416,12 +416,12 @@ func (h *Handler) DeleteGroupPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	postID, err := parseID(r, "post_id")
+	postID, err := common.PathID(r, "post_id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -457,7 +457,7 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -481,7 +481,7 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groupID, err := parseID(r, "id")
+	groupID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
@@ -501,7 +501,7 @@ func (h *Handler) RespondEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	eventID, err := parseID(r, "id")
+	eventID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid event id", http.StatusBadRequest)
 		return
@@ -546,7 +546,7 @@ func (h *Handler) MyEventResponse(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	eventID, err := parseID(r, "id")
+	eventID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid event id", http.StatusBadRequest)
 		return
@@ -607,12 +607,4 @@ func writeError(w http.ResponseWriter, err error, fallback string) {
 	default:
 		http.Error(w, fallback, http.StatusInternalServerError)
 	}
-}
-
-func parseID(r *http.Request, name string) (int64, error) {
-	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
-	if err != nil || id < 1 {
-		return 0, strconv.ErrSyntax
-	}
-	return id, nil
 }

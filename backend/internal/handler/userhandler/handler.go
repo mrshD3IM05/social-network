@@ -105,7 +105,7 @@ func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	targetID, err := parseID(r, "id")
+	targetID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
@@ -130,7 +130,7 @@ func (h *Handler) FollowStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	targetID, err := parseID(r, "id")
+	targetID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
@@ -148,7 +148,7 @@ func (h *Handler) UnfollowUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	targetID, err := parseID(r, "id")
+	targetID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
@@ -165,7 +165,7 @@ func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	requestID, err := parseID(r, "id")
+	requestID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid follow request id", http.StatusBadRequest)
 		return
@@ -189,7 +189,7 @@ func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 // profile: a private one only opens up to its followers. It writes the error
 // itself and answers false once the caller should stop.
 func (h *Handler) visibleUser(w http.ResponseWriter, r *http.Request) (*model.User, bool) {
-	id, err := parseID(r, "id")
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return nil, false
@@ -228,12 +228,4 @@ func writePeople(w http.ResponseWriter, users []*model.User) {
 		people = append(people, common.PublicUser(user))
 	}
 	common.WriteJSON(w, http.StatusOK, people)
-}
-
-func parseID(r *http.Request, name string) (int64, error) {
-	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
-	if err != nil || id < 1 {
-		return 0, strconv.ErrSyntax
-	}
-	return id, nil
 }

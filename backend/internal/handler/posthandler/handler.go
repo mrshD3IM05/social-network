@@ -1,12 +1,10 @@
 package posthandler
 
 import (
-	"errors"
 	"net/http"
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
-	"strconv"
 )
 
 type Handler struct {
@@ -61,7 +59,7 @@ func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	id, err := parseID(r)
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -83,7 +81,7 @@ func (h *Handler) ReactionPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	id, err := parseID(r)
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -105,7 +103,7 @@ func (h *Handler) DeleteReaction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	id, err := parseID(r)
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -133,7 +131,7 @@ func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	id, err := parseID(r)
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -161,7 +159,7 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	id, err := parseID(r)
+	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -175,14 +173,4 @@ func (h *Handler) DeletePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-func parseID(r *http.Request) (int64, error) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id < 1 {
-		if err == nil {
-			err = errors.New("id must be positive")
-		}
-		return 0, err
-	}
-	return id, nil
 }

@@ -3,7 +3,6 @@ package commenthandler
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/repository"
@@ -28,7 +27,7 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	postID, err := parseID(r)
+	postID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -49,7 +48,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	postID, err := parseID(r)
+	postID, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
@@ -80,12 +79,4 @@ func writeError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, "could not process comment", http.StatusInternalServerError)
 	}
-}
-
-func parseID(r *http.Request) (int64, error) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id < 1 {
-		return 0, strconv.ErrSyntax
-	}
-	return id, nil
 }

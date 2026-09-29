@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sn-backend/internal/model"
 	"sn-backend/internal/service/sessionsvc"
+	"strconv"
 )
 
 func PublicUser(user *model.User) map[string]any {
@@ -31,4 +32,13 @@ func CurrentUserID(r *http.Request, sessions *sessionsvc.Service) (int64, error)
 		return 0, err
 	}
 	return session.UserID, nil
+}
+
+// PathID reads a positive id from the url path, like {id} in /posts/{id}.
+func PathID(r *http.Request, name string) (int64, error) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
+	if err != nil || id < 1 {
+		return 0, strconv.ErrSyntax
+	}
+	return id, nil
 }
