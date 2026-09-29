@@ -8,25 +8,20 @@ import (
 	"strings"
 
 	"sn-backend/internal/handler/common"
-	"sn-backend/internal/model"
 	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/messagesvc"
 	"sn-backend/internal/service/sessionsvc"
+	ws "sn-backend/internal/websocket"
 )
-
-// Publisher is the websocket hub: a sent message is pushed to both sides.
-type Publisher interface {
-	PublishMessage(*model.Message)
-}
 
 type Handler struct {
 	Service   *messagesvc.Service
 	Files     *filesvc.Service
 	Session   *sessionsvc.Service
-	WebSocket Publisher
+	WebSocket *ws.Hub
 }
 
-func New(service *messagesvc.Service, files *filesvc.Service, session *sessionsvc.Service, webSocket Publisher) *Handler {
+func New(service *messagesvc.Service, files *filesvc.Service, session *sessionsvc.Service, webSocket *ws.Hub) *Handler {
 	return &Handler{Service: service, Files: files, Session: session, WebSocket: webSocket}
 }
 
