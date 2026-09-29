@@ -99,6 +99,14 @@ func (h *Handler) SetPrivacy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not update profile privacy", http.StatusInternalServerError)
 		return
 	}
+	// a public profile is followed without asking, so the waiting requests
+	// are accepted at once
+	if !private {
+		if err := h.Follow.AcceptAllPending(viewerID); err != nil {
+			http.Error(w, "could not accept pending follow requests", http.StatusInternalServerError)
+			return
+		}
+	}
 	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
 func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {

@@ -81,6 +81,8 @@ export default function ProfilePage() {
       setMessage(updated.private
         ? 'Your profile is private — only your followers can see it.'
         : 'Your profile is public — everyone can see it.')
+      // going public accepts the waiting follow requests, so reload the lists
+      if (!updated.private) load()
     } catch (err) {
       setMessage(err.message)
     }

@@ -120,6 +120,21 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 	return nil
 }
 
+// AcceptAllPending accepts every request waiting for userID. It runs when a
+// profile turns public: a public profile has no requests to answer.
+func (s *Service) AcceptAllPending(userID int64) error {
+	requests, err := s.repo.ListPendingFollowRequests(userID)
+	if err != nil {
+		return err
+	}
+	for _, request := range requests {
+		if err := s.Respond(userID, request.ID, model.FollowAccepted); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // PendingRequests are the follow requests waiting for userID to answer.
 func (s *Service) PendingRequests(userID int64) ([]*model.FollowRequest, error) {
 	return s.repo.ListPendingFollowRequests(userID)
