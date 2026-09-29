@@ -1,5 +1,6 @@
 services:
   backend:
+    image: social-network-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -14,6 +15,7 @@ services:
       - social-network
 
   frontend:
+    image: social-network-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
