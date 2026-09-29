@@ -147,10 +147,10 @@ export default function RegisterPage() {
 
       <div className="row">
         <div>
-          <label>Nickname</label>
+          <label>Nickname <small>optional</small></label>
           <input
             name="nickname"
-            placeholder={`${LIMITS.nickname.min}–${LIMITS.nickname.max} letters or numbers`}
+            placeholder="made from your name if empty"
             maxLength={LIMITS.nickname.max}
             className={errors.nickname ? 'invalid' : undefined}
           />

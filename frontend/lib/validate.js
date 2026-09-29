@@ -49,7 +49,7 @@ export function checkEmail(value) {
 
 export function checkNickname(value) {
   const nickname = (value || '').trim().toLowerCase()
-  if (!nickname) return 'Nickname is required.'
+  if (!nickname) return '' // optional: the server makes one from the name
   if (!nicknameRegex.test(nickname) || !letterRegex.test(nickname)) {
     const { min, max } = LIMITS.nickname
     return `Nickname must be ${min}–${max} letters or numbers, with at least one letter.`
