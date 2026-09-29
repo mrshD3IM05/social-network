@@ -121,6 +121,7 @@ func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusCreated, follow)
 }
+
 // FollowStatus handles GET /users/{id}/follow: {"status": "accepted" | "pending" | ""}
 // so the profile page knows which button to show.
 func (h *Handler) FollowStatus(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +184,7 @@ func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
 // visibleUser resolves the {id} in the path and checks the caller may see that
 // profile: a private one only opens up to its followers. It writes the error
 // itself and answers false once the caller should stop.

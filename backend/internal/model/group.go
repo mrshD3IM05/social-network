@@ -75,13 +75,13 @@ type GroupJoinRequest struct {
 // creator, members and the caller's own relationship to the group.
 type GroupDetail struct {
 	Group
-	Creator       *GroupCreator  `json:"creator,omitempty"`
-	Members       []GroupMember  `json:"members"`
-	MemberCount   int            `json:"member_count"`
-	IsMember      bool           `json:"is_member"`
-	IsCreator     bool           `json:"is_creator"`
-	PendingInvite bool           `json:"pending_invite"`
-	PendingJoin   bool           `json:"pending_join"`
+	Creator       *GroupCreator `json:"creator,omitempty"`
+	Members       []GroupMember `json:"members"`
+	MemberCount   int           `json:"member_count"`
+	IsMember      bool          `json:"is_member"`
+	IsCreator     bool          `json:"is_creator"`
+	PendingInvite bool          `json:"pending_invite"`
+	PendingJoin   bool          `json:"pending_join"`
 }
 
 type GroupListItem struct {

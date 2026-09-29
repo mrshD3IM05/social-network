@@ -1,7 +1,6 @@
 package repository
 
 import (
-
 	"sn-backend/internal/model"
 )
 
