@@ -68,43 +68,36 @@ func (s *Service) Login(identifier, password string) (*model.User, error) {
 	return user, nil
 }
 
-type RegisterInput struct {
-	Email, Password, FirstName, LastName, DateOfBirth string
-	Nickname, AboutMe                                 string
-}
-
-func (s *Service) Register(input RegisterInput) (*model.User, error) {
-	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
-	input.Nickname = strings.ToLower(strings.TrimSpace(input.Nickname))
-	input.FirstName = strings.TrimSpace(input.FirstName)
-	input.LastName = strings.TrimSpace(input.LastName)
-	input.AboutMe = strings.TrimSpace(input.AboutMe)
-	if err := validateRegisterInput(input); err != nil {
-		return nil, err
+// Register checks the new user, hashes its plain password and stores it.
+func (s *Service) Register(user *model.User) error {
+	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+	user.Nickname = strings.ToLower(strings.TrimSpace(user.Nickname))
+	user.FirstName = strings.TrimSpace(user.FirstName)
+	user.LastName = strings.TrimSpace(user.LastName)
+	user.AboutMe = strings.TrimSpace(user.AboutMe)
+	if err := validateRegisterInput(user); err != nil {
+		return err
 	}
-	if _, err := s.users.GetUserByEmail(input.Email); err == nil {
-		return nil, ErrEmailTaken
+	if _, err := s.users.GetUserByEmail(user.Email); err == nil {
+		return ErrEmailTaken
 	} else if !errors.Is(err, repository.ErrNotFound) {
-		return nil, err
+		return err
 	}
 	// login accepts a nickname too, so two accounts cannot share one
-	if _, err := s.users.GetUserByNickname(input.Nickname); err == nil {
-		return nil, ErrNicknameTaken
+	if _, err := s.users.GetUserByNickname(user.Nickname); err == nil {
+		return ErrNicknameTaken
 	} else if !errors.Is(err, repository.ErrNotFound) {
-		return nil, err
+		return err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	user := &model.User{Email: input.Email, Password: string(hash), FirstName: input.FirstName, LastName: input.LastName, DateOfBirth: input.DateOfBirth, Nickname: input.Nickname, AboutMe: input.AboutMe}
-	if err := s.users.CreateUser(user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	user.Password = string(hash)
+	return s.users.CreateUser(user)
 }
 
-func validateRegisterInput(input RegisterInput) error {
+func validateRegisterInput(input *model.User) error {
 	if strings.TrimSpace(input.Email) == "" {
 		return fmt.Errorf("%w: email is required", ErrInvalidInput)
 	}

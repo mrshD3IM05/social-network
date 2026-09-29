@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"sn-backend/internal/handler/common"
+	"sn-backend/internal/model"
 	"sn-backend/internal/service/authsvc"
 	"sn-backend/internal/service/sessionsvc"
 	ws "sn-backend/internal/websocket"
@@ -24,8 +25,16 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	user, err := h.Service.Register(authsvc.RegisterInput{Email: r.FormValue("email"), Password: r.FormValue("password"), FirstName: r.FormValue("first_name"), LastName: r.FormValue("last_name"), DateOfBirth: r.FormValue("date_of_birth"), Nickname: r.FormValue("nickname"), AboutMe: r.FormValue("about_me")})
-	if err != nil {
+	user := &model.User{
+		Email:       r.FormValue("email"),
+		Password:    r.FormValue("password"),
+		FirstName:   r.FormValue("first_name"),
+		LastName:    r.FormValue("last_name"),
+		DateOfBirth: r.FormValue("date_of_birth"),
+		Nickname:    r.FormValue("nickname"),
+		AboutMe:     r.FormValue("about_me"),
+	}
+	if err := h.Service.Register(user); err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, authsvc.ErrEmailTaken) || errors.Is(err, authsvc.ErrNicknameTaken) {
 			status = http.StatusConflict
