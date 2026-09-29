@@ -21,12 +21,13 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | method | path | request | response |
 |---|---|---|---|
 | GET | /users | - | everyone except you, public shape, ordered by name |
-| GET | /user/{id} | - | public profile, 403 if the profile is private and you don't follow them |
+| GET | /user/{id} | - | profile with every register field except the password, 403 if the profile is private and you don't follow them |
 | GET | /users/{id}/followers | - | users following them, same privacy gate as the profile |
 | GET | /users/{id}/following | - | users they follow, same privacy gate as the profile |
 | GET | /users/{id}/follow | - | {"status": "accepted" \| "pending" \| ""} your follow relation to that user |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
+| GET | /follow-requests | - | [{id, created_at, user}] requests waiting for you to answer |
 | POST | /follow-requests/{id}/accept | - | 204 |
 | POST | /follow-requests/{id}/decline | - | 204 |
 | PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private |
@@ -35,8 +36,8 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | method | path | request | response |
 |---|---|---|---|
 | GET | /posts | - | posts visible to you (will add cursor pagination to it) |
-| POST | /posts | form: content, privacy = public \| almost_private \| private | 201 + post json |
-| PUT | /posts/{id} | form: content, privacy | 200 + post json, only the owner can update |
+| POST | /posts | form: content, privacy = public \| almost_private \| private, viewers = user id (repeat it; required for private, each must follow you) | 201 + post json |
+| PUT | /posts/{id} | form: content, privacy, viewers (optional, replaces the chosen followers) | 200 + post json, only the owner can update |
 | DELETE | /posts/{id} | - | 204, only the owner can delete |
 | POST | /posts/{id}/reactions | form: reaction = like \| dislike | 200 + summary, toggles: same reaction removes it, other switches; invisible post = 404 |
 | DELETE | /posts/{id}/reactions | - | 200 + summary after removing your reaction |

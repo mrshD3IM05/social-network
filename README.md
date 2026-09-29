@@ -57,7 +57,6 @@ social-network/
 ├── backend/
 │   ├── Dockerfile
 │   ├── readme.md             ← full API reference + diagrams
-│   ├── schema.sql            ← reference snapshot of the final schema (not executed)
 │   ├── go.mod / go.sum
 │   ├── cmd/server/main.go    ← entry point: opens the DB, runs migrations, starts :8080
 │   └── internal/
@@ -251,7 +250,7 @@ To change the schema, add a new pair such as `000020_<name>.up.sql` / `.down.sql
 | `messages` | private (`to_user_id`) or group (`group_id`) messages. Exactly one of them is set. |
 | `files` | uploaded image metadata, linked to a post or message |
 
-[backend/schema.sql](backend/schema.sql) is a readable snapshot of the final schema. It is **for reference only**: the server never runs it.
+The migrations are the only definition of the database: the server applies the missing ones at every start, so there is no separate schema file to keep in sync.
 
 ---
 
@@ -263,14 +262,15 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 |---|---|
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
 | Users | `GET /users`, `GET /user/{id}`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
-| Follows | `GET/POST/DELETE /users/{id}/follow`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
+| Follows | `GET/POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
+| Notifications | `GET /notifications`, `POST /notifications/read` |
 | Posts | `GET/POST /posts`, `GET/PUT/DELETE /posts/{id}` |
 | Comments | `GET/POST /posts/{id}/comments` |
 | Reactions | `POST/DELETE /posts/{id}/reactions` |
 | Files | `POST /files`, `POST /avatar`, `GET /fs/{id}` |
 | Groups | `GET/POST /groups`, `GET/PUT/DELETE /groups/{id}`, `POST /groups/{id}/avatar`, `GET /groups/{id}/members`, `DELETE /groups/{id}/members/{userID}` |
 | Invitations | `POST /groups/{id}/invitations`, `GET /group-invitations`, `POST /group-invitations/{id}/accept`, `POST /group-invitations/{id}/decline` |
-| Join requests | `POST/GET /groups/{id}/join-requests`, `POST /group-join-requests/{id}/accept`, `POST /group-join-requests/{id}/decline` |
+| Join requests | `POST/GET /groups/{id}/join-requests`, `GET /group-join-requests`, `POST /group-join-requests/{id}/accept`, `POST /group-join-requests/{id}/decline` |
 | Group posts | `GET/POST /groups/{id}/posts`, `DELETE /groups/{id}/posts/{post_id}` |
 | Events | `GET/POST /groups/{id}/events`, `GET/POST /events/{id}/response` |
 | Messages | `GET /messages/{id}`, `GET /groups/{id}/messages`, `POST /messages` |
