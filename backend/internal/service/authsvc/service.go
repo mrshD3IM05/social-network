@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -75,6 +76,13 @@ func (s *Service) Register(user *model.User) error {
 	user.FirstName = strings.TrimSpace(user.FirstName)
 	user.LastName = strings.TrimSpace(user.LastName)
 	user.AboutMe = strings.TrimSpace(user.AboutMe)
+	if user.Nickname == "" {
+		nickname, err := s.newNickname(user.FirstName, user.LastName)
+		if err != nil {
+			return err
+		}
+		user.Nickname = nickname
+	}
 	if err := validateRegisterInput(user); err != nil {
 		return err
 	}
@@ -95,6 +103,36 @@ func (s *Service) Register(user *model.User) error {
 	}
 	user.Password = string(hash)
 	return s.users.CreateUser(user)
+}
+
+// newNickname builds a free nickname from the first and last name, like
+// "johnsmith", then "johnsmith2", "johnsmith3"... when it is already taken.
+func (s *Service) newNickname(firstName, lastName string) (string, error) {
+	base := ""
+	for _, r := range strings.ToLower(firstName + lastName) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			base += string(r)
+		}
+	}
+	// a nickname needs 4 characters and a letter (names can be "Li" or "José")
+	if len(base) < 4 || !letterRegex.MatchString(base) {
+		base = "user" + base
+	}
+	for number := 1; ; number++ {
+		suffix := ""
+		if number > 1 {
+			suffix = strconv.Itoa(number)
+		}
+		// keep the whole nickname within 15 characters
+		nickname := base[:min(len(base), 15-len(suffix))] + suffix
+		_, err := s.users.GetUserByNickname(nickname)
+		if errors.Is(err, repository.ErrNotFound) {
+			return nickname, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
 }
 
 func validateRegisterInput(input *model.User) error {
