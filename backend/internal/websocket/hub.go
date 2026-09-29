@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -98,7 +99,14 @@ func checkOrigin(r *http.Request) bool {
 	return false
 }
 
-func (h *Hub) PublishNotification(notification *model.Notification) {
+// Notify saves the notification and sends it right away to the user's open
+// pages. A notification that cannot be saved is only logged: it never makes
+// the action that caused it (a follow, an invite...) fail.
+func (h *Hub) Notify(notification *model.Notification) {
+	if err := h.repo.CreateNotification(notification); err != nil {
+		log.Printf("could not create notification: %v", err)
+		return
+	}
 	h.publish(notification.UserID, map[string]any{"type": "notification", "notification": notification})
 }
 

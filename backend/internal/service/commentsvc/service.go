@@ -17,8 +17,7 @@ var (
 	ErrNoAccess       = errors.New("comment: no access to this post")
 )
 
-// Service reuses the existing notification plumbing (persist +
-// hub fan-out), the same pattern as groupsvc.notify.
+// Service uses the hub to notify a post's author of new comments.
 type Service struct {
 	repo *repository.Repository
 	hub  *ws.Hub
@@ -61,21 +60,19 @@ func (s *Service) Create(authorID, postID int64, content string) (*model.Comment
 		return nil, err
 	}
 
-	// Best-effort notification to the post author (not when they comment
-	// on their own post). Persistence failures never fail the comment.
-	if post, err := s.repo.GetPost(postID); err == nil && post.AuthorID != authorID {
-		notification := &model.Notification{
-			UserID:  post.AuthorID,
-			Type:    model.NotificationCommentPost,
-			ActorID: authorID,
-			Content: "commented on your post",
-		}
-		s.notify(notification)
-	}
-
 	created, err := s.reload(comment.ID, postID)
 	if err != nil {
 		return nil, err
+	}
+
+	// tell the post author (not when they comment on their own post)
+	if post, err := s.repo.GetPost(postID); err == nil && post.AuthorID != authorID {
+		s.hub.Notify(&model.Notification{
+			UserID:  post.AuthorID,
+			Type:    model.NotificationCommentPost,
+			ActorID: authorID,
+			Content: created.AuthorFirstName + " " + created.AuthorLastName + " commented on your post",
+		})
 	}
 	return created, nil
 }
@@ -95,13 +92,3 @@ func (s *Service) reload(commentID, postID int64) (*model.Comment, error) {
 	return nil, repository.ErrNotFound
 }
 
-// notify persists a notification and pushes it to the user's websockets via
-// the existing hub (same contract as groupsvc.notify).
-func (s *Service) notify(n *model.Notification) {
-	if err := s.repo.CreateNotification(n); err != nil {
-		return
-	}
-	if s.hub != nil {
-		s.hub.PublishNotification(n)
-	}
-}

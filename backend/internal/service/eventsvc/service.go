@@ -25,7 +25,7 @@ var (
 	ErrNotGroupMember     = errors.New("event: only group members can do that")
 )
 
-// Service reuses the group notification plumbing (persist + hub fan-out).
+// Service uses the hub to notify group members of new events.
 type Service struct {
 	repo *repository.Repository
 	hub  *ws.Hub
@@ -167,7 +167,7 @@ func (s *Service) notifyMembers(event *model.GroupEvent) {
 		if memberID == event.CreatorID {
 			continue
 		}
-		s.notify(&model.Notification{
+		s.hub.Notify(&model.Notification{
 			UserID:  memberID,
 			Type:    model.NotificationEventCreated,
 			ActorID: event.CreatorID,
@@ -177,14 +177,3 @@ func (s *Service) notifyMembers(event *model.GroupEvent) {
 	}
 }
 
-// notify persists a notification and pushes it to the user's websockets via
-// the existing hub (same contract as groupsvc.notify).
-func (s *Service) notify(n *model.Notification) {
-	if err := s.repo.CreateNotification(n); err != nil {
-		log.Printf("eventsvc: could not create notification: %v", err)
-		return
-	}
-	if s.hub != nil {
-		s.hub.PublishNotification(n)
-	}
-}

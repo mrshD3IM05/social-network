@@ -404,6 +404,34 @@ func (r *Repository) GetPendingJoinRequestsForGroup(groupID int64) ([]*model.Gro
 	return requests, rows.Err()
 }
 
+// GetPendingJoinRequestsForCreator returns the pending join requests of every
+// group created by userID, so they can be answered from the notifications page.
+func (r *Repository) GetPendingJoinRequestsForCreator(userID int64) ([]*model.GroupJoinRequest, error) {
+	rows, err := r.db.Query(
+		`SELECT `+groupJoinRequestColumns+`
+		 FROM group_join_requests gj
+		 JOIN groups g ON g.id = gj.group_id
+		 JOIN users u ON u.id = gj.user_id
+		 WHERE g.creator_id = ? AND gj.status = ?
+		 ORDER BY gj.created_at DESC, gj.id DESC`,
+		userID, model.GroupJoinPending,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	requests := make([]*model.GroupJoinRequest, 0)
+	for rows.Next() {
+		request, err := scanGroupJoinRequest(rows)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	return requests, rows.Err()
+}
+
 func (r *Repository) DeleteGroupJoinRequest(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM group_join_requests WHERE id = ?`, id)
 	return err

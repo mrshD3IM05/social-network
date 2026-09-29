@@ -2,7 +2,6 @@ package groupsvc
 
 import (
 	"errors"
-	"log"
 	"strings"
 
 	"sn-backend/internal/model"
@@ -36,7 +35,7 @@ type Service struct {
 }
 
 // New wires the service to a repository and the websocket hub for
-// notification fan-out; nil hub means notifications are only persisted.
+// notifications.
 func New(repo *repository.Repository, hub *ws.Hub) *Service {
 	return &Service{repo: repo, hub: hub}
 }
@@ -115,7 +114,7 @@ func (s *Service) RemoveMember(creatorID, groupID, userID int64) error {
 	if err := s.repo.RemoveGroupMember(groupID, userID); err != nil {
 		return err
 	}
-	s.notify(&model.Notification{
+	s.hub.Notify(&model.Notification{
 		UserID:  userID,
 		Type:    model.NotificationGroupRemoved,
 		ActorID: creatorID,
@@ -251,10 +250,10 @@ func (s *Service) Invite(memberID, groupID, toUserID int64) (*model.GroupInvitat
 		UserID:  toUserID,
 		Type:    model.NotificationGroupInvite,
 		ActorID: memberID,
-		Content: inviter.Nickname + " invited you to join \"" + group.Title + "\"",
+		Content: inviter.FirstName + " " + inviter.LastName + " invited you to join \"" + group.Title + "\"",
 		GroupID: &group.ID,
 	}
-	s.notify(notification)
+	s.hub.Notify(notification)
 	return created, nil
 }
 
@@ -269,14 +268,18 @@ func (s *Service) RespondInvitation(userID, invitationID int64, accept bool) err
 		if err != nil {
 			return err
 		}
+		name := "someone"
+		if user, err := s.repo.GetUserByID(userID); err == nil {
+			name = user.FirstName + " " + user.LastName
+		}
 		notification := &model.Notification{
 			UserID:  invitation.FromUserID,
 			Type:    model.NotificationGroupInviteResp,
 			ActorID: userID,
-			Content: "accepted your invitation to \"" + invitation.GroupTitle + "\"",
+			Content: name + " accepted your invitation to \"" + invitation.GroupTitle + "\"",
 			GroupID: &invitation.GroupID,
 		}
-		s.notify(notification)
+		s.hub.Notify(notification)
 		return nil
 	}
 	return s.repo.RefuseGroupInvitationTx(invitationID, userID)
@@ -336,7 +339,7 @@ func (s *Service) RequestJoin(userID, groupID int64) (*model.GroupJoinRequest, e
 		Content: requesterName(created) + " requested to join \"" + group.Title + "\"",
 		GroupID: &group.ID,
 	}
-	s.notify(notification)
+	s.hub.Notify(notification)
 	return created, nil
 }
 
@@ -372,7 +375,7 @@ func (s *Service) RespondJoinRequest(creatorID, requestID int64, accept bool) er
 		Content: "your request to join \"" + group.Title + "\" was accepted",
 		GroupID: &group.ID,
 	}
-	s.notify(notification)
+	s.hub.Notify(notification)
 	return nil
 }
 
@@ -389,6 +392,11 @@ func (s *Service) PendingJoinRequests(viewerID, groupID int64) ([]*model.GroupJo
 		return nil, ErrNotGroupCreator
 	}
 	return s.repo.GetPendingJoinRequestsForGroup(groupID)
+}
+
+// MyJoinRequests are the pending join requests of every group userID created.
+func (s *Service) MyJoinRequests(userID int64) ([]*model.GroupJoinRequest, error) {
+	return s.repo.GetPendingJoinRequestsForCreator(userID)
 }
 
 // creatorGroup loads the group and checks userID is its creator.
@@ -423,18 +431,6 @@ func requesterName(request *model.GroupJoinRequest) string {
 	return name
 }
 
-// notify persists a notification and best-effort pushes it to the user's
-// websockets via the existing hub. Persistence failures are logged but do
-// not fail the group operation.
-func (s *Service) notify(n *model.Notification) {
-	if err := s.repo.CreateNotification(n); err != nil {
-		log.Printf("groupsvc: could not create notification: %v", err)
-		return
-	}
-	if s.hub != nil {
-		s.hub.PublishNotification(n)
-	}
-}
 
 // isUnique reports SQLite UNIQUE-constraint violations from the driver so
 // races between the pre-check and the insert stay safe.
