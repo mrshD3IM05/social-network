@@ -37,7 +37,8 @@ go.work.sum
 # .vscode/
 
 # folders
-backend/uploads/
+# uploaded images are runtime data, wherever the server is started from
+uploads/
 instructions.md
 
 
