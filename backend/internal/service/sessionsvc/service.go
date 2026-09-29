@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"sn-backend/internal/model"
+	"sn-backend/internal/repository"
 )
 
 const (
@@ -20,18 +21,12 @@ var (
 	ErrExpired = errors.New("session: expired")
 )
 
-type Repository interface {
-	CreateSession(*model.Session) error
-	GetSession(string) (*model.Session, error)
-	DeleteSession(string) error
-}
-
 type Service struct {
-	repo Repository
+	repo *repository.Repository
 	ttl  time.Duration
 }
 
-func New(repo Repository) *Service { return &Service{repo: repo, ttl: DefaultTTL} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo, ttl: DefaultTTL} }
 
 func (s *Service) Create(userID int64) (*model.Session, error) {
 	var token [32]byte

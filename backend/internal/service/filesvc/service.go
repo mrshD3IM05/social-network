@@ -44,24 +44,12 @@ func IsBadImage(err error) bool {
 		errors.Is(err, ErrTooManyImages) || errors.Is(err, ErrImageDimensions)
 }
 
-type Repository interface {
-	CreateFile(*model.File) error
-	GetFile(string) (*model.File, error)
-	CanViewFile(int64, string) (bool, error)
-	CountAttachedFiles(postID, messageID, commentID *int64) (int, error)
-	GetPost(int64) (*model.Post, error)
-	GetComment(int64) (*model.Comment, error)
-	CanAttachToMessage(int64, int64) (bool, error)
-	GetUserByID(int64) (*model.User, error)
-	UpdateUser(*model.User) error
-}
-
 type Service struct {
-	repo        Repository
+	repo        *repository.Repository
 	storagePath string
 }
 
-func New(repo Repository, storagePath string) *Service {
+func New(repo *repository.Repository, storagePath string) *Service {
 	return &Service{repo: repo, storagePath: storagePath}
 }
 

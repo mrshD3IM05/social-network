@@ -17,23 +17,14 @@ var (
 	ErrNoAccess       = errors.New("comment: no access to this post")
 )
 
-// Repository is the subset of repository.Repository the comment service needs.
-type Repository interface {
-	CreateComment(*model.Comment) error
-	ListPostComments(int64) ([]*model.Comment, error)
-	CanViewPost(int64, int64) (bool, error)
-	GetPost(int64) (*model.Post, error)
-	CreateNotification(*model.Notification) error
-}
-
 // Service reuses the existing notification plumbing (persist +
 // hub fan-out), the same pattern as groupsvc.notify.
 type Service struct {
-	repo Repository
+	repo *repository.Repository
 	hub  *ws.Hub
 }
 
-func New(repo Repository, hub *ws.Hub) *Service {
+func New(repo *repository.Repository, hub *ws.Hub) *Service {
 	return &Service{repo: repo, hub: hub}
 }
 

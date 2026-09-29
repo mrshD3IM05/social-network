@@ -25,30 +25,13 @@ var (
 	ErrNotGroupMember     = errors.New("event: only group members can do that")
 )
 
-// Repository is the subset of repository.Repository the event service needs.
-type Repository interface {
-	CreateEvent(*model.GroupEvent) error
-	ListGroupEvents(groupID, viewerID int64) ([]*model.EventListItem, error)
-	SetEventResponse(int64, int64, string) error
-	GetEventResponse(int64, int64) (*model.EventResponse, error)
-	EventResponseCounts(int64) (int, int, error)
-
-	GetGroup(int64) (*model.Group, error)
-	GetGroupIDForEvent(int64) (int64, error)
-	IsGroupMember(int64, int64) (bool, error)
-	GroupMemberIDs(int64) ([]int64, error)
-	GetUserByID(int64) (*model.User, error)
-
-	CreateNotification(*model.Notification) error
-}
-
 // Service reuses the group notification plumbing (persist + hub fan-out).
 type Service struct {
-	repo Repository
+	repo *repository.Repository
 	hub  *ws.Hub
 }
 
-func New(repo Repository, hub *ws.Hub) *Service {
+func New(repo *repository.Repository, hub *ws.Hub) *Service {
 	return &Service{repo: repo, hub: hub}
 }
 

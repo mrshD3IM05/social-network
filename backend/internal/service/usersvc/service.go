@@ -6,16 +6,9 @@ import (
 	"sn-backend/internal/repository"
 )
 
-type Repository interface {
-	GetUserByID(int64) (*model.User, error)
-	ListUsers(int64) ([]*model.User, error)
-	IsFollowing(int64, int64) (bool, error)
-	SetUserPrivate(int64, bool) error
-}
+type Service struct{ users *repository.Repository }
 
-type Service struct{ users Repository }
-
-func New(users Repository) *Service                      { return &Service{users: users} }
+func New(users *repository.Repository) *Service          { return &Service{users: users} }
 func (s *Service) GetUser(id int64) (*model.User, error) { return s.users.GetUserByID(id) }
 
 // ListUsers is the directory behind GET /users: every registered user except
@@ -33,6 +26,7 @@ func (s *Service) CanViewProfile(viewerID int64, user *model.User) (bool, error)
 	}
 	return s.users.IsFollowing(viewerID, user.ID)
 }
+
 // SetPrivacy turns the caller's own profile public or private and answers with
 // the stored user, so the client never has to guess what was saved.
 func (s *Service) SetPrivacy(userID int64, private bool) (*model.User, error) {

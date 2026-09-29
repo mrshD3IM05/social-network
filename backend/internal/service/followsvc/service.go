@@ -13,19 +13,9 @@ var (
 	ErrNotRecipient     = errors.New("follow: user is not the recipient")
 )
 
-type Repository interface {
-	GetUserByID(int64) (*model.User, error)
-	GetFollowRequest(int64, int64) (*model.FollowRequest, error)
-	GetFollowRequestByID(int64) (*model.FollowRequest, error)
-	CreateFollowRequest(int64, int64, string) (*model.FollowRequest, error)
-	UpdateFollowStatus(int64, string) error
-	DeleteFollow(int64, int64) error
-	ListFollowers(int64) ([]*model.User, error)
-	ListFollowing(int64) ([]*model.User, error)
-}
-type Service struct{ repo Repository }
+type Service struct{ repo *repository.Repository }
 
-func New(repo Repository) *Service { return &Service{repo: repo} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo} }
 func (s *Service) Follow(from, to int64) (*model.FollowRequest, error) {
 	if from == to {
 		return nil, ErrCannotFollowSelf

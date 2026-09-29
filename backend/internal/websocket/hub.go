@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"sn-backend/internal/model"
+	"sn-backend/internal/repository"
 	"sn-backend/internal/service/sessionsvc"
 )
 
@@ -21,20 +22,14 @@ var ErrInvalidMessage = errors.New("websocket: invalid message")
 // same limit as messagesvc.MaxContentLength (the HTTP send endpoint)
 const maxContentLength = 1000
 
-type Repository interface {
-	CreateMessage(*model.Message) error
-	CanMessage(int64, *int64, *int64) (bool, error)
-	GroupMemberIDs(int64) ([]int64, error)
-}
-
 type Hub struct {
 	mu       sync.RWMutex
 	clients  map[int64]map[*Client]struct{}
-	repo     Repository
+	repo     *repository.Repository
 	sessions *sessionsvc.Service
 }
 
-func NewHub(repo Repository, sessions *sessionsvc.Service) *Hub {
+func NewHub(repo *repository.Repository, sessions *sessionsvc.Service) *Hub {
 	return &Hub{clients: make(map[int64]map[*Client]struct{}), repo: repo, sessions: sessions}
 }
 

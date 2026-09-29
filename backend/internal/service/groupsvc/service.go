@@ -30,56 +30,14 @@ var (
 	ErrRemoveCreator      = errors.New("group: the creator cannot be removed")
 )
 
-// Repository is the subset of repository.Repository the group service needs.
-type Repository interface {
-	CreateGroup(*model.Group) error
-	GetGroup(int64) (*model.Group, error)
-	UpdateGroup(*model.Group) error
-	DeleteGroup(int64) error
-	RemoveGroupMember(int64, int64) error
-	ListGroupMessages(int64) ([]*model.Message, error)
-	ListGroups() ([]*model.Group, error)
-	GetGroupMembers(int64) ([]*model.GroupMember, error)
-	IsGroupMember(int64, int64) (bool, error)
-	AddGroupMember(int64, int64) error
-	CountGroupMembers(int64) (int, error)
-	GetUserByID(int64) (*model.User, error)
-	GetGroupCreator(int64) (*model.GroupCreator, error)
-
-	CreateGroupInvitation(*model.GroupInvitation) (*model.GroupInvitation, error)
-	GetGroupInvitationByID(int64) (*model.GroupInvitation, error)
-	PendingGroupInvitation(int64, int64) (*model.GroupInvitation, error)
-	GetPendingInvitationsForUser(int64) ([]*model.GroupInvitation, error)
-	GetPendingInvitationsForGroup(int64) ([]*model.GroupInvitation, error)
-	UpdateGroupInvitationStatus(int64, string) error
-	DeleteGroupInvitation(int64) error
-
-	CreateGroupJoinRequest(*model.GroupJoinRequest) (*model.GroupJoinRequest, error)
-	GetGroupJoinRequestByID(int64) (*model.GroupJoinRequest, error)
-	PendingGroupJoinRequest(int64, int64) (*model.GroupJoinRequest, error)
-	GetPendingJoinRequestsForGroup(int64) ([]*model.GroupJoinRequest, error)
-	UpdateGroupJoinRequestStatus(int64, string) error
-	DeleteGroupJoinRequest(int64) error
-
-	GroupDetailPayload(int64, int64) (*model.GroupDetail, error)
-	GroupListPayload(int64) ([]*model.GroupListItem, error)
-
-	AcceptGroupInvitationTx(int64, int64) error
-	AcceptGroupJoinRequestTx(int64, int64) error
-	RefuseGroupInvitationTx(int64, int64) error
-	RefuseGroupJoinRequestTx(int64, int64) error
-
-	CreateNotification(*model.Notification) error
-}
-
 type Service struct {
-	repo Repository
+	repo *repository.Repository
 	hub  *ws.Hub
 }
 
 // New wires the service to a repository and the websocket hub for
 // notification fan-out; nil hub means notifications are only persisted.
-func New(repo Repository, hub *ws.Hub) *Service {
+func New(repo *repository.Repository, hub *ws.Hub) *Service {
 	return &Service{repo: repo, hub: hub}
 }
 

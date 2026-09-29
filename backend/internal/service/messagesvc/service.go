@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"sn-backend/internal/model"
+	"sn-backend/internal/repository"
 )
 
 const (
@@ -20,16 +21,9 @@ var (
 	ErrTooLong    = errors.New("message: content is too long")
 )
 
-type Repository interface {
-	CanMessage(int64, *int64, *int64) (bool, error)
-	CreateMessage(*model.Message) error
-	ListMessages(int64, int64, int) ([]*model.Message, error)
-	ListMessageFileIDs(int64) ([]string, error)
-}
+type Service struct{ repo *repository.Repository }
 
-type Service struct{ repo Repository }
-
-func New(repo Repository) *Service { return &Service{repo: repo} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo} }
 
 // History returns the stored conversation with one user. The same rule the
 // websocket applies before accepting a message guards it, so history cannot be

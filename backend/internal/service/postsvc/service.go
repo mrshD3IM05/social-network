@@ -2,10 +2,10 @@ package postsvc
 
 import (
 	"errors"
-	"strings"
-	"unicode/utf8"
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+	"strings"
+	"unicode/utf8"
 )
 
 var (
@@ -17,28 +17,10 @@ var (
 	ErrForbidden       = errors.New("post: only the author or the group creator can delete a group post")
 )
 
-type Repository interface {
-	CreatePost(*model.Post) error
-	GetPost(int64) (*model.Post, error)
-	UpdatePostOwned(*model.Post, int64) error
-	DeletePostOwned(int64, int64) error
-	ListVisiblePosts(int64) ([]*model.Post, error)
-	CanViewPost(int64, int64) (bool, error)
-	LoadPostReactions(*model.Post, int64) error
-	GetReaction(string, int64, int64) (*model.Reaction, error)
-	SetReaction(string, int64, int64, string) error
-	DeleteReaction(string, int64, int64) error
-	GetReactionSummary(string, int64, int64) (*model.ReactionSummary, error)
-	IsGroupMember(int64, int64) (bool, error)
-	ListGroupPosts(groupID, viewerID int64) ([]*model.Post, error)
-	GetGroupIDForPost(int64) (int64, error)
-	GetPostAuthor(int64) (int64, error)
-	IsGroupCreator(int64, int64) (bool, error)
-	DeletePost(int64) error
-}
-type Service struct{ repo Repository }
+type Service struct{ repo *repository.Repository }
 
-func New(repo Repository) *Service { return &Service{repo: repo} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo} }
+
 // same limit as the frontend (LIMITS.post in frontend/lib/validate.js)
 const maxContentLen = 1000
 
