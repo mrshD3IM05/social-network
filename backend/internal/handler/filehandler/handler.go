@@ -40,32 +40,20 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, filesvc.ErrTooManyImages.Error(), http.StatusBadRequest)
 		return
 	}
-	var postID *int64
-	if value := r.FormValue("post_id"); value != "" {
-		parsed, parseErr := strconv.ParseInt(value, 10, 64)
-		if parseErr != nil || parsed < 1 {
-			http.Error(w, "invalid post id", http.StatusBadRequest)
-			return
-		}
-		postID = &parsed
+	postID, err := formID(r, "post_id")
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
 	}
-	var messageID *int64
-	if value := r.FormValue("message_id"); value != "" {
-		parsed, parseErr := strconv.ParseInt(value, 10, 64)
-		if parseErr != nil || parsed < 1 {
-			http.Error(w, "invalid message id", http.StatusBadRequest)
-			return
-		}
-		messageID = &parsed
+	messageID, err := formID(r, "message_id")
+	if err != nil {
+		http.Error(w, "invalid message id", http.StatusBadRequest)
+		return
 	}
-	var commentID *int64
-	if value := r.FormValue("comment_id"); value != "" {
-		parsed, parseErr := strconv.ParseInt(value, 10, 64)
-		if parseErr != nil || parsed < 1 {
-			http.Error(w, "invalid comment id", http.StatusBadRequest)
-			return
-		}
-		commentID = &parsed
+	commentID, err := formID(r, "comment_id")
+	if err != nil {
+		http.Error(w, "invalid comment id", http.StatusBadRequest)
+		return
 	}
 	if postID != nil && messageID != nil {
 		http.Error(w, "post_id and message_id cannot be combined", http.StatusBadRequest)
@@ -142,4 +130,17 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	http.ServeFile(w, r, file.StoragePath)
+}
+
+// formID reads an optional positive id from the form: nil when it is empty.
+func formID(r *http.Request, name string) (*int64, error) {
+	value := r.FormValue(name)
+	if value == "" {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id < 1 {
+		return nil, strconv.ErrSyntax
+	}
+	return &id, nil
 }
