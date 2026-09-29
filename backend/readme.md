@@ -30,7 +30,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | GET | /follow-requests | - | [{id, created_at, user}] requests waiting for you to answer |
 | POST | /follow-requests/{id}/accept | - | 204 |
 | POST | /follow-requests/{id}/decline | - | 204 |
-| PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private |
+| PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private; going public accepts every pending follow request |
 
 ### posts
 | method | path | request | response |
@@ -72,7 +72,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | DELETE | /groups/{id}/posts/{post_id} | - | 204, the post author or the group creator |
 | GET | /groups/{id}/events | - | group events, members only |
 | POST | /groups/{id}/events | form: title, description, event_time | 201 + event json, members only |
-| POST | /events/{id}/response | form: response = going \| not_going | 200, changeable, one response per user |
+| POST | /events/{id}/response | form: choice = going \| not_going, or empty to remove your answer | 200 + {my_choice, going_count, not_going_count}, one response per user |
 | GET | /events/{id}/response | - | your response to that event |
 
 Groups notifications (group_invitation, group_join_request, group_invite_response, group_join_response) are stored in the notifications table and pushed live over /ws with the standard `{"type":"notification", ...}` event.
