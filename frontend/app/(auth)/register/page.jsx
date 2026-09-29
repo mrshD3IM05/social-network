@@ -3,10 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { apiPost } from '@/lib/api'
+import { apiPost, apiUpload } from '@/lib/api'
+import Icon from '@/components/Icon'
 import {
+  IMAGE_ACCEPT,
   LIMITS,
   checkDateOfBirth,
+  checkImageFile,
   checkEmail,
   checkNickname,
   checkPassword,
@@ -19,6 +22,22 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState({}) // one message per field
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [avatar, setAvatar] = useState(null) // the picked photo file
+  const [preview, setPreview] = useState('') // local url to show it
+
+  async function pickAvatar(e) {
+    const file = e.target.files[0]
+    e.target.value = '' // so the same file can be picked again
+    if (!file) return
+
+    const problem = await checkImageFile(file)
+    setErrors(rest => ({ ...rest, avatar: problem || '' }))
+    if (problem) return
+
+    if (preview) URL.revokeObjectURL(preview)
+    setAvatar(file)
+    setPreview(URL.createObjectURL(file))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -53,7 +72,13 @@ export default function RegisterPage() {
 
     try {
       await apiPost('/register', values)
-      // registering also logs you in
+      // registering also logs you in, so the photo can be sent right after
+      if (avatar) {
+        const formData = new FormData()
+        formData.append('avatar', avatar)
+        // the account exists already: if the photo fails it can be set in settings
+        await apiUpload('/avatar', formData).catch(() => {})
+      }
       router.push('/home')
     } catch (err) {
       setError(err.message)
@@ -76,6 +101,18 @@ export default function RegisterPage() {
     <form className="auth-form" onSubmit={handleSubmit} onInput={clearError} noValidate>
       <h1>Create your account</h1>
       <p className="subtitle">It takes less than a minute.</p>
+
+      <label>Photo <small>optional, JPEG, PNG or GIF</small></label>
+      <div className="photo-row">
+        {preview
+          ? <img className="avatar" style={{ width: 56, height: 56 }} src={preview} alt="" />
+          : <span className="avatar" style={{ width: 56, height: 56 }}><Icon name="camera" size={20} /></span>}
+        <label className="btn btn-light">
+          {avatar ? 'Change photo' : 'Add photo'}
+          <input type="file" accept={IMAGE_ACCEPT} hidden onChange={pickAvatar} />
+        </label>
+      </div>
+      {fieldError('avatar')}
 
       <div className="row">
         <div>
