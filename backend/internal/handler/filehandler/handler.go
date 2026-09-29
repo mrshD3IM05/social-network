@@ -24,7 +24,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, filesvc.MaxRequestSize)
-	if err := r.ParseMultipartForm(filesvc.MaxRequestSize); err != nil {
+	if err := r.ParseMultipartForm(filesvc.MaxMemory); err != nil {
 		http.Error(w, "upload is too large or invalid", http.StatusBadRequest)
 		return
 	}
@@ -99,7 +99,7 @@ func (h *Handler) SetAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, filesvc.MaxImageSize+1<<20)
-	if err := r.ParseMultipartForm(filesvc.MaxImageSize + 1<<20); err != nil {
+	if err := r.ParseMultipartForm(filesvc.MaxMemory); err != nil {
 		http.Error(w, "upload is too large or invalid", http.StatusBadRequest)
 		return
 	}

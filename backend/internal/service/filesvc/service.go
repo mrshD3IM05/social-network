@@ -25,6 +25,10 @@ const (
 	MaxImageSide = 8000
 	// MaxRequestSize is the biggest upload body: every image plus the form fields.
 	MaxRequestSize = MaxImageSize*MaxImages + 1<<20
+	// MaxMemory is how much of an upload is held in memory while it is read.
+	// Anything past it goes to a temporary file, so a few big uploads at the
+	// same time cannot fill the server's memory.
+	MaxMemory = 1 << 20
 )
 
 var (

@@ -123,7 +123,7 @@ func readForm(w http.ResponseWriter, r *http.Request) ([]*multipart.FileHeader, 
 	}
 	limit := filesvc.MaxRequestSize
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	if err := r.ParseMultipartForm(limit); err != nil {
+	if err := r.ParseMultipartForm(filesvc.MaxMemory); err != nil {
 		return nil, err
 	}
 	if r.MultipartForm == nil {
