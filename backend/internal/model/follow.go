@@ -14,4 +14,6 @@ type FollowRequest struct {
 	ToUserID   int64     `json:"to_user_id"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+	// the user who sent it, only loaded when listing pending requests
+	From *User `json:"-"`
 }

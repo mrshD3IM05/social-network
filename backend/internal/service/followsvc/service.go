@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+	ws "sn-backend/internal/websocket"
 )
 
 var (
@@ -13,9 +14,15 @@ var (
 	ErrNotRecipient     = errors.New("follow: user is not the recipient")
 )
 
-type Service struct{ repo *repository.Repository }
+type Service struct {
+	repo *repository.Repository
+	hub  *ws.Hub
+}
 
-func New(repo *repository.Repository) *Service { return &Service{repo: repo} }
+func New(repo *repository.Repository, hub *ws.Hub) *Service { return &Service{repo: repo, hub: hub} }
+
+// Follow sends a follow request. A public profile accepts it right away, a
+// private one gets a notification to accept or decline it.
 func (s *Service) Follow(from, to int64) (*model.FollowRequest, error) {
 	if from == to {
 		return nil, ErrCannotFollowSelf
@@ -37,12 +44,40 @@ func (s *Service) Follow(from, to int64) (*model.FollowRequest, error) {
 			return nil, err
 		}
 		existing.Status = status
+		s.notifyFollow(existing)
 		return existing, nil
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
-	return s.repo.CreateFollowRequest(from, to, status)
+	follow, err := s.repo.CreateFollowRequest(from, to, status)
+	if err != nil {
+		return nil, err
+	}
+	s.notifyFollow(follow)
+	return follow, nil
+}
+
+// notifyFollow tells the followed user about a new request or a new follower.
+func (s *Service) notifyFollow(follow *model.FollowRequest) {
+	name := s.name(follow.FromUserID)
+	notification := &model.Notification{UserID: follow.ToUserID, ActorID: follow.FromUserID}
+	if follow.Status == model.FollowPending {
+		notification.Type = model.NotificationFollowRequest
+		notification.Content = name + " wants to follow you"
+	} else {
+		notification.Type = model.NotificationNewFollower
+		notification.Content = name + " started following you"
+	}
+	s.hub.Notify(notification)
+}
+
+func (s *Service) name(userID int64) string {
+	user, err := s.repo.GetUserByID(userID)
+	if err != nil {
+		return "someone"
+	}
+	return user.FirstName + " " + user.LastName
 }
 func (s *Service) Unfollow(from, to int64) error { return s.repo.DeleteFollow(from, to) }
 
@@ -71,7 +106,23 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 	if follow.Status != model.FollowPending {
 		return ErrExists
 	}
-	return s.repo.UpdateFollowStatus(requestID, status)
+	if err := s.repo.UpdateFollowStatus(requestID, status); err != nil {
+		return err
+	}
+	if status == model.FollowAccepted {
+		s.hub.Notify(&model.Notification{
+			UserID:  follow.FromUserID,
+			Type:    model.NotificationFollowAccepted,
+			ActorID: recipient,
+			Content: s.name(recipient) + " accepted your follow request",
+		})
+	}
+	return nil
+}
+
+// PendingRequests are the follow requests waiting for userID to answer.
+func (s *Service) PendingRequests(userID int64) ([]*model.FollowRequest, error) {
+	return s.repo.ListPendingFollowRequests(userID)
 }
 
 // Followers are the users who follow userID, Following the ones userID follows.

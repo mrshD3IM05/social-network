@@ -106,3 +106,35 @@ func (r *Repository) listFollowUsers(query string, userID int64) ([]*model.User,
 	}
 	return users, rows.Err()
 }
+
+// ListPendingFollowRequests returns the follow requests waiting for userID to
+// accept or decline them, with the user who sent each one.
+func (r *Repository) ListPendingFollowRequests(userID int64) ([]*model.FollowRequest, error) {
+	rows, err := r.db.Query(
+		`SELECT f.id, f.created_at, `+userColumnsPrefixed+`
+		 FROM follow_requests f
+		 JOIN users u ON u.id = f.from_user_id
+		 WHERE f.to_user_id = ? AND f.status = ?
+		 ORDER BY f.id DESC`,
+		userID, model.FollowPending,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	requests := []*model.FollowRequest{}
+	for rows.Next() {
+		request := &model.FollowRequest{ToUserID: userID, Status: model.FollowPending, From: new(model.User)}
+		var private int
+		from := request.From
+		if err := rows.Scan(&request.ID, &request.CreatedAt, &from.ID, &from.Email, &from.Password, &from.FirstName,
+			&from.LastName, &from.DateOfBirth, &from.Avatar, &from.Nickname, &from.AboutMe, &private, &from.CreatedAt); err != nil {
+			return nil, err
+		}
+		from.Private = private == 1
+		request.FromUserID = from.ID
+		requests = append(requests, request)
+	}
+	return requests, rows.Err()
+}
