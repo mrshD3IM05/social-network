@@ -719,6 +719,13 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 .chat-form label.icon-button { flex-shrink: 0; cursor: pointer; }
 
+/* emoji button in the chats: the grid opens above the message box */
+.emoji-picker { position: relative; flex-shrink: 0; }
+.emoji-picker > .icon-button { font-size: 18px; }
+.emoji-grid { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 20; display: grid; grid-template-columns: repeat(8, 32px); gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, .12); }
+.emoji-grid button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; font-size: 20px; cursor: pointer; }
+.emoji-grid button:hover { background: var(--paper); }
+
 /* a new message is waiting (the sidebar item is already position: relative) */
 .menu-dot { flex-shrink: 0; width: 8px; height: 8px; margin-left: auto; border-radius: 999px; background: var(--accent); }
 /* unread notifications: a number, so it never looks like the message dot */

@@ -16,6 +16,7 @@ import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
 import { IMAGE_ACCEPT, LIMITS, checkImageFile, checkImageFiles, checkText } from '@/lib/validate'
+import EmojiPicker from '@/components/EmojiPicker'
 
 // One group: an identity header (who, what, how many, the actions) and one
 // tab per thing the group holds — posts, events, chat, members, and the
@@ -529,6 +530,7 @@ function GroupChat({ groupId, me, members }) {
             onChange={pickFiles}
           />
         </label>
+        <EmojiPicker onPick={emoji => onType({ target: { value: text + emoji } })} />
 
         <input
           value={text}

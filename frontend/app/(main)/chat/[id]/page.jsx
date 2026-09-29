@@ -11,6 +11,7 @@ import { useThrottle } from '@/lib/timing'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
+import EmojiPicker from '@/components/EmojiPicker'
 
 // A private conversation with one user, in real time over a WebSocket.
 export default function ConversationPage() {
@@ -206,6 +207,7 @@ export default function ConversationPage() {
             onChange={pickFiles}
           />
         </label>
+        <EmojiPicker onPick={emoji => onType({ target: { value: text + emoji } })} />
 
         <input
           value={text}
