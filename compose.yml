@@ -37,11 +37,8 @@ services:
       - frontend
     ports:
       - "8000:80"
-      - "8443:443"
     volumes:
       - ./caddy/Caddyfile.docker:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
     networks:
       - social-network
 
@@ -51,5 +48,3 @@ networks:
 volumes:
   backend-data:
   backend-uploads:
-  caddy_data:
-  caddy_config:

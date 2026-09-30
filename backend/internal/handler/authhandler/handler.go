@@ -47,7 +47,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create session", http.StatusInternalServerError)
 		return
 	}
-	h.Session.SetCookie(w, r, session)
+	h.Session.SetCookie(w, session)
 	common.WriteJSON(w, http.StatusCreated, common.PrivateUser(user))
 }
 
@@ -66,7 +66,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create session", http.StatusInternalServerError)
 		return
 	}
-	h.Session.SetCookie(w, r, session)
+	h.Session.SetCookie(w, session)
 	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
 
@@ -77,7 +77,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 			h.WebSocket.RevokeSessionClients(cookie.Value)
 		}
 	}
-	h.Session.ClearCookie(w, r)
+	h.Session.ClearCookie(w)
 	common.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

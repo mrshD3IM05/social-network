@@ -57,7 +57,7 @@ export function imageUrl(id) {
 // server, which serves /ws without the /api/v1 prefix. Behind Caddy the
 // /api/v1 prefix is stripped by the proxy like for every other request.
 export function socketUrl() {
-  const { protocol, hostname, port } = window.location
+  const { hostname, host, port } = window.location
   if (port === '3000') return `ws://${hostname}:8080/ws`
-  return `${protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${API}/ws`
+  return `ws://${host}${API}/ws`
 }
