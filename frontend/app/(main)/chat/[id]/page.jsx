@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
-import { getDraft, setDraft } from '@/lib/draft'
 import { markRead } from '@/lib/unread'
 import { useThrottle } from '@/lib/timing'
 import CharCount from '@/components/CharCount'
@@ -20,7 +19,7 @@ export default function ConversationPage() {
   const [me, setMe] = useState(null)
   const [other, setOther] = useState(null)
   const [messages, setMessages] = useState([])
-  const [text, setText] = useState(getDraft())
+  const [text, setText] = useState('')
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
   const [blocked, setBlocked] = useState(false)
@@ -92,7 +91,6 @@ export default function ConversationPage() {
 
   function onType(e) {
     setText(e.target.value)
-    setDraft(e.target.value)
     sendTyping()
   }
 
@@ -135,7 +133,6 @@ export default function ConversationPage() {
 
       await apiUpload('/messages', body)
       setText('')
-      setDraft('')
       clearFiles()
     } catch (err) {
       setError(err.message)
