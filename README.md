@@ -78,7 +78,7 @@ social-network/
     │   └── (main)/home, profile/[id], people, groups, groups/[id],
     │              chat, chat/[id], notifications, settings
     ├── components/           ← PostCard, PostForm, Navbar, Modal, EventCard, …
-    └── lib/                  ← api.js (fetch helpers), validate, unread, draft, people
+    └── lib/                  ← api.js (fetch helpers), validate, unread, people
 ```
 
 Files created at runtime (ignored by git):
@@ -102,7 +102,7 @@ Then open **http://localhost:8000**.
 
 | Service | Container | Port | Notes |
 |---|---|---|---|
-| `caddy` | social-network-caddy | host `8000` → 80, `8443` → 443 | The only service reachable from outside |
+| `caddy` | social-network-caddy | host `8000` → 80 | The only service reachable from outside |
 | `frontend` | social-network-frontend | 3000 (internal) | `next start` |
 | `backend` | social-network-backend | 8080 (internal) | Go API + WebSocket |
 
@@ -329,7 +329,7 @@ The frontend is a Next.js App Router app written in plain JavaScript and CSS ([f
 - The `(main)` layout calls `GET /me`. If that fails it redirects to `/login`; otherwise it shows the navbar.
 - [lib/api.js](frontend/lib/api.js) provides `apiGet`, `apiPost`, `apiPut`, `apiDelete`, `apiUpload`, `imageUrl(id)` and `socketUrl()`.
 - [lib/validate.js](frontend/lib/validate.js) checks form input on the client. The backend checks it again.
-- [lib/unread.js](frontend/lib/unread.js) and [lib/draft.js](frontend/lib/draft.js) track unread chat counts and keep unsent message drafts.
+- [lib/unread.js](frontend/lib/unread.js) tracks which conversations have unread messages.
 
 Scripts: `npm run dev`, `npm run build`, `npm run start`, `npm run lint`.
 
@@ -342,7 +342,7 @@ Scripts: `npm run dev`, `npm run build`, `npm run start`, `npm run lint`.
 - Register checks every field (lengths, 8–72 character password, unique email and nickname). The avatar can only be set by uploading one.
 - A failed login takes the same time whether the account exists or not.
 - Uploads are limited by size, count, detected type and pixel size, and are never served as a public static folder. `GET /fs/{id}` answers with `nosniff` and a sandbox CSP, so a file can never run as a page.
-- The session cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` when the site is served over https.
+- The session cookie is `HttpOnly` and `SameSite=Lax`.
 - The WebSocket only accepts pages from the same host, or from `ALLOWED_ORIGINS` (default: the Next dev server on port 3000). Chat messages are limited to 1000 characters on both HTTP and the socket.
 - Each IP is rate-limited: 1000 requests/minute, and 10/minute on login and register. Behind Caddy the real client IP is read from `X-Forwarded-For`.
 - The server has read and idle timeouts, and both the API and the frontend send `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy` headers.
