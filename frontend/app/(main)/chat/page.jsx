@@ -1,64 +1,49 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import usePaged from '@/lib/usePaged'
-import { apiGet } from '@/lib/api'
+import { fetchContacts } from '@/lib/people'
 import { getUnread, onUnreadChange } from '@/lib/unread'
 import Icon from '@/components/Icon'
-import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
 
-// List only people who have an accepted follow relationship with you.
+// The people you can message: the ones where one of you follows the other.
+// Everyone else would only get "you cannot message them yet", so they are not
+// listed here — /people is where you go to find someone new to follow.
 export default function ChatListPage() {
-  const [me, setMe] = useState(null)
+  const [people, setPeople] = useState(null)
   const [unread, setUnread] = useState(getUnread())
-  const followers = usePaged(me ? `/users/${me.id}/followers` : null)
-  const following = usePaged(me ? `/users/${me.id}/following` : null)
 
-  const people = useMemo(() => {
-    const byID = new Map()
-    for (const person of [...(followers.items || []), ...(following.items || [])]) byID.set(person.id, person)
-    return [...byID.values()].sort((a, b) =>
-      `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`),
-    )
-  }, [followers.items, following.items])
-
-  const peopleList = {
-    hasMore: followers.hasMore || following.hasMore,
-    loading: followers.loading || following.loading,
-    loadMore: () => {
-      if (followers.hasMore) followers.loadMore()
-      if (following.hasMore) following.loadMore()
-    },
-  }
+  useEffect(() => {
+    fetchContacts()
+      .then(setPeople)
+      .catch(() => setPeople([]))
+  }, [])
 
   // a dot on every person whose message has not been opened yet
   useEffect(() => onUnreadChange(setUnread), [])
-  useEffect(() => { apiGet('/me').then(setMe) }, [])
 
   return (
     <>
-      <PageHeader label="Inbox" title="Messages" subtitle="Pick someone to start a real-time conversation." />
+      <PageHeader label="Inbox" title="Messages" subtitle="Pick someone you follow, or who follows you." />
 
-      {(!me || followers.items === null || following.items === null) && <p className="loading">Loading…</p>}
+      {people === null && <p className="loading">Loading…</p>}
 
-      {me && people.length === 0 && (
+      {people !== null && people.length === 0 && (
         <div className="empty">
           <p className="empty-title">No one to message yet</p>
-          <p>Follow someone, or wait for someone to follow you.</p>
+          <p>Follow someone, or get them to follow you, to start a conversation.</p>
         </div>
       )}
 
       <div className="card list">
-        {people.map(person => (
+        {people?.map(person => (
           <PersonRow key={person.id} person={person} href={`/chat/${person.id}`}>
             {unread.has(person.id) && <span className="menu-dot" title="New message" />}
             <Icon name="chat" size={16} />
           </PersonRow>
         ))}
       </div>
-      <LoadMore list={peopleList} />
     </>
   )
 }

@@ -91,8 +91,28 @@ func (r *Repository) ListFollowing(userID, lastID int64) ([]*model.User, error) 
 	)
 }
 
-func (r *Repository) listFollowUsers(query string, userID, lastID int64) ([]*model.User, error) {
-	rows, err := r.db.Query(query, userID, model.FollowAccepted, lastID, lastID, PageSize)
+// ListMessageableUsers returns the users userID can start a private chat with.
+// The rule is the one CanMessage applies before every message: at least one of
+// the two follows the other, with an accepted request — in either direction, so
+// a pending follow counts for nothing. Yourself is left out, like in /users.
+// Ordered by name so the Messages list reads like the people directory.
+func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
+	return r.listFollowUsers(
+		`SELECT `+userColumnsPrefixed+`
+		 FROM users u
+		 WHERE u.id != ? AND EXISTS (
+			SELECT 1 FROM follow_requests f
+			WHERE (f.from_user_id = ? AND f.to_user_id = u.id
+			    OR f.from_user_id = u.id AND f.to_user_id = ?)
+			  AND f.status = ?
+		 )
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
+		userID, userID, userID, model.FollowAccepted,
+	)
+}
+
+func (r *Repository) listFollowUsers(query string, args ...any) ([]*model.User, error) {
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
