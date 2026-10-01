@@ -418,6 +418,8 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   animation: rise .25s var(--ease);
 }
 .bubble.mine { align-self: flex-end; border-color: var(--ink); border-radius: 16px 16px 4px 16px; background: var(--ink); color: var(--paper); }
+.message-time { display: block; margin-top: 4px; font-size: 11px; line-height: 1.2; color: var(--muted); }
+.bubble.mine .message-time { color: inherit; opacity: .68; }
 .chat-error { padding: 0 16px; }
 .chat-form { display: flex; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 .chat-form .btn { width: 44px; padding: 0; }

@@ -237,6 +237,9 @@ export default function ConversationPage() {
                 {msg.images.map(fileId => <img key={fileId} src={imageUrl(fileId)} alt="" />)}
               </span>
             )}
+            <time className="message-time" dateTime={msg.created_at}>
+              {new Date(msg.created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </time>
           </div>
         ))}
         {typing && <p className="typing">{other.first_name} is typing…</p>}
