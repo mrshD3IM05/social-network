@@ -133,13 +133,13 @@ func (s *Service) Delete(ownerID, postID int64) error {
 	return nil
 }
 // ListVisible is one page of the feed: every post viewerID may see.
-func (s *Service) ListVisible(viewerID int64, offset int) ([]*model.Post, error) {
-	return s.repo.ListVisiblePosts(viewerID, 0, offset)
+func (s *Service) ListVisible(viewerID, lastID int64) ([]*model.Post, error) {
+	return s.repo.ListVisiblePosts(viewerID, 0, lastID)
 }
 
 // UserPosts is one page of the posts of authorID that viewerID may see.
-func (s *Service) UserPosts(viewerID, authorID int64, offset int) ([]*model.Post, error) {
-	return s.repo.ListVisiblePosts(viewerID, authorID, offset)
+func (s *Service) UserPosts(viewerID, authorID, lastID int64) ([]*model.Post, error) {
+	return s.repo.ListVisiblePosts(viewerID, authorID, lastID)
 }
 
 // Get returns one post the viewer is allowed to see (privacy rules for
@@ -196,7 +196,7 @@ func (s *Service) CreateGroupPost(authorID, groupID int64, content, privacy stri
 }
 
 // GroupPosts lists the posts of one group. Members only.
-func (s *Service) GroupPosts(viewerID, groupID int64, offset int) ([]*model.Post, error) {
+func (s *Service) GroupPosts(viewerID, groupID, lastID int64) ([]*model.Post, error) {
 	member, err := s.repo.IsGroupMember(groupID, viewerID)
 	if err != nil {
 		return nil, err
@@ -204,7 +204,7 @@ func (s *Service) GroupPosts(viewerID, groupID int64, offset int) ([]*model.Post
 	if !member {
 		return nil, ErrNotGroupMember
 	}
-	return s.repo.ListGroupPosts(groupID, viewerID, offset)
+	return s.repo.ListGroupPosts(groupID, viewerID, lastID)
 }
 
 // DeleteGroupPost removes one group post. The current user is always taken

@@ -36,9 +36,10 @@ func (r *Repository) CreateNotification(n *model.Notification) error {
 	return nil
 }
 
-// ListNotifications returns one page of a user's notifications, newest first.
-func (r *Repository) ListNotifications(userID int64, offset int) ([]*model.Notification, error) {
-	rows, err := r.db.Query(notificationSelect+` WHERE n.user_id = ? ORDER BY n.id DESC LIMIT ? OFFSET ?`, userID, PageSize, offset)
+// ListNotifications returns one page of a user's notifications, newest first,
+// starting after the notification lastID (0: the first page).
+func (r *Repository) ListNotifications(userID, lastID int64) ([]*model.Notification, error) {
+	rows, err := r.db.Query(notificationSelect+` WHERE n.user_id = ? AND (? = 0 OR n.id < ?) ORDER BY n.id DESC LIMIT ?`, userID, lastID, lastID, PageSize)
 	if err != nil {
 		return nil, err
 	}

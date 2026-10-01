@@ -20,11 +20,11 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 ### users & follows
 | method | path | request | response |
 |---|---|---|---|
-| GET | /users | query: q (search by name or nickname), offset | 10 users except you, public shape, ordered by name |
+| GET | /users | query: q (search by name or nickname), last | 10 users except you, public shape, ordered by name |
 | GET | /user/{id} | - | profile with every register field except the password, plus post_count, follower_count, following_count; 403 if the profile is private and you don't follow them |
-| GET | /users/{id}/posts | query: offset | 10 of their posts you may see, same privacy gate as the profile |
-| GET | /users/{id}/followers | query: offset | 10 users following them, same privacy gate as the profile |
-| GET | /users/{id}/following | query: offset | 10 users they follow, same privacy gate as the profile |
+| GET | /users/{id}/posts | query: last | 10 of their posts you may see, same privacy gate as the profile |
+| GET | /users/{id}/followers | query: last | 10 users following them, same privacy gate as the profile |
+| GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |
 | GET | /users/{id}/follow | - | {"status": "accepted" \| "pending" \| ""} your follow relation to that user |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
@@ -36,7 +36,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 ### posts
 | method | path | request | response |
 |---|---|---|---|
-| GET | /posts | query: offset | 10 posts visible to you, newest first |
+| GET | /posts | query: last | 10 posts visible to you, newest first |
 | POST | /posts | form: content, privacy = public \| almost_private \| private, viewers = user id (repeat it; required for private, each must follow you) | 201 + post json |
 | PUT | /posts/{id} | form: content, privacy, viewers (optional, replaces the chosen followers) | 200 + post json, only the owner can update |
 | DELETE | /posts/{id} | - | 204, only the owner can delete |
@@ -68,7 +68,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | GET | /groups/{id}/join-requests | - | pending requests, creator only |
 | POST | /group-join-requests/{id}/accept | - | 204, group creator only, joins atomically |
 | POST | /group-join-requests/{id}/decline | - | 204, group creator only |
-| GET | /groups/{id}/posts | query: offset | 10 group posts, newest first, members only |
+| GET | /groups/{id}/posts | query: last | 10 group posts, newest first, members only |
 | POST | /groups/{id}/posts | form: content | 201 + post json, members only |
 | DELETE | /groups/{id}/posts/{post_id} | - | 204, the post author or the group creator |
 | GET | /groups/{id}/events | - | group events, members only |

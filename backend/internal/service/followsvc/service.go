@@ -142,9 +142,9 @@ func (s *Service) PendingRequests(userID int64) ([]*model.FollowRequest, error) 
 
 // Followers are the users who follow userID, Following the ones userID follows.
 // Both only count accepted requests, so a pending one shows up in neither.
-func (s *Service) Followers(userID int64, offset int) ([]*model.User, error) {
-	return s.repo.ListFollowers(userID, offset)
+func (s *Service) Followers(userID, lastID int64) ([]*model.User, error) {
+	return s.repo.ListFollowers(userID, lastID)
 }
-func (s *Service) Following(userID int64, offset int) ([]*model.User, error) {
-	return s.repo.ListFollowing(userID, offset)
+func (s *Service) Following(userID, lastID int64) ([]*model.User, error) {
+	return s.repo.ListFollowing(userID, lastID)
 }

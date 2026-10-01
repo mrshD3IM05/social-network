@@ -7,7 +7,8 @@ import { apiGet } from './api'
 export const PAGE_SIZE = 10
 
 // Loads a list 10 by 10: the first page right away, the next one each time
-// loadMore() is called. The API answers ?offset=0, ?offset=10, ?offset=20...
+// loadMore() is called. The next page is asked for with ?last=<id of the last
+// item shown>, so new items at the top never shift what comes next.
 // `path` may already have a query (/users?q=ann). Pass null to wait.
 export default function usePaged(path) {
   const [items, setItems] = useState(null) // null until the first page arrives
@@ -16,15 +17,15 @@ export default function usePaged(path) {
   const [error, setError] = useState(null)
   const current = useRef(path) // the answer of an older path (old search) is ignored
 
-  const load = useCallback(async (offset) => {
+  // last: id of the last item already shown, 0 for the first page
+  const load = useCallback(async (last) => {
     if (!path) return
     current.current = path
     setLoading(true)
     try {
-      const page = await apiGet(`${path}${path.includes('?') ? '&' : '?'}offset=${offset}`)
+      const page = await apiGet(last ? `${path}${path.includes('?') ? '&' : '?'}last=${last}` : path)
       if (current.current !== path) return
-      // a new item can push an old one to the next page: never show it twice
-      setItems(list => (offset === 0 ? page : [...list, ...page.filter(item => !list.some(old => old.id === item.id))]))
+      setItems(list => (last ? [...list, ...page] : page))
       setHasMore(page.length === PAGE_SIZE)
       setError(null)
     } catch (err) {
@@ -44,7 +45,7 @@ export default function usePaged(path) {
     hasMore,
     loading,
     error,
-    loadMore: () => load(items?.length || 0),
+    loadMore: () => load(items?.at(-1)?.id || 0),
     reload: () => load(0),
   }
 }

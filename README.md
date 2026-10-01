@@ -276,7 +276,7 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 | Messages | `GET /messages/{id}`, `GET /groups/{id}/messages`, `POST /messages` |
 | Realtime | `GET /ws` |
 
-Long lists come 10 at a time: the feed, profile posts, group posts, users (with `?q=` search), followers, following and notifications. Ask for the next page with `?offset=10`, `?offset=20`… A page with fewer than 10 items is the last one.
+Long lists come 10 at a time: the feed, profile posts, group posts, users (with `?q=` search), followers, following and notifications. Ask for the next page with `?last=<id>`, the id of the last item you already have: the page starts right after it, so items added at the top in the meantime never shift it. A page with fewer than 10 items is the last one.
 
 Errors come back as a plain-text body with the matching status code: `400` for invalid input, `401` when you are not logged in, `403` when you are not allowed, `404` when something is not found or you can't see it, `409` for duplicates, and `429` when you hit the rate limit.
 

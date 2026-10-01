@@ -66,33 +66,33 @@ func (r *Repository) IsFollowing(fromUserID, toUserID int64) (bool, error) {
 // ListFollowers returns the users who follow userID, ListFollowing the users
 // userID follows. Only accepted requests count — a pending one is not a follow.
 // Both order by name like the people directory, so the lists read the same on
-// every call.
-func (r *Repository) ListFollowers(userID int64, offset int) ([]*model.User, error) {
+// every call, and start after the user lastID (0: the first page).
+func (r *Repository) ListFollowers(userID, lastID int64) ([]*model.User, error) {
 	return r.listFollowUsers(
 		`SELECT `+userColumnsPrefixed+`
 		 FROM follow_requests f
 		 JOIN users u ON u.id = f.from_user_id
-		 WHERE f.to_user_id = ? AND f.status = ?
+		 WHERE f.to_user_id = ? AND f.status = ? AND `+afterUserCondition+`
 		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
-		 LIMIT ? OFFSET ?`,
-		userID, offset,
+		 LIMIT ?`,
+		userID, lastID,
 	)
 }
 
-func (r *Repository) ListFollowing(userID int64, offset int) ([]*model.User, error) {
+func (r *Repository) ListFollowing(userID, lastID int64) ([]*model.User, error) {
 	return r.listFollowUsers(
 		`SELECT `+userColumnsPrefixed+`
 		 FROM follow_requests f
 		 JOIN users u ON u.id = f.to_user_id
-		 WHERE f.from_user_id = ? AND f.status = ?
+		 WHERE f.from_user_id = ? AND f.status = ? AND `+afterUserCondition+`
 		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
-		 LIMIT ? OFFSET ?`,
-		userID, offset,
+		 LIMIT ?`,
+		userID, lastID,
 	)
 }
 
-func (r *Repository) listFollowUsers(query string, userID int64, offset int) ([]*model.User, error) {
-	rows, err := r.db.Query(query, userID, model.FollowAccepted, PageSize, offset)
+func (r *Repository) listFollowUsers(query string, userID, lastID int64) ([]*model.User, error) {
+	rows, err := r.db.Query(query, userID, model.FollowAccepted, lastID, lastID, PageSize)
 	if err != nil {
 		return nil, err
 	}

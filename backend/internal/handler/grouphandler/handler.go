@@ -415,7 +415,7 @@ func (h *Handler) ListGroupPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	posts, err := h.Post.GroupPosts(userID, groupID, common.Offset(r))
+	posts, err := h.Post.GroupPosts(userID, groupID, common.LastID(r))
 	if err != nil {
 		writeGroupPostError(w, err)
 		return

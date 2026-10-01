@@ -183,17 +183,18 @@ func postVisibleArgs(viewerID int64) []any {
 
 // ListVisiblePosts returns one page of the posts viewerID may see, newest
 // first. With authorID set, only that user's posts (their profile); with 0,
-// everybody's (the feed).
-func (r *Repository) ListVisiblePosts(viewerID, authorID int64, offset int) ([]*model.Post, error) {
-	args := append([]any{authorID, authorID}, postVisibleArgs(viewerID)...)
-	args = append(args, PageSize, offset)
+// everybody's (the feed). The page starts after the post lastID (0: the first
+// page). Ids only grow, so the newest post is the one with the biggest id.
+func (r *Repository) ListVisiblePosts(viewerID, authorID, lastID int64) ([]*model.Post, error) {
+	args := append([]any{authorID, authorID, lastID, lastID}, postVisibleArgs(viewerID)...)
+	args = append(args, PageSize)
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
-		WHERE p.group_id IS NULL AND (? = 0 OR p.author_id = ?) AND `+postVisibleCondition+`
-		ORDER BY p.created_at DESC, p.id DESC
-		LIMIT ? OFFSET ?`,
+		WHERE p.group_id IS NULL AND (? = 0 OR p.author_id = ?) AND (? = 0 OR p.id < ?) AND `+postVisibleCondition+`
+		ORDER BY p.id DESC
+		LIMIT ?`,
 		args...,
 	)
 	if err != nil {
@@ -227,18 +228,19 @@ func (r *Repository) CountVisiblePosts(viewerID, authorID int64) (int, error) {
 	return count, err
 }
 
-// ListGroupPosts returns one page of the posts of one group, newest first. The service
+// ListGroupPosts returns one page of the posts of one group, newest first,
+// starting after the post lastID (0: the first page). The service
 // layer checks group membership before calling this — the query itself is
 // only reachable for authorized viewers.
-func (r *Repository) ListGroupPosts(groupID, viewerID int64, offset int) ([]*model.Post, error) {
+func (r *Repository) ListGroupPosts(groupID, viewerID, lastID int64) ([]*model.Post, error) {
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
-		WHERE p.group_id = ?
-		ORDER BY p.created_at DESC, p.id DESC
-		LIMIT ? OFFSET ?`,
-		groupID, PageSize, offset,
+		WHERE p.group_id = ? AND (? = 0 OR p.id < ?)
+		ORDER BY p.id DESC
+		LIMIT ?`,
+		groupID, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err

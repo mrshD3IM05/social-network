@@ -15,8 +15,8 @@ func (s *Service) GetUser(id int64) (*model.User, error) { return s.users.GetUse
 // ListUsers is the directory behind GET /users: every registered user except
 // the viewer. Private profiles stay in the list — CanViewProfile still gates
 // the profile itself.
-func (s *Service) ListUsers(viewerID int64, search string, offset int) ([]*model.User, error) {
-	return s.users.ListUsers(viewerID, strings.TrimSpace(search), offset)
+func (s *Service) ListUsers(viewerID int64, search string, lastID int64) ([]*model.User, error) {
+	return s.users.ListUsers(viewerID, strings.TrimSpace(search), lastID)
 }
 
 // ProfileCounts are the numbers shown on a profile: the posts viewerID can
@@ -51,8 +51,8 @@ func (s *Service) SetPrivacy(userID int64, private bool) (*model.User, error) {
 }
 
 // Notifications is one page of the user's notifications, newest first.
-func (s *Service) Notifications(userID int64, offset int) ([]*model.Notification, error) {
-	return s.users.ListNotifications(userID, offset)
+func (s *Service) Notifications(userID, lastID int64) ([]*model.Notification, error) {
+	return s.users.ListNotifications(userID, lastID)
 }
 
 func (s *Service) UnreadNotifications(userID int64) (int, error) {

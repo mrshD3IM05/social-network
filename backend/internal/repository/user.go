@@ -73,17 +73,25 @@ func (r *Repository) GetUserByID(id int64) (*model.User, error) {
 	return user, nil
 }
 
+// afterUserCondition keeps the users u that come after the user lastID in
+// name order (first name, last name, id), so a page starts right after the
+// one before. It takes lastID twice: 0 means the first page.
+const afterUserCondition = `(? = 0 OR (u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id) >
+	(SELECT first_name, last_name, id FROM users WHERE id = ?))`
+
 // ListUsers returns one page of the users except excludeID whose name or
-// nickname contains search (empty search keeps everyone), ordered by name.
-func (r *Repository) ListUsers(excludeID int64, search string, offset int) ([]*model.User, error) {
+// nickname contains search (empty search keeps everyone), ordered by name,
+// starting after the user lastID.
+func (r *Repository) ListUsers(excludeID int64, search string, lastID int64) ([]*model.User, error) {
 	// % and _ are wildcards in LIKE, so they are escaped to be searched as text
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search) + "%"
 	rows, err := r.db.Query(
-		`SELECT `+userColumns+` FROM users
-		 WHERE id != ? AND (first_name || ' ' || last_name || ' ' || nickname) LIKE ? ESCAPE '\'
-		 ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id
-		 LIMIT ? OFFSET ?`,
-		excludeID, pattern, PageSize, offset,
+		`SELECT `+userColumnsPrefixed+` FROM users u
+		 WHERE u.id != ? AND (u.first_name || ' ' || u.last_name || ' ' || u.nickname) LIKE ? ESCAPE '\'
+		 AND `+afterUserCondition+`
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
+		 LIMIT ?`,
+		excludeID, pattern, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err

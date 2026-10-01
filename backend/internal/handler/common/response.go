@@ -34,13 +34,14 @@ func CurrentUserID(r *http.Request, sessions *sessionsvc.Service) (int64, error)
 	return session.UserID, nil
 }
 
-// Offset reads ?offset=, where the next page of a list starts (0 by default).
-func Offset(r *http.Request) int {
-	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
-	if err != nil || offset < 0 {
+// LastID reads ?last=, the id of the last item the client already has: the
+// next page starts right after it. 0 (or nothing) asks for the first page.
+func LastID(r *http.Request) int64 {
+	last, err := strconv.ParseInt(r.URL.Query().Get("last"), 10, 64)
+	if err != nil || last < 0 {
 		return 0
 	}
-	return offset
+	return last
 }
 
 // PathID reads a positive id from the url path, like {id} in /posts/{id}.

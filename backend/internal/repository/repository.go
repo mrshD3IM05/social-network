@@ -13,7 +13,7 @@ var (
 )
 
 // PageSize is how many items a list endpoint answers at once ("10 by 10").
-// The next ones are asked for with ?offset=10, ?offset=20...
+// The next ones are asked for with ?last=<id of the last item already shown>.
 const PageSize = 10
 
 type Repository struct {
