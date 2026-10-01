@@ -1,9 +1,7 @@
 services:
   backend:
     image: social-network-backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: social-network-backend
     restart: unless-stopped
     expose:
@@ -16,9 +14,7 @@ services:
 
   frontend:
     image: social-network-frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    build: ./frontend
     container_name: social-network-frontend
     restart: unless-stopped
     depends_on:

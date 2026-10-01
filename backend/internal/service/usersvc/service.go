@@ -2,20 +2,31 @@ package usersvc
 
 import (
 	"errors"
+	"strings"
+
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
 )
+
+// SearchLimit caps the nickname search behind GET /users, so the directory
+// never loads the whole network and always answers with a small, fixed page.
+const SearchLimit = 20
 
 type Service struct{ users *repository.Repository }
 
 func New(users *repository.Repository) *Service          { return &Service{users: users} }
 func (s *Service) GetUser(id int64) (*model.User, error) { return s.users.GetUserByID(id) }
 
-// ListUsers is the directory behind GET /users: every registered user except
+// ListUsers is the directory behind GET /users: up to SearchLimit users whose
+// nickname contains the search text (none when it is blank), except
 // the viewer. Private profiles stay in the list — CanViewProfile still gates
 // the profile itself.
-func (s *Service) ListUsers(viewerID int64) ([]*model.User, error) {
-	return s.users.ListUsers(viewerID)
+func (s *Service) ListUsers(viewerID int64, search string) ([]*model.User, error) {
+	search = strings.ToLower(strings.TrimSpace(search))
+	if search == "" {
+		return []*model.User{}, nil
+	}
+	return s.users.ListUsers(viewerID, search, SearchLimit)
 }
 func (s *Service) CanViewProfile(viewerID int64, user *model.User) (bool, error) {
 	if !user.Private || viewerID == user.ID {

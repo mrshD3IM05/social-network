@@ -1,18 +1,17 @@
 import { apiGet } from '@/lib/api'
 
-// The people directory: every registered user except you.
-// Backed by GET /users (internal/handler/userhandler), which only returns the
-// public profile fields. Used by People, Messages and the group invite list.
-export function fetchPeople() {
-  return apiGet('/users')
+// The people directory, searched by nickname. Backed by GET /users
+// (internal/handler/userhandler), which answers with up to 20 public profiles
+// whose nickname contains the text, and with nothing when the search is blank.
+// Used by People and the group invite list.
+export function fetchPeople(search) {
+  return apiGet(`/users?search=${encodeURIComponent(search)}`)
 }
 
-// Keep the people whose name or nickname contains the search text.
-// The list is small enough to filter in the browser.
-export function searchPeople(people, search) {
-  const text = search.trim().toLowerCase()
-  if (!text) return people
-  return people.filter(person =>
-    `${person.first_name} ${person.last_name} ${person.nickname}`.toLowerCase().includes(text)
-  )
+// The people you can start a private conversation with, i.e. the Messages list.
+// Backed by GET /contacts, which applies the rule the message endpoints check:
+// at least one of the two follows the other, accepted. Everyone else would only
+// get a 403 from /messages/{id}, so they are not listed.
+export function fetchContacts() {
+  return apiGet('/contacts')
 }

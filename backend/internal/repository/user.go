@@ -72,10 +72,19 @@ func (r *Repository) GetUserByID(id int64) (*model.User, error) {
 	return user, nil
 }
 
-// ListUsers returns every registered user except excludeID (pass 0 to keep
-// everyone), ordered by name so the directory reads the same on every call.
-func (r *Repository) ListUsers(excludeID int64) ([]*model.User, error) {
-	rows, err := r.db.Query(`SELECT `+userColumns+` FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id`, excludeID)
+// ListUsers searches the people directory by nickname: the up-to-`limit` users
+// whose nickname contains `search`, except the caller, ordered by name so the
+// directory reads the same on every call. `search` must be non-empty and lower
+// cased by the caller, because nicknames are stored lower cased.
+func (r *Repository) ListUsers(viewerID int64, search string, limit int) ([]*model.User, error) {
+	rows, err := r.db.Query(
+		`SELECT `+userColumns+`
+		 FROM users
+		 WHERE id != ? AND nickname LIKE '%' || ? || '%'
+		 ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id
+		 LIMIT ?`,
+		viewerID, search, limit,
+	)
 	if err != nil {
 		return nil, err
 	}

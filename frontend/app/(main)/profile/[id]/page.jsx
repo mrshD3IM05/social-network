@@ -4,13 +4,17 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
+import { parseId } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
+import NotFound from '@/components/NotFound'
 import PersonRow from '@/components/PersonRow'
 import PostCard from '@/components/PostCard'
 
 export default function ProfilePage() {
   const { id } = useParams() // the [id] from the URL, e.g. /profile/3
+  // 0 when the url is not a real id, like /profile/abc or /profile/0
+  const userId = parseId(id)
   const [me, setMe] = useState(null)
   const [user, setUser] = useState(null)
   const [posts, setPosts] = useState([])
@@ -20,36 +24,41 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState([])
   const [tab, setTab] = useState('posts') // 'posts' | 'followers' | 'following'
   const [message, setMessage] = useState('')
+  const [notFound, setNotFound] = useState(false)
   const [savingPrivacy, setSavingPrivacy] = useState(false)
 
   async function load() {
+    // there is no such user, so nothing is requested
+    if (!userId) return
     setMe(await apiGet('/me'))
-    apiGet(`/users/${id}/follow`)
+    apiGet(`/users/${userId}/follow`)
       .then(result => setFollowStatus(result.status))
       .catch(() => {})
     try {
-      setUser(await apiGet(`/user/${id}`))
+      setUser(await apiGet(`/user/${userId}`))
       setIsPrivate(false)
       // no "posts of one user" endpoint yet, so we filter the feed
       const feed = await apiGet('/posts')
-      setPosts(feed.filter(post => post.author_id === Number(id)))
+      setPosts(feed.filter(post => post.author_id === userId))
       // who follows them and who they follow — the API gates both exactly like
-      // the profile, so a private profile answers 403 and we never get here
-      setFollowers(await apiGet(`/users/${id}/followers`))
-      setFollowing(await apiGet(`/users/${id}/following`))
+      // the profile, so a private one answers 403 and we never get here
+      setFollowers(await apiGet(`/users/${userId}/followers`))
+      setFollowing(await apiGet(`/users/${userId}/following`))
     } catch (err) {
-      if (err.status === 403) setIsPrivate(true) // private profile you don't follow
+      // 400 = the id is not one the API accepts, 404 = nobody under it
+      if (err.status === 400 || err.status === 404) setNotFound(true)
+      else if (err.status === 403) setIsPrivate(true) // private profile you don't follow
       else setMessage(err.message)
     }
   }
 
   useEffect(() => {
     load()
-  }, [id])
+  }, [userId])
 
   async function follow() {
     try {
-      const result = await apiPost(`/users/${id}/follow`)
+      const result = await apiPost(`/users/${userId}/follow`)
       setFollowStatus(result.status)
       setMessage(result.status === 'pending' ? 'Follow request sent.' : 'You are now following.')
       load() // a new follower may now see more posts
@@ -61,7 +70,7 @@ export default function ProfilePage() {
   // also used to cancel a pending request
   async function unfollow() {
     try {
-      await apiDelete(`/users/${id}/follow`)
+      await apiDelete(`/users/${userId}/follow`)
       setMessage(followStatus === 'pending' ? 'Follow request cancelled.' : 'Unfollowed.')
       setFollowStatus('')
       load()
@@ -98,6 +107,17 @@ export default function ProfilePage() {
     ) : (
       <button className="btn" onClick={follow}>{isPrivate ? 'Request to follow' : 'Follow'}</button>
     )
+
+  if (!userId || notFound) {
+    return (
+      <NotFound
+        title="Profile not found"
+        text="Nobody is here under that id."
+        back="/people"
+        label="Back to people"
+      />
+    )
+  }
 
   if (isPrivate) {
     return (

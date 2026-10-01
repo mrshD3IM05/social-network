@@ -1,19 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fetchPeople } from '@/lib/people'
+import { fetchContacts } from '@/lib/people'
 import { getUnread, onUnreadChange } from '@/lib/unread'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
 
-// List of people you can chat with (everyone on the network).
+// The people you can message: the ones where one of you follows the other.
+// Everyone else would only get "you cannot message them yet", so they are not
+// listed here — /people is where you go to find someone new to follow.
 export default function ChatListPage() {
   const [people, setPeople] = useState(null)
   const [unread, setUnread] = useState(getUnread())
 
   useEffect(() => {
-    fetchPeople()
+    fetchContacts()
       .then(setPeople)
       .catch(() => setPeople([]))
   }, [])
@@ -23,14 +25,14 @@ export default function ChatListPage() {
 
   return (
     <>
-      <PageHeader label="Inbox" title="Messages" subtitle="Pick someone to start a real-time conversation." />
+      <PageHeader label="Inbox" title="Messages" subtitle="Pick someone you follow, or who follows you." />
 
       {people === null && <p className="loading">Loading…</p>}
 
       {people !== null && people.length === 0 && (
         <div className="empty">
           <p className="empty-title">No one to message yet</p>
-          <p>You are the only member so far.</p>
+          <p>Follow someone, or get them to follow you, to start a conversation.</p>
         </div>
       )}
 

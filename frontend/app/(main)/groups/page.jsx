@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
-import { fetchPeople } from '@/lib/people'
 import { LIMITS, checkText } from '@/lib/validate'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
@@ -16,7 +15,6 @@ import CharCount from '@/components/CharCount'
 export default function GroupsPage() {
   const [groups, setGroups] = useState(null)
   const [invitations, setInvitations] = useState([])
-  const [people, setPeople] = useState({}) // user id → person, to name the inviters
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [joiningId, setJoiningId] = useState(null) // id of the group being joined
@@ -32,10 +30,6 @@ export default function GroupsPage() {
 
   useEffect(() => {
     load()
-    // the directory turns "user #3" into a name and a face on the invitations
-    fetchPeople()
-      .then(list => setPeople(Object.fromEntries(list.map(person => [person.id, person]))))
-      .catch(() => {})
   }, [])
 
   async function respondInvitation(id, accept) {
@@ -85,7 +79,9 @@ export default function GroupsPage() {
         <section className="card invitations">
           <h2>Group invitations</h2>
           {invitations.map(inv => {
-            const from = people[inv.from_user_id]
+            const from = inv.from_first_name
+              ? { first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }
+              : null
             return (
               <div key={inv.id} className="list-item">
                 {from

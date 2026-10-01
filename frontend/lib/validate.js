@@ -31,6 +31,17 @@ const letterRegex = /[a-z]/
 
 // Every check below answers with an error message, or '' when the value is fine.
 
+// The {id} of a url like /chat/3. Next.js hands any segment to a [id] route, so
+// it has to be checked before it goes into a request: /chat/abc and /chat/0 both
+// reach the page. 0 means "not a real id".
+//
+// This is the same rule the API applies in common.PathID, which rejects anything
+// under 1 with a 400 — so a bad id never even reaches the network.
+export function parseId(value) {
+  const id = Number(value)
+  return Number.isInteger(id) && id >= 1 ? id : 0
+}
+
 // Required text with a maximum length: names, about me, a post, a message…
 export function checkText(label, value, max, { required = true } = {}) {
   const text = (value || '').trim()

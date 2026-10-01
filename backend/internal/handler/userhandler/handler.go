@@ -22,17 +22,18 @@ func New(service *usersvc.Service, session *sessionsvc.Service, follow *followsv
 }
 
 // ListUsers handles GET /users: the people directory every "pick a person"
-// screen reads from (People, Messages, group invites). It never includes the
-// caller and only exposes the public profile fields.
+// screen searches (People, group invites). It answers with up to usersvc's
+// SearchLimit users whose nickname contains the ?search= text, never the
+// caller, and with an empty list when the search is blank.
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	users, err := h.Service.ListUsers(viewerID)
+	users, err := h.Service.ListUsers(viewerID, r.URL.Query().Get("search"))
 	if err != nil {
-		http.Error(w, "could not list users", http.StatusInternalServerError)
+		http.Error(w, "could not search users", http.StatusInternalServerError)
 		return
 	}
 	writePeople(w, users)
@@ -71,6 +72,25 @@ func (h *Handler) Following(w http.ResponseWriter, r *http.Request) {
 	users, err := h.Follow.Following(user.ID)
 	if err != nil {
 		http.Error(w, "could not list following", http.StatusInternalServerError)
+		return
+	}
+	writePeople(w, users)
+}
+
+// Contacts handles GET /contacts: the people the caller can start a private
+// conversation with, which is what the Messages list shows. The rule is the one
+// /messages and /ws apply before accepting a message (CanMessage): at least one
+// of the two follows the other, accepted. Anyone outside it would only get a 403
+// from /messages/{id}, so they are left out here.
+func (h *Handler) Contacts(w http.ResponseWriter, r *http.Request) {
+	viewerID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	users, err := h.Follow.Messageable(viewerID)
+	if err != nil {
+		http.Error(w, "could not list contacts", http.StatusInternalServerError)
 		return
 	}
 	writePeople(w, users)
