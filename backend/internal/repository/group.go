@@ -184,7 +184,8 @@ func (r *Repository) GetGroupMembers(groupID int64) ([]*model.GroupMember, error
 
 // ----------------------------------------------------------- invitations
 
-const groupInvitationColumns = `gi.id, gi.group_id, g.title, gi.from_user_id, gi.to_user_id, gi.status, gi.created_at`
+// the invitation, its group title and the name and photo of who sent it
+const groupInvitationColumns = `gi.id, gi.group_id, g.title, gi.from_user_id, fu.first_name, fu.last_name, fu.avatar, gi.to_user_id, gi.status, gi.created_at`
 
 func scanGroupInvitation(s scanner) (*model.GroupInvitation, error) {
 	invitation := new(model.GroupInvitation)
@@ -193,6 +194,9 @@ func scanGroupInvitation(s scanner) (*model.GroupInvitation, error) {
 		&invitation.GroupID,
 		&invitation.GroupTitle,
 		&invitation.FromUserID,
+		&invitation.FromFirstName,
+		&invitation.FromLastName,
+		&invitation.FromAvatar,
 		&invitation.ToUserID,
 		&invitation.Status,
 		&invitation.CreatedAt,
@@ -222,6 +226,7 @@ func (r *Repository) GetGroupInvitationByID(id int64) (*model.GroupInvitation, e
 		`SELECT `+groupInvitationColumns+`
 		 FROM group_invitations gi
 		 JOIN groups g ON g.id = gi.group_id
+		 JOIN users fu ON fu.id = gi.from_user_id
 		 WHERE gi.id = ?`,
 		id,
 	))
@@ -238,6 +243,7 @@ func (r *Repository) PendingGroupInvitation(groupID, toUserID int64) (*model.Gro
 		`SELECT `+groupInvitationColumns+`
 		 FROM group_invitations gi
 		 JOIN groups g ON g.id = gi.group_id
+		 JOIN users fu ON fu.id = gi.from_user_id
 		 WHERE gi.group_id = ? AND gi.to_user_id = ?
 		 ORDER BY gi.id DESC LIMIT 1`,
 		groupID, toUserID,
@@ -253,6 +259,7 @@ func (r *Repository) GetPendingInvitationsForUser(userID int64) ([]*model.GroupI
 		`SELECT `+groupInvitationColumns+`
 		 FROM group_invitations gi
 		 JOIN groups g ON g.id = gi.group_id
+		 JOIN users fu ON fu.id = gi.from_user_id
 		 WHERE gi.to_user_id = ? AND gi.status = ?
 		 ORDER BY gi.created_at DESC, gi.id DESC`,
 		userID, model.GroupInvitationPending,
@@ -278,6 +285,7 @@ func (r *Repository) GetPendingInvitationsForGroup(groupID int64) ([]*model.Grou
 		`SELECT `+groupInvitationColumns+`
 		 FROM group_invitations gi
 		 JOIN groups g ON g.id = gi.group_id
+		 JOIN users fu ON fu.id = gi.from_user_id
 		 WHERE gi.group_id = ? AND gi.status = ?
 		 ORDER BY gi.created_at DESC, gi.id DESC`,
 		groupID, model.GroupInvitationPending,

@@ -50,13 +50,16 @@ type GroupCreator struct {
 }
 
 type GroupInvitation struct {
-	ID         int64     `json:"id"`
-	GroupID    int64     `json:"group_id"`
-	GroupTitle string    `json:"group_title"`
-	FromUserID int64     `json:"from_user_id"`
-	ToUserID   int64     `json:"to_user_id"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	GroupID       int64     `json:"group_id"`
+	GroupTitle    string    `json:"group_title"`
+	FromUserID    int64     `json:"from_user_id"`
+	FromFirstName string    `json:"from_first_name"`
+	FromLastName  string    `json:"from_last_name"`
+	FromAvatar    string    `json:"from_avatar"`
+	ToUserID      int64     `json:"to_user_id"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type GroupJoinRequest struct {
