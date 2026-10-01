@@ -79,14 +79,14 @@ func (r *Repository) CanAttachToMessage(messageID, userID int64) (bool, error) {
 	return allowed == 1, err
 }
 
-// ListGroupMessages returns the last 100 messages of a group chat, oldest first.
-func (r *Repository) ListGroupMessages(groupID int64) ([]*model.Message, error) {
+// ListGroupMessages returns one older-to-newer page of a group chat.
+func (r *Repository) ListGroupMessages(groupID, lastID int64) ([]*model.Message, error) {
 	rows, err := r.db.Query(`
 		SELECT id, from_user_id, group_id, content, created_at FROM (
 			SELECT id, from_user_id, group_id, content, created_at
-			FROM messages WHERE group_id = ?
-			ORDER BY id DESC LIMIT 100
-		) ORDER BY id`, groupID)
+			FROM messages WHERE group_id = ? AND (? = 0 OR id < ?)
+			ORDER BY id DESC LIMIT ?
+		) ORDER BY id`, groupID, lastID, lastID, MessagePageSize)
 	if err != nil {
 		return nil, err
 	}

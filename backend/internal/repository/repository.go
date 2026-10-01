@@ -16,6 +16,10 @@ var (
 // The next ones are asked for with ?last=<id of the last item already shown>.
 const PageSize = 10
 
+// MessagePageSize is larger than ordinary list pages so chat context remains
+// useful while still loading history incrementally.
+const MessagePageSize = 15
+
 type Repository struct {
 	db *sql.DB
 }

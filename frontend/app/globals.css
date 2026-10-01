@@ -739,3 +739,4 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 /* "Load more" under a list that comes 10 by 10 */
 .load-more { display: flex; margin: 16px auto 0; }
 .viewer-picker .load-more { margin: 0; }
+.chat-load-more { display: flex; margin: 0 auto 12px; }

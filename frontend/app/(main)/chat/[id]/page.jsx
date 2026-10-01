@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
 import { markRead } from '@/lib/unread'
 import { useThrottle } from '@/lib/timing'
+import useMessageHistory from '@/lib/useMessageHistory'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -18,7 +19,6 @@ export default function ConversationPage() {
   const otherId = Number(id)
   const [me, setMe] = useState(null)
   const [other, setOther] = useState(null)
-  const [messages, setMessages] = useState([])
   const [text, setText] = useState('')
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
@@ -27,8 +27,12 @@ export default function ConversationPage() {
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null) // useRef keeps the socket between renders
   const pendingUploadsRef = useRef(new Map())
-  const bottomRef = useRef(null)
+  const messageListRef = useRef(null)
+  const loadMoreButtonRef = useRef(null)
+  const preservedScrollRef = useRef(null)
   const fileRef = useRef(null)
+  const history = useMessageHistory(`/messages/${id}`)
+  const { messages, setMessages, hasMore, loadingMore, error: historyError, loadMore } = history
 
   useEffect(() => {
     apiGet('/me').then(setMe)
@@ -36,15 +40,6 @@ export default function ConversationPage() {
 
     // opening the conversation means you read it, so its dot goes away
     markRead(otherId)
-
-    // the conversation is saved, so it is read back on every visit
-    apiGet(`/messages/${id}`)
-      .then(setMessages)
-      .catch(err => {
-        // the API refuses when neither of you follows the other
-        if (err.status === 403) setBlocked(true)
-        else setError(err.message)
-      })
 
     // Connect straight to the Go server (the cookie is sent automatically)
     const socket = new WebSocket(socketUrl())
@@ -58,7 +53,7 @@ export default function ConversationPage() {
         const msg = data.message
         // keep only the messages of this conversation
         if (msg.from_user_id === otherId || msg.to_user_id === otherId) {
-          setMessages(list => (list.some(m => m.id === msg.id) ? list : [...list, msg]))
+          setMessages(list => ((list || []).some(m => m.id === msg.id) ? list : [...(list || []), msg]))
         }
       }
       // "typing" only means right now, so it fades on its own
@@ -87,10 +82,54 @@ export default function ConversationPage() {
     }
   }, [id, otherId])
 
-  // scroll to the newest message
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, typing])
+    if (!historyError) return
+    // the API refuses when neither of you follows the other
+    if (historyError.status === 403) setBlocked(true)
+    else setError(historyError.message)
+  }, [historyError])
+
+  // Prepending older history must not move the message currently being read.
+  useLayoutEffect(() => {
+    const preserved = preservedScrollRef.current
+    const list = messageListRef.current
+    if (preserved && list) {
+      list.scrollTop = preserved.top + list.scrollHeight - preserved.height
+      preservedScrollRef.current = null
+    } else if (messages !== null && list) {
+      // Initial history and new socket messages open directly at newest item.
+      list.scrollTop = list.scrollHeight
+    }
+  }, [messages])
+
+  useEffect(() => {
+    if (typing && messageListRef.current) messageListRef.current.scrollTop = messageListRef.current.scrollHeight
+  }, [typing])
+
+  const loadOlderMessages = useCallback(() => {
+    const list = messageListRef.current
+    if (list) preservedScrollRef.current = { top: list.scrollTop, height: list.scrollHeight }
+    loadMore()
+  }, [loadMore])
+
+  const loadWhenSeen = useCallback(() => {
+    if (messageListRef.current?.scrollTop <= 80) loadOlderMessages()
+  }, [loadOlderMessages])
+
+  // Reaching the small top button loads the next older page. The same
+  // throttled loader remains available through a click.
+  useEffect(() => {
+    const button = loadMoreButtonRef.current
+    if (!hasMore || loadingMore || !button || !('IntersectionObserver' in window)) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) loadOlderMessages()
+      },
+      { root: messageListRef.current, rootMargin: '80px 0px 0px' },
+    )
+    observer.observe(button)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loadOlderMessages])
 
   // Tell the other side we are writing, at most once every two seconds.
   // The trailing call keeps "typing…" alive until the last keystroke.
@@ -183,9 +222,14 @@ export default function ConversationPage() {
         </div>
       </header>
 
-      <div className="chat-messages">
-        {messages.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
-        {messages.map(msg => (
+      <div ref={messageListRef} className="chat-messages" onScroll={loadWhenSeen}>
+        {hasMore && (
+          <button ref={loadMoreButtonRef} type="button" className="btn btn-light chat-load-more" onClick={loadOlderMessages} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : 'Load older messages'}
+          </button>
+        )}
+        {messages?.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
+        {messages?.map(msg => (
           <div key={msg.id} className={msg.from_user_id === me.id ? 'bubble mine' : 'bubble'}>
             {msg.content && <span>{msg.content}</span>}
             {msg.images?.length > 0 && (
@@ -197,7 +241,6 @@ export default function ConversationPage() {
         ))}
         {typing && <p className="typing">{other.first_name} is typing…</p>}
 
-        <div ref={bottomRef} />
       </div>
 
       {error && <p className="error chat-error">{error}</p>}

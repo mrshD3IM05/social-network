@@ -208,7 +208,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	messages, err := h.Service.Messages(userID, groupID)
+	messages, err := h.Service.Messages(userID, groupID, common.LastID(r))
 	if err != nil {
 		writeError(w, err, "could not list messages")
 		return

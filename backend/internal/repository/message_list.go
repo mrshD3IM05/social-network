@@ -5,7 +5,7 @@ import "sn-backend/internal/model"
 // ListMessages returns the private messages between two users, oldest first.
 // Only the last `limit` messages are kept, so a long conversation does not load
 // all at once.
-func (r *Repository) ListMessages(userID, otherID int64, limit int) ([]*model.Message, error) {
+func (r *Repository) ListMessages(userID, otherID int64, limit int, lastID int64) ([]*model.Message, error) {
 	// the inner query keeps the newest messages, the outer one puts them back
 	// in reading order (same shape as ListGroupMessages)
 	rows, err := r.db.Query(`
@@ -14,9 +14,10 @@ func (r *Repository) ListMessages(userID, otherID int64, limit int) ([]*model.Me
 			FROM messages
 			WHERE group_id IS NULL
 			  AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
+			  AND (? = 0 OR id < ?)
 			ORDER BY id DESC LIMIT ?
 		) ORDER BY id`,
-		userID, otherID, otherID, userID, limit,
+		userID, otherID, otherID, userID, lastID, lastID, limit,
 	)
 	if err != nil {
 		return nil, err

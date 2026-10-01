@@ -11,7 +11,7 @@ import (
 
 const (
 	MaxContentLength = 1000
-	DefaultLimit     = 50
+	DefaultLimit     = repository.MessagePageSize
 	MaxLimit         = 200
 )
 
@@ -28,7 +28,7 @@ func New(repo *repository.Repository) *Service { return &Service{repo: repo} }
 // History returns the stored conversation with one user. The same rule the
 // websocket applies before accepting a message guards it, so history cannot be
 // read by someone who could not have taken part in it.
-func (s *Service) History(viewerID, otherID int64, limit int) ([]*model.Message, error) {
+func (s *Service) History(viewerID, otherID int64, limit int, lastID int64) ([]*model.Message, error) {
 	allowed, err := s.repo.CanMessage(viewerID, &otherID, nil)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (s *Service) History(viewerID, otherID int64, limit int) ([]*model.Message,
 	if limit < 1 || limit > MaxLimit {
 		limit = DefaultLimit
 	}
-	return s.repo.ListMessages(viewerID, otherID, limit)
+	return s.repo.ListMessages(viewerID, otherID, limit, lastID)
 }
 
 // Send saves a message, either to one person or to a group chat.

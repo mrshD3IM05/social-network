@@ -125,7 +125,7 @@ func (s *Service) RemoveMember(creatorID, groupID, userID int64) error {
 }
 
 // Messages returns the group chat history, members only.
-func (s *Service) Messages(viewerID, groupID int64) ([]*model.Message, error) {
+func (s *Service) Messages(viewerID, groupID, lastID int64) ([]*model.Message, error) {
 	isMember, err := s.repo.IsGroupMember(groupID, viewerID)
 	if err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func (s *Service) Messages(viewerID, groupID int64) ([]*model.Message, error) {
 	if !isMember {
 		return nil, ErrNotGroupMember
 	}
-	return s.repo.ListGroupMessages(groupID)
+	return s.repo.ListGroupMessages(groupID, lastID)
 }
 
 // CheckCreator reports ErrNotGroupCreator (or ErrNotFound) when userID does

@@ -39,7 +39,7 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 
-	messages, err := h.Service.History(viewerID, otherID, limit)
+	messages, err := h.Service.History(viewerID, otherID, limit, common.LastID(r))
 	if err != nil {
 		writeError(w, err, "could not load the conversation")
 		return
