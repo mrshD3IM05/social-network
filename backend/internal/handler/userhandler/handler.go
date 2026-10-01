@@ -5,6 +5,7 @@ import (
 	"sn-backend/internal/handler/common"
 	"sn-backend/internal/model"
 	"sn-backend/internal/service/followsvc"
+	"sn-backend/internal/service/postsvc"
 	"sn-backend/internal/service/sessionsvc"
 	"sn-backend/internal/service/usersvc"
 	"strconv"
@@ -15,22 +16,24 @@ type Handler struct {
 	Service *usersvc.Service
 	Session *sessionsvc.Service
 	Follow  *followsvc.Service
+	Post    *postsvc.Service
 }
 
-func New(service *usersvc.Service, session *sessionsvc.Service, follow *followsvc.Service) *Handler {
-	return &Handler{Service: service, Session: session, Follow: follow}
+func New(service *usersvc.Service, session *sessionsvc.Service, follow *followsvc.Service, post *postsvc.Service) *Handler {
+	return &Handler{Service: service, Session: session, Follow: follow, Post: post}
 }
 
-// ListUsers handles GET /users: the people directory every "pick a person"
-// screen reads from (People, Messages, group invites). It never includes the
-// caller and only exposes the public profile fields.
+// ListUsers handles GET /users?q=&offset=: one page of the people directory
+// every "pick a person" screen reads from (People, Messages, group invites),
+// searched by name or nickname. It never includes the caller and only exposes
+// the public profile fields.
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	users, err := h.Service.ListUsers(viewerID)
+	users, err := h.Service.ListUsers(viewerID, r.URL.Query().Get("q"), common.Offset(r))
 	if err != nil {
 		http.Error(w, "could not list users", http.StatusInternalServerError)
 		return
@@ -43,9 +46,35 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	viewerID, _ := common.CurrentUserID(r, h.Session)
+	posts, followers, following, err := h.Service.ProfileCounts(viewerID, user.ID)
+	if err != nil {
+		http.Error(w, "could not count profile activity", http.StatusInternalServerError)
+		return
+	}
 	// the subject wants every register field on the profile (never the
 	// password), and visibleUser already checked the caller may see it
-	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
+	profile := common.PrivateUser(user)
+	profile["post_count"] = posts
+	profile["follower_count"] = followers
+	profile["following_count"] = following
+	common.WriteJSON(w, http.StatusOK, profile)
+}
+
+// UserPosts handles GET /users/{id}/posts?offset=: one page of the posts on a
+// profile, behind the same privacy gate as the profile itself.
+func (h *Handler) UserPosts(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.visibleUser(w, r)
+	if !ok {
+		return
+	}
+	viewerID, _ := common.CurrentUserID(r, h.Session)
+	posts, err := h.Post.UserPosts(viewerID, user.ID, common.Offset(r))
+	if err != nil {
+		http.Error(w, "could not list posts", http.StatusInternalServerError)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, posts)
 }
 
 // Followers handles GET /users/{id}/followers and Following GET
@@ -56,7 +85,7 @@ func (h *Handler) Followers(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	users, err := h.Follow.Followers(user.ID)
+	users, err := h.Follow.Followers(user.ID, common.Offset(r))
 	if err != nil {
 		http.Error(w, "could not list followers", http.StatusInternalServerError)
 		return
@@ -68,7 +97,7 @@ func (h *Handler) Following(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	users, err := h.Follow.Following(user.ID)
+	users, err := h.Follow.Following(user.ID, common.Offset(r))
 	if err != nil {
 		http.Error(w, "could not list following", http.StatusInternalServerError)
 		return
@@ -202,12 +231,28 @@ func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	notifications, err := h.Service.Notifications(userID)
+	notifications, err := h.Service.Notifications(userID, common.Offset(r))
 	if err != nil {
 		http.Error(w, "could not list notifications", http.StatusInternalServerError)
 		return
 	}
 	common.WriteJSON(w, http.StatusOK, notifications)
+}
+
+// UnreadNotifications handles GET /notifications/unread: {"count": n}, the
+// number on the bell in the sidebar.
+func (h *Handler) UnreadNotifications(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	count, err := h.Service.UnreadNotifications(userID)
+	if err != nil {
+		http.Error(w, "could not count notifications", http.StatusInternalServerError)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
 // ReadNotifications handles POST /notifications/read: marks them all as seen.

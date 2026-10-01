@@ -19,6 +19,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// user routes
 	mux.Handle("GET /users", auth.Authorized(http.HandlerFunc(h.User.ListUsers)))
 	mux.Handle("GET /user/{id}", auth.Authorized(http.HandlerFunc(h.User.GetUser)))
+	mux.Handle("GET /users/{id}/posts", auth.Authorized(http.HandlerFunc(h.User.UserPosts)))
 	mux.Handle("GET /users/{id}/followers", auth.Authorized(http.HandlerFunc(h.User.Followers)))
 	mux.Handle("GET /users/{id}/following", auth.Authorized(http.HandlerFunc(h.User.Following)))
 	mux.Handle("GET /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowStatus)))
@@ -31,6 +32,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 
 	// notification routes
 	mux.Handle("GET /notifications", auth.Authorized(http.HandlerFunc(h.User.Notifications)))
+	mux.Handle("GET /notifications/unread", auth.Authorized(http.HandlerFunc(h.User.UnreadNotifications)))
 	mux.Handle("POST /notifications/read", auth.Authorized(http.HandlerFunc(h.User.ReadNotifications)))
 
 	// post routes

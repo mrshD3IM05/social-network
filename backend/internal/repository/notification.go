@@ -36,9 +36,9 @@ func (r *Repository) CreateNotification(n *model.Notification) error {
 	return nil
 }
 
-// ListNotifications returns the latest notifications of a user, newest first.
-func (r *Repository) ListNotifications(userID int64) ([]*model.Notification, error) {
-	rows, err := r.db.Query(notificationSelect+` WHERE n.user_id = ? ORDER BY n.id DESC LIMIT 100`, userID)
+// ListNotifications returns one page of a user's notifications, newest first.
+func (r *Repository) ListNotifications(userID int64, offset int) ([]*model.Notification, error) {
+	rows, err := r.db.Query(notificationSelect+` WHERE n.user_id = ? ORDER BY n.id DESC LIMIT ? OFFSET ?`, userID, PageSize, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +53,12 @@ func (r *Repository) ListNotifications(userID int64) ([]*model.Notification, err
 		notifications = append(notifications, n)
 	}
 	return notifications, rows.Err()
+}
+
+func (r *Repository) CountUnreadNotifications(userID int64) (int, error) {
+	var count int
+	err := r.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read = 0`, userID).Scan(&count)
+	return count, err
 }
 
 func (r *Repository) MarkNotificationsRead(userID int64) error {

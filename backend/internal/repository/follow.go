@@ -67,30 +67,32 @@ func (r *Repository) IsFollowing(fromUserID, toUserID int64) (bool, error) {
 // userID follows. Only accepted requests count — a pending one is not a follow.
 // Both order by name like the people directory, so the lists read the same on
 // every call.
-func (r *Repository) ListFollowers(userID int64) ([]*model.User, error) {
+func (r *Repository) ListFollowers(userID int64, offset int) ([]*model.User, error) {
 	return r.listFollowUsers(
 		`SELECT `+userColumnsPrefixed+`
 		 FROM follow_requests f
 		 JOIN users u ON u.id = f.from_user_id
 		 WHERE f.to_user_id = ? AND f.status = ?
-		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
-		userID,
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
+		 LIMIT ? OFFSET ?`,
+		userID, offset,
 	)
 }
 
-func (r *Repository) ListFollowing(userID int64) ([]*model.User, error) {
+func (r *Repository) ListFollowing(userID int64, offset int) ([]*model.User, error) {
 	return r.listFollowUsers(
 		`SELECT `+userColumnsPrefixed+`
 		 FROM follow_requests f
 		 JOIN users u ON u.id = f.to_user_id
 		 WHERE f.from_user_id = ? AND f.status = ?
-		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
-		userID,
+		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
+		 LIMIT ? OFFSET ?`,
+		userID, offset,
 	)
 }
 
-func (r *Repository) listFollowUsers(query string, userID int64) ([]*model.User, error) {
-	rows, err := r.db.Query(query, userID, model.FollowAccepted)
+func (r *Repository) listFollowUsers(query string, userID int64, offset int) ([]*model.User, error) {
+	rows, err := r.db.Query(query, userID, model.FollowAccepted, PageSize, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +107,20 @@ func (r *Repository) listFollowUsers(query string, userID int64) ([]*model.User,
 		users = append(users, user)
 	}
 	return users, rows.Err()
+}
+
+// CountFollowers is how many users follow userID, CountFollowing how many
+// users userID follows.
+func (r *Repository) CountFollowers(userID int64) (int, error) {
+	var count int
+	err := r.QueryRow(`SELECT COUNT(*) FROM follow_requests WHERE to_user_id = ? AND status = ?`, userID, model.FollowAccepted).Scan(&count)
+	return count, err
+}
+
+func (r *Repository) CountFollowing(userID int64) (int, error) {
+	var count int
+	err := r.QueryRow(`SELECT COUNT(*) FROM follow_requests WHERE from_user_id = ? AND status = ?`, userID, model.FollowAccepted).Scan(&count)
+	return count, err
 }
 
 // ListPendingFollowRequests returns the follow requests waiting for userID to

@@ -42,7 +42,7 @@ func New(repo *repository.Repository) *Handlers {
 	fileService := filesvc.New(repo, "uploads")
 	return &Handlers{
 		Auth:      authhandler.New(authsvc.New(repo), session, webSocket),
-		User:      userhandler.New(usersvc.New(repo), session, followsvc.New(repo, webSocket)),
+		User:      userhandler.New(usersvc.New(repo), session, followsvc.New(repo, webSocket), postService),
 		Post:      posthandler.New(postService, session),
 		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), session),
 		File:      filehandler.New(fileService, session),

@@ -34,6 +34,15 @@ func CurrentUserID(r *http.Request, sessions *sessionsvc.Service) (int64, error)
 	return session.UserID, nil
 }
 
+// Offset reads ?offset=, where the next page of a list starts (0 by default).
+func Offset(r *http.Request) int {
+	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+	if err != nil || offset < 0 {
+		return 0
+	}
+	return offset
+}
+
 // PathID reads a positive id from the url path, like {id} in /posts/{id}.
 func PathID(r *http.Request, name string) (int64, error) {
 	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)

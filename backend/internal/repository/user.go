@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 
 	"sn-backend/internal/model"
 )
@@ -72,10 +73,18 @@ func (r *Repository) GetUserByID(id int64) (*model.User, error) {
 	return user, nil
 }
 
-// ListUsers returns every registered user except excludeID (pass 0 to keep
-// everyone), ordered by name so the directory reads the same on every call.
-func (r *Repository) ListUsers(excludeID int64) ([]*model.User, error) {
-	rows, err := r.db.Query(`SELECT `+userColumns+` FROM users WHERE id != ? ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id`, excludeID)
+// ListUsers returns one page of the users except excludeID whose name or
+// nickname contains search (empty search keeps everyone), ordered by name.
+func (r *Repository) ListUsers(excludeID int64, search string, offset int) ([]*model.User, error) {
+	// % and _ are wildcards in LIKE, so they are escaped to be searched as text
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search) + "%"
+	rows, err := r.db.Query(
+		`SELECT `+userColumns+` FROM users
+		 WHERE id != ? AND (first_name || ' ' || last_name || ' ' || nickname) LIKE ? ESCAPE '\'
+		 ORDER BY first_name COLLATE NOCASE, last_name COLLATE NOCASE, id
+		 LIMIT ? OFFSET ?`,
+		excludeID, pattern, PageSize, offset,
+	)
 	if err != nil {
 		return nil, err
 	}

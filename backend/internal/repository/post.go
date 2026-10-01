@@ -181,14 +181,20 @@ func postVisibleArgs(viewerID int64) []any {
 	}
 }
 
-func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
+// ListVisiblePosts returns one page of the posts viewerID may see, newest
+// first. With authorID set, only that user's posts (their profile); with 0,
+// everybody's (the feed).
+func (r *Repository) ListVisiblePosts(viewerID, authorID int64, offset int) ([]*model.Post, error) {
+	args := append([]any{authorID, authorID}, postVisibleArgs(viewerID)...)
+	args = append(args, PageSize, offset)
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
-		WHERE p.group_id IS NULL AND `+postVisibleCondition+`
-		ORDER BY p.created_at DESC, p.id DESC`,
-		postVisibleArgs(viewerID)...,
+		WHERE p.group_id IS NULL AND (? = 0 OR p.author_id = ?) AND `+postVisibleCondition+`
+		ORDER BY p.created_at DESC, p.id DESC
+		LIMIT ? OFFSET ?`,
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -209,17 +215,30 @@ func (r *Repository) ListVisiblePosts(viewerID int64) ([]*model.Post, error) {
 	return r.enrichPosts(posts, viewerID)
 }
 
-// ListGroupPosts returns the posts of one group, newest first. The service
+// CountVisiblePosts is how many posts of authorID viewerID may see.
+func (r *Repository) CountVisiblePosts(viewerID, authorID int64) (int, error) {
+	var count int
+	args := append([]any{authorID}, postVisibleArgs(viewerID)...)
+	err := r.QueryRow(`
+		SELECT COUNT(*) FROM posts p
+		WHERE p.group_id IS NULL AND p.author_id = ? AND `+postVisibleCondition,
+		args...,
+	).Scan(&count)
+	return count, err
+}
+
+// ListGroupPosts returns one page of the posts of one group, newest first. The service
 // layer checks group membership before calling this — the query itself is
 // only reachable for authorized viewers.
-func (r *Repository) ListGroupPosts(groupID, viewerID int64) ([]*model.Post, error) {
+func (r *Repository) ListGroupPosts(groupID, viewerID int64, offset int) ([]*model.Post, error) {
 	rows, err := r.db.Query(`
 		SELECT `+postColumns+`
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
 		WHERE p.group_id = ?
-		ORDER BY p.created_at DESC, p.id DESC`,
-		groupID,
+		ORDER BY p.created_at DESC, p.id DESC
+		LIMIT ? OFFSET ?`,
+		groupID, PageSize, offset,
 	)
 	if err != nil {
 		return nil, err
