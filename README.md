@@ -78,7 +78,7 @@ social-network/
     │   └── (main)/home, profile/[id], people, groups, groups/[id],
     │              chat, chat/[id], notifications, settings
     ├── components/           ← PostCard, PostForm, Navbar, Modal, EventCard, …
-    └── lib/                  ← api.js (fetch helpers), validate, unread, people
+    └── lib/                  ← api.js (fetch helpers), validate, unread, usePaged (lists 10 by 10)
 ```
 
 Files created at runtime (ignored by git):
@@ -261,9 +261,9 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 | Area | Routes |
 |---|---|
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
-| Users | `GET /users`, `GET /user/{id}`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
+| Users | `GET /users`, `GET /user/{id}`, `GET /users/{id}/posts`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
 | Follows | `GET/POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
-| Notifications | `GET /notifications`, `POST /notifications/read` |
+| Notifications | `GET /notifications`, `GET /notifications/unread`, `POST /notifications/read` |
 | Posts | `GET/POST /posts`, `GET/PUT/DELETE /posts/{id}` |
 | Comments | `GET/POST /posts/{id}/comments` |
 | Reactions | `POST/DELETE /posts/{id}/reactions` |
@@ -275,6 +275,8 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 | Events | `GET/POST /groups/{id}/events`, `GET/POST /events/{id}/response` |
 | Messages | `GET /messages/{id}`, `GET /groups/{id}/messages`, `POST /messages` |
 | Realtime | `GET /ws` |
+
+Long lists come 10 at a time: the feed, profile posts, group posts, users (with `?q=` search), followers, following and notifications. Ask for the next page with `?offset=10`, `?offset=20`… A page with fewer than 10 items is the last one.
 
 Errors come back as a plain-text body with the matching status code: `400` for invalid input, `401` when you are not logged in, `403` when you are not allowed, `404` when something is not found or you can't see it, `409` for duplicates, and `429` when you hit the rate limit.
 
