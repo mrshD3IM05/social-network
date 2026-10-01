@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import { apiGet, apiPost, apiUpload } from '@/lib/api'
+import usePaged from '@/lib/usePaged'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
 import CharCount from './CharCount'
 import Icon from './Icon'
+import LoadMore from './LoadMore'
 
 // Form to write a new post. onPosted() is called after it is saved.
 // Inside a group, `groupId` is set: the post goes to the group (members only)
@@ -13,7 +15,8 @@ export default function PostForm({ onPosted, groupId }) {
   const [content, setContent] = useState('')
   const [privacy, setPrivacy] = useState('public')
   const [files, setFiles] = useState([])
-  const [followers, setFollowers] = useState(null) // loaded when "Chosen followers" is picked
+  const [myId, setMyId] = useState(null) // known once "Chosen followers" is picked
+  const followers = usePaged(myId ? `/users/${myId}/followers` : null) // 10 at a time
   const [viewers, setViewers] = useState([]) // ids of the followers who can see a private post
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,10 +36,10 @@ export default function PostForm({ onPosted, groupId }) {
 
   async function changePrivacy(e) {
     setPrivacy(e.target.value)
-    if (e.target.value === 'private' && followers === null) {
+    if (e.target.value === 'private' && !myId) {
       try {
         const me = await apiGet('/me')
-        setFollowers(await apiGet(`/users/${me.id}/followers`))
+        setMyId(me.id)
       } catch (err) {
         setError(err.message)
       }
@@ -136,16 +139,17 @@ export default function PostForm({ onPosted, groupId }) {
         </button>
       </div>
 
-      {!groupId && privacy === 'private' && followers !== null && (
+      {!groupId && privacy === 'private' && followers.items !== null && (
         <div className="viewer-picker">
           <p className="hint">Who can see this post?</p>
-          {followers.length === 0 && <p className="hint">You have no followers yet.</p>}
-          {followers.map(person => (
+          {followers.items.length === 0 && <p className="hint">You have no followers yet.</p>}
+          {followers.items.map(person => (
             <label key={person.id} className={viewers.includes(person.id) ? 'viewer-chip active' : 'viewer-chip'}>
               <input type="checkbox" checked={viewers.includes(person.id)} onChange={() => toggleViewer(person.id)} />
               {person.first_name} {person.last_name}
             </label>
           ))}
+          <LoadMore list={followers} />
         </div>
       )}
 

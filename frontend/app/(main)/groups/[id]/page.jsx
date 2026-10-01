@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl, socketUrl } from '@/lib/api'
-import { fetchPeople, searchPeople } from '@/lib/people'
+import usePaged from '@/lib/usePaged'
 import { useDebouncedValue, useThrottle } from '@/lib/timing'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import CharCount from '@/components/CharCount'
+import LoadMore from '@/components/LoadMore'
 import PersonRow from '@/components/PersonRow'
 import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
@@ -27,7 +28,6 @@ export default function GroupDetailPage() {
   const router = useRouter()
   const [me, setMe] = useState(null)
   const [group, setGroup] = useState(null)
-  const [posts, setPosts] = useState(null)
   const [events, setEvents] = useState(null)
   const [requests, setRequests] = useState([])
   const [tab, setTab] = useState('posts')
@@ -51,12 +51,8 @@ export default function GroupDetailPage() {
     }
   }, [id])
 
-  // The three member-only lists. Each one is read through its own helper, so
-  // the first paint and every refresh take the same path.
-  const loadPosts = useCallback(
-    () => apiGet(`/groups/${id}/posts`).then(setPosts).catch(() => setPosts([])),
-    [id],
-  )
+  // The member-only lists. Posts come 10 at a time, and only for members.
+  const posts = usePaged(isMember ? `/groups/${id}/posts` : null)
   const loadEvents = useCallback(
     () => apiGet(`/groups/${id}/events`).then(setEvents).catch(() => setEvents([])),
     [id],
@@ -72,13 +68,11 @@ export default function GroupDetailPage() {
 
   useEffect(() => {
     if (!isMember) {
-      setPosts(null)
       setEvents(null)
       return
     }
-    loadPosts()
     loadEvents()
-  }, [isMember, loadPosts, loadEvents])
+  }, [isMember, loadEvents])
 
   useEffect(() => {
     if (group?.is_creator) loadRequests()
@@ -101,10 +95,7 @@ export default function GroupDetailPage() {
   // Deleting a post only touches that one card: drop it from state instead
   // of refetching, so the page keeps its scroll position and the tab count
   // stays correct without a reload.
-  const postDeleted = useCallback(
-    postId => setPosts(list => (list ? list.filter(p => p.id !== postId) : list)),
-    [],
-  )
+  const postDeleted = postId => posts.setItems(list => (list ? list.filter(p => p.id !== postId) : list))
 
   function respondJoinRequest(request, accept) {
     setRequests(list => list.filter(r => r.id !== request.id))
@@ -152,7 +143,7 @@ export default function GroupDetailPage() {
   if (!group || !me) return <p className="loading">{error || 'Loading…'}</p>
 
   const tabs = [
-    { key: 'posts', label: 'Posts', count: posts?.length },
+    { key: 'posts', label: 'Posts' },
     { key: 'events', label: 'Events', count: events?.length },
     { key: 'chat', label: 'Chat' },
     { key: 'members', label: 'Members', count: group.member_count },
@@ -236,12 +227,12 @@ export default function GroupDetailPage() {
           {/* ------------------------------------------------- posts */}
           {tab === 'posts' && (
             <>
-              <PostForm groupId={id} onPosted={loadPosts} />
-              {posts === null && <p className="loading">Loading posts…</p>}
-              {posts?.length === 0 && (
+              <PostForm groupId={id} onPosted={posts.reload} />
+              {posts.items === null && <p className="loading">Loading posts…</p>}
+              {posts.items?.length === 0 && (
                 <Empty title="No posts yet">Write the first one with the box above.</Empty>
               )}
-              {posts?.map(post => (
+              {posts.items?.map(post => (
                 <PostCard
                   key={post.id}
                   post={post}
@@ -250,6 +241,7 @@ export default function GroupDetailPage() {
                   onDeleted={postDeleted}
                 />
               ))}
+              <LoadMore list={posts} />
             </>
           )}
 
@@ -662,20 +654,17 @@ function Empty({ title, children }) {
   )
 }
 
-// Pick someone from the people directory (GET /users) and invite them.
-// Members are filtered out; the API answers 409 for anyone already invited.
+// Pick someone from the people directory (GET /users, searched by the server,
+// 10 at a time) and invite them. Members are filtered out; the API answers 409
+// for anyone already invited.
 function InviteModal({ groupId, memberIds, onClose, onInvited }) {
-  const [people, setPeople] = useState(null)
   const [search, setSearch] = useState('')
   const [invited, setInvited] = useState({}) // person id → true once the API confirms
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetchPeople()
-      .then(setPeople)
-      .catch(err => setError(err.message))
-  }, [])
+  const query = useDebouncedValue(search, 250).trim() // search once typing pauses
+  const people = usePaged(`/users?q=${encodeURIComponent(query)}`)
 
   async function invite(person) {
     setError('')
@@ -690,10 +679,7 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
     setBusyId(null)
   }
 
-  const candidates = (people || []).filter(person => !memberIds.has(person.id))
-  // filter once typing pauses, not on every keystroke
-  const query = useDebouncedValue(search, 250)
-  const shown = searchPeople(candidates, query)
+  const shown = (people.items || []).filter(person => !memberIds.has(person.id))
 
   return (
     <Modal title="Invite people" onClose={onClose}>
@@ -708,15 +694,13 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
         />
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {(error || people.error) && <p className="error">{error || people.error.message}</p>}
 
-      {people === null && !error && <p className="loading">Loading…</p>}
+      {people.items === null && !people.error && <p className="loading">Loading…</p>}
 
-      {people !== null && shown.length === 0 && (
+      {people.items !== null && shown.length === 0 && !people.hasMore && (
         <Empty title="No one to invite">
-          {candidates.length === 0
-            ? 'Everyone on the network is already a member.'
-            : 'No one matches that search.'}
+          {query ? 'No one matches that search.' : 'Everyone on the network is already a member.'}
         </Empty>
       )}
 
@@ -733,6 +717,7 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
           </PersonRow>
         ))}
       </div>
+      <LoadMore list={people} />
 
       <div className="composer-bar">
         <CharCount value={search} max={LIMITS.search} />

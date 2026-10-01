@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { apiGet, apiPost, socketUrl } from '@/lib/api'
+import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
-import Icon from '@/components/Icon'
+import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
 
@@ -12,7 +13,8 @@ import PersonRow from '@/components/PersonRow'
 const REQUEST_TYPES = ['follow_request', 'group_invitation', 'group_join_request']
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(null)
+  const notifications = usePaged('/notifications') // 10 at a time
+  const markedRead = useRef(false)
   const [followRequests, setFollowRequests] = useState([])
   const [invitations, setInvitations] = useState([])
   const [joinRequests, setJoinRequests] = useState([])
@@ -24,15 +26,16 @@ export default function NotificationsPage() {
     apiGet('/group-join-requests').then(setJoinRequests).catch(() => {})
   }
 
+  // once the first page is shown with its "read" flags (so the new ones are
+  // highlighted), mark everything as seen
   useEffect(() => {
-    // keep the "read" flags we got, so the new ones can be highlighted,
-    // then mark everything as seen
-    apiGet('/notifications')
-      .then(list => {
-        setNotifications(list)
-        apiPost('/notifications/read').catch(() => {})
-      })
-      .catch(err => setError(err.message))
+    if (notifications.items && !markedRead.current) {
+      markedRead.current = true
+      apiPost('/notifications/read').catch(() => {})
+    }
+  }, [notifications.items])
+
+  useEffect(() => {
     loadRequests()
 
     // new ones arrive in real time while the page is open
@@ -40,7 +43,7 @@ export default function NotificationsPage() {
     socket.onmessage = event => {
       const data = JSON.parse(event.data)
       if (data.type !== 'notification') return
-      setNotifications(list => [data.notification, ...(list || [])])
+      notifications.setItems(list => [data.notification, ...(list || [])])
       apiPost('/notifications/read').catch(() => {})
       if (REQUEST_TYPES.includes(data.notification.type)) loadRequests()
     }
@@ -88,10 +91,10 @@ export default function NotificationsPage() {
 
           {invitations.map(inv => (
             <div key={`i${inv.id}`} className="list-item">
-              <span className="list-icon"><Icon name="users" size={16} /></span>
+              <Avatar user={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }} size={40} />
               <span className="list-text">
                 <strong>You are invited to join “{inv.group_title}”</strong>
-                <small>Group invitation</small>
+                <small>{inv.from_first_name} {inv.from_last_name} invited you</small>
               </span>
               {actions('/group-invitations', inv.id, setInvitations)}
             </div>
@@ -110,18 +113,19 @@ export default function NotificationsPage() {
         </section>
       )}
 
-      {notifications === null && !error && <p className="loading">Loading…</p>}
+      {notifications.error && <p className="error">{notifications.error.message}</p>}
+      {notifications.items === null && !notifications.error && <p className="loading">Loading…</p>}
 
-      {notifications?.length === 0 && requestCount === 0 && (
+      {notifications.items?.length === 0 && requestCount === 0 && (
         <div className="empty">
           <p className="empty-title">You are all caught up</p>
           <p>Follow requests, invitations and group events will show up here.</p>
         </div>
       )}
 
-      {notifications?.length > 0 && (
+      {notifications.items?.length > 0 && (
         <div className="card list">
-          {notifications.map(n => {
+          {notifications.items.map(n => {
             const actor = { first_name: n.actor_first_name, last_name: n.actor_last_name, avatar: n.actor_avatar }
             return (
               <Link
@@ -140,6 +144,7 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
+      <LoadMore list={notifications} />
     </>
   )
 }

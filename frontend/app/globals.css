@@ -735,3 +735,7 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
 
 /* a group message with a picture is tall, so the avatar sits at the top */
 .chat-line:has(.bubble-images) { align-items: flex-start; }
+
+/* "Load more" under a list that comes 10 by 10 */
+.load-more { display: flex; margin: 16px auto 0; }
+.viewer-picker .load-more { margin: 0; }

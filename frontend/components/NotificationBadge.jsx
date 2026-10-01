@@ -13,11 +13,9 @@ export default function NotificationBadge() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    apiGet('/notifications')
-      .then(list => {
-        if (window.location.pathname !== '/notifications') {
-          setCount(list.filter(n => !n.read).length)
-        }
+    apiGet('/notifications/unread')
+      .then(result => {
+        if (window.location.pathname !== '/notifications') setCount(result.count)
       })
       .catch(() => {})
 

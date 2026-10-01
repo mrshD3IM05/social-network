@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
+import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
+import LoadMore from '@/components/LoadMore'
 import PersonRow from '@/components/PersonRow'
 import PostCard from '@/components/PostCard'
 
@@ -13,11 +15,12 @@ export default function ProfilePage() {
   const { id } = useParams() // the [id] from the URL, e.g. /profile/3
   const [me, setMe] = useState(null)
   const [user, setUser] = useState(null)
-  const [posts, setPosts] = useState([])
   const [isPrivate, setIsPrivate] = useState(false)
   const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
-  const [followers, setFollowers] = useState([])
-  const [following, setFollowing] = useState([])
+  // the three lists come 10 at a time; a private profile answers 403 to them
+  const posts = usePaged(`/users/${id}/posts`)
+  const followers = usePaged(`/users/${id}/followers`)
+  const following = usePaged(`/users/${id}/following`)
   const [tab, setTab] = useState('posts') // 'posts' | 'followers' | 'following'
   const [message, setMessage] = useState('')
   const [savingPrivacy, setSavingPrivacy] = useState(false)
@@ -28,15 +31,9 @@ export default function ProfilePage() {
       .then(result => setFollowStatus(result.status))
       .catch(() => {})
     try {
+      // the profile with its counts (posts, followers, following)
       setUser(await apiGet(`/user/${id}`))
       setIsPrivate(false)
-      // no "posts of one user" endpoint yet, so we filter the feed
-      const feed = await apiGet('/posts')
-      setPosts(feed.filter(post => post.author_id === Number(id)))
-      // who follows them and who they follow — the API gates both exactly like
-      // the profile, so a private profile answers 403 and we never get here
-      setFollowers(await apiGet(`/users/${id}/followers`))
-      setFollowing(await apiGet(`/users/${id}/following`))
     } catch (err) {
       if (err.status === 403) setIsPrivate(true) // private profile you don't follow
       else setMessage(err.message)
@@ -47,12 +44,20 @@ export default function ProfilePage() {
     load()
   }, [id])
 
+  // after a follow, unfollow or privacy change: the profile and its lists
+  function refresh() {
+    load()
+    posts.reload()
+    followers.reload()
+    following.reload()
+  }
+
   async function follow() {
     try {
       const result = await apiPost(`/users/${id}/follow`)
       setFollowStatus(result.status)
       setMessage(result.status === 'pending' ? 'Follow request sent.' : 'You are now following.')
-      load() // a new follower may now see more posts
+      refresh() // a new follower may now see more posts
     } catch (err) {
       setMessage(err.message)
     }
@@ -64,7 +69,7 @@ export default function ProfilePage() {
       await apiDelete(`/users/${id}/follow`)
       setMessage(followStatus === 'pending' ? 'Follow request cancelled.' : 'Unfollowed.')
       setFollowStatus('')
-      load()
+      refresh()
     } catch (err) {
       setMessage(err.message)
     }
@@ -76,13 +81,13 @@ export default function ProfilePage() {
     setSavingPrivacy(true)
     try {
       const updated = await apiPut('/me/privacy', { private: !user.private })
-      setUser(updated)
+      setUser(old => ({ ...old, ...updated })) // keeps the counts
       setMe(updated)
       setMessage(updated.private
         ? 'Your profile is private — only your followers can see it.'
         : 'Your profile is public — everyone can see it.')
       // going public accepts the waiting follow requests, so reload the lists
-      if (!updated.private) load()
+      if (!updated.private) refresh()
     } catch (err) {
       setMessage(err.message)
     }
@@ -149,9 +154,9 @@ export default function ProfilePage() {
           {user.about_me && <p className="profile-about">{user.about_me}</p>}
 
           <div className="profile-stats">
-            <span><strong>{posts.length}</strong> posts</span>
-            <span><strong>{followers.length}</strong> followers</span>
-            <span><strong>{following.length}</strong> following</span>
+            <span><strong>{user.post_count}</strong> posts</span>
+            <span><strong>{user.follower_count}</strong> followers</span>
+            <span><strong>{user.following_count}</strong> following</span>
             <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
             <span>{user.email}</span>
             {user.date_of_birth && <span>Born {new Date(user.date_of_birth + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
@@ -163,9 +168,9 @@ export default function ProfilePage() {
 
       <div className="profile-tabs">
         {[
-          ['posts', 'Posts', posts.length],
-          ['followers', 'Followers', followers.length],
-          ['following', 'Following', following.length],
+          ['posts', 'Posts', user.post_count],
+          ['followers', 'Followers', user.follower_count],
+          ['following', 'Following', user.following_count],
         ].map(([key, label, count]) => (
           <button
             key={key}
@@ -178,21 +183,24 @@ export default function ProfilePage() {
       </div>
 
       {tab === 'posts' && (
-        posts.length === 0 ? (
+        posts.items?.length === 0 ? (
           <div className="empty">
             <p className="empty-title">No posts to show</p>
             <p>Posts you are allowed to see will appear here.</p>
           </div>
         ) : (
-          posts.map(post => (
-            <PostCard key={post.id} post={post} myId={me.id} onDeleted={load} />
-          ))
+          <>
+            {posts.items?.map(post => (
+              <PostCard key={post.id} post={post} myId={me.id} onDeleted={refresh} />
+            ))}
+            <LoadMore list={posts} />
+          </>
         )
       )}
 
       {tab !== 'posts' && (() => {
         const people = tab === 'followers' ? followers : following
-        if (people.length === 0) {
+        if (people.items?.length === 0) {
           return (
             <div className="empty">
               <p className="empty-title">
@@ -207,13 +215,16 @@ export default function ProfilePage() {
           )
         }
         return (
-          <div className="card list">
-            {people.map(person => (
-              <PersonRow key={person.id} person={person} href={`/profile/${person.id}`}>
-                <Icon name="arrow" size={16} />
-              </PersonRow>
-            ))}
-          </div>
+          <>
+            <div className="card list">
+              {people.items?.map(person => (
+                <PersonRow key={person.id} person={person} href={`/profile/${person.id}`}>
+                  <Icon name="arrow" size={16} />
+                </PersonRow>
+              ))}
+            </div>
+            <LoadMore list={people} />
+          </>
         )
       })()}
     </>
