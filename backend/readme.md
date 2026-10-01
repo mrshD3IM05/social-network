@@ -20,7 +20,8 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 ### users & follows
 | method | path | request | response |
 |---|---|---|---|
-| GET | /users | - | everyone except you, public shape, ordered by name |
+| GET | /users | query: search = nickname text | up to 20 users whose nickname contains the text, public shape, ordered by name; empty search returns [] |
+| GET | /contacts | - | users you can message: at least one of you follows the other (accepted), public shape, ordered by name |
 | GET | /user/{id} | - | profile with every register field except the password, 403 if the profile is private and you don't follow them |
 | GET | /users/{id}/followers | - | users following them, same privacy gate as the profile |
 | GET | /users/{id}/following | - | users they follow, same privacy gate as the profile |
@@ -60,7 +61,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
 | GET | /groups/{id}/messages | - | last 100 group chat messages, members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
-| GET | /group-invitations | - | your pending invitations |
+| GET | /group-invitations | - | your pending invitations, each with the inviter's name (from_first_name, from_last_name, from_nickname, from_avatar) |
 | POST | /group-invitations/{id}/accept | - | 204, recipient only, joins atomically |
 | POST | /group-invitations/{id}/decline | - | 204, recipient only |
 | POST | /groups/{id}/join-requests | - | 201 + request json, non-members only; members/duplicates rejected |

@@ -38,7 +38,7 @@ The full API reference and the sequence diagrams live in [backend/readme.md](bac
 | **Comments and reactions** | Comment on any post you can see. React with like or dislike: the same reaction again removes it, the other one switches it. |
 | **Groups** | Create a group with a title, description and avatar. Invite members, or ask to join and let the creator accept. Group posts, comments, events and a group chat are visible to members only. The creator can edit or delete the group and remove members. |
 | **Events** | Members create events (title, description, date/time) and answer `going` / `not_going`. They can change their answer later. |
-| **Chat** | Real-time private messages between users when at least one of them follows the other. Group chat for members. Image attachments and a "typing…" indicator. |
+| **Chat** | Real-time private messages between users when at least one of them follows the other (the Messages list shows only those people). Group chat for members. Image attachments and a "typing…" indicator. |
 | **Notifications** | Stored and pushed live: `comment_post`, `group_invitation`, `group_invite_response`, `group_join_request`, `group_join_response`, `group_removed`, `event_created`. |
 
 ---
@@ -261,7 +261,8 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 | Area | Routes |
 |---|---|
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
-| Users | `GET /users`, `GET /user/{id}`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
+| Users | `GET /users?search=` (nickname, up to 20), `GET /user/{id}`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
+| Contacts | `GET /contacts` (the users you can message: at least one of you follows the other) |
 | Follows | `GET/POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
 | Notifications | `GET /notifications`, `POST /notifications/read` |
 | Posts | `GET/POST /posts`, `GET/PUT/DELETE /posts/{id}` |
@@ -320,7 +321,7 @@ The frontend is a Next.js App Router app written in plain JavaScript and CSS ([f
 | `/login`, `/register` | auth pages (`(auth)` layout) |
 | `/home` | feed + post composer |
 | `/profile/[id]` | profile, posts, followers/following, follow button |
-| `/people` | every user, to find people to follow |
+| `/people` | search people by nickname to follow |
 | `/groups`, `/groups/[id]` | group list; group page with posts, events, members, chat |
 | `/chat`, `/chat/[id]` | conversation list; a private chat |
 | `/notifications` | live notifications with accept/decline actions |

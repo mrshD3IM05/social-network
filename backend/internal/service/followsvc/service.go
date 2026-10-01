@@ -148,3 +148,10 @@ func (s *Service) Followers(userID int64) ([]*model.User, error) {
 func (s *Service) Following(userID int64) ([]*model.User, error) {
 	return s.repo.ListFollowing(userID)
 }
+
+// Messageable are the users userID can start a private chat with: at least one
+// of the two follows the other, accepted. It is the Messages list, and the same
+// rule CanMessage checks before a message goes through.
+func (s *Service) Messageable(userID int64) ([]*model.User, error) {
+	return s.repo.ListMessageableUsers(userID)
+}

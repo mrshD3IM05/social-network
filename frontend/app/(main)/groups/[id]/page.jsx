@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl, socketUrl } from '@/lib/api'
-import { fetchPeople, searchPeople } from '@/lib/people'
+import { fetchPeople } from '@/lib/people'
 import { useDebouncedValue, useThrottle } from '@/lib/timing'
 import Modal from '@/components/Modal'
 import Avatar from '@/components/Avatar'
@@ -15,8 +14,9 @@ import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
-import { IMAGE_ACCEPT, LIMITS, checkImageFile, checkImageFiles, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFile, checkImageFiles, checkText, parseId } from '@/lib/validate'
 import EmojiPicker from '@/components/EmojiPicker'
+import NotFound from '@/components/NotFound'
 
 // One group: an identity header (who, what, how many, the actions) and one
 // tab per thing the group holds — posts, events, chat, members, and the
@@ -24,6 +24,8 @@ import EmojiPicker from '@/components/EmojiPicker'
 // posts, events, chat and members to members.
 export default function GroupDetailPage() {
   const { id } = useParams()
+  // 0 when the url is not a real id, like /groups/abc or /groups/0
+  const groupId = parseId(id)
   const router = useRouter()
   const [me, setMe] = useState(null)
   const [group, setGroup] = useState(null)
@@ -41,15 +43,19 @@ export default function GroupDetailPage() {
   const isMember = group?.is_member || group?.is_creator
 
   const load = useCallback(async () => {
+    // there is no such group, so nothing is requested
+    if (!groupId) return
     try {
-      const [detail, current] = await Promise.all([apiGet(`/groups/${id}`), apiGet('/me')])
+      const [detail, current] = await Promise.all([apiGet(`/groups/${groupId}`), apiGet('/me')])
       setGroup(detail)
       setMe(current)
     } catch (err) {
-      if (err.status === 404) setNotFound(true)
+      // 400 = the id is not one the API accepts, 404 = no such group or none
+      // you have a relation to
+      if (err.status === 400 || err.status === 404) setNotFound(true)
       else setError(err.message)
     }
-  }, [id])
+  }, [groupId])
 
   // The three member-only lists. Each one is read through its own helper, so
   // the first paint and every refresh take the same path.
@@ -139,13 +145,14 @@ export default function GroupDetailPage() {
     )
   }
 
-  if (notFound) {
+  if (!groupId || notFound) {
     return (
-      <div className="empty">
-        <p className="empty-title">Group not found</p>
-        <p>It does not exist, or you have no relation to it.</p>
-        <Link href="/groups" className="btn">Back to groups</Link>
-      </div>
+      <NotFound
+        title="Group not found"
+        text="It does not exist, or you have no relation to it."
+        back="/groups"
+        label="Back to groups"
+      />
     )
   }
 
@@ -662,8 +669,8 @@ function Empty({ title, children }) {
   )
 }
 
-// Pick someone from the people directory (GET /users) and invite them.
-// Members are filtered out; the API answers 409 for anyone already invited.
+// Pick someone by nickname from the people directory (GET /users) and invite
+// them. Members are filtered out; the API answers 409 for anyone already invited.
 function InviteModal({ groupId, memberIds, onClose, onInvited }) {
   const [people, setPeople] = useState(null)
   const [search, setSearch] = useState('')
@@ -671,11 +678,25 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
 
+  // search once typing pauses, not on every keystroke
+  const query = useDebouncedValue(search, 250).trim()
+
   useEffect(() => {
-    fetchPeople()
-      .then(setPeople)
-      .catch(err => setError(err.message))
-  }, [])
+    // nothing is looked up until there is a nickname to search for
+    if (!query) {
+      setPeople(null)
+      setError('')
+      return
+    }
+
+    let active = true
+    setPeople(null)
+    setError('')
+    fetchPeople(query)
+      .then(list => { if (active) setPeople(list) })
+      .catch(err => { if (active) setError(err.message) })
+    return () => { active = false }
+  }, [query])
 
   async function invite(person) {
     setError('')
@@ -690,17 +711,15 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
     setBusyId(null)
   }
 
+  // members are left out; the API answers 409 for anyone already invited
   const candidates = (people || []).filter(person => !memberIds.has(person.id))
-  // filter once typing pauses, not on every keystroke
-  const query = useDebouncedValue(search, 250)
-  const shown = searchPeople(candidates, query)
 
   return (
     <Modal title="Invite people" onClose={onClose}>
       <div className="search">
         <Icon name="search" />
         <input
-          placeholder="Search by name or nickname"
+          placeholder="Search by nickname"
           value={search}
           maxLength={LIMITS.search}
           onChange={e => setSearch(e.target.value)}
@@ -710,18 +729,24 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
 
       {error && <p className="error">{error}</p>}
 
-      {people === null && !error && <p className="loading">Loading…</p>}
+      {!query && !error && (
+        <Empty title="Find someone to invite">
+          Type a nickname to search the people directory.
+        </Empty>
+      )}
 
-      {people !== null && shown.length === 0 && (
+      {query && people === null && !error && <p className="loading">Loading…</p>}
+
+      {query && people !== null && candidates.length === 0 && (
         <Empty title="No one to invite">
-          {candidates.length === 0
-            ? 'Everyone on the network is already a member.'
-            : 'No one matches that search.'}
+          {people.length === 0
+            ? 'No one matches that nickname.'
+            : 'Everyone who matches is already a member.'}
         </Empty>
       )}
 
       <div className="invite-list">
-        {shown.map(person => (
+        {candidates.map(person => (
           <PersonRow key={person.id} person={person} size={40}>
             {invited[person.id] ? (
               <span className="chip">Invited</span>

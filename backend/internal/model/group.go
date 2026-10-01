@@ -57,6 +57,13 @@ type GroupInvitation struct {
 	ToUserID   int64     `json:"to_user_id"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
+
+	// The inviter's public profile, joined in by the repository so the frontend
+	// can name them without loading the whole people directory.
+	FromFirstName string `json:"from_first_name"`
+	FromLastName  string `json:"from_last_name"`
+	FromNickname  string `json:"from_nickname"`
+	FromAvatar    string `json:"from_avatar"`
 }
 
 type GroupJoinRequest struct {

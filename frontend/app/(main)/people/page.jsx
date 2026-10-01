@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fetchPeople, searchPeople } from '@/lib/people'
+import { fetchPeople } from '@/lib/people'
 import { LIMITS } from '@/lib/validate'
 import { useDebouncedValue } from '@/lib/timing'
 import Icon from '@/components/Icon'
@@ -13,24 +13,34 @@ export default function PeoplePage() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    fetchPeople()
-      .then(setPeople)
-      .catch(err => setError(err.message))
-  }, [])
+  // search once typing pauses, not on every keystroke
+  const query = useDebouncedValue(search, 250).trim()
 
-  // filter once typing pauses, not on every keystroke
-  const query = useDebouncedValue(search, 250)
-  const shown = searchPeople(people || [], query)
+  useEffect(() => {
+    // nothing is looked up until there is a nickname to search for
+    if (!query) {
+      setPeople(null)
+      setError('')
+      return
+    }
+
+    let active = true
+    setPeople(null)
+    setError('')
+    fetchPeople(query)
+      .then(list => { if (active) setPeople(list) })
+      .catch(err => { if (active) setError(err.message) })
+    return () => { active = false }
+  }, [query])
 
   return (
     <>
-      <PageHeader label="Directory" title="People" subtitle="Everyone on the network." />
+      <PageHeader label="Directory" title="People" subtitle="Search for someone by their nickname." />
 
       <div className="search">
         <Icon name="search" />
         <input
-          placeholder="Search by name or nickname"
+          placeholder="Search by nickname"
           value={search}
           maxLength={LIMITS.search}
           onChange={e => setSearch(e.target.value)}
@@ -39,22 +49,31 @@ export default function PeoplePage() {
 
       {error && <p className="error">{error}</p>}
 
-      {people === null && !error && <p className="loading">Loading…</p>}
-
-      {people !== null && shown.length === 0 && (
+      {!query && !error && (
         <div className="empty">
-          <p className="empty-title">No one found</p>
-          <p>{people.length === 0 ? 'You are the only member so far.' : 'No one matches that search.'}</p>
+          <p className="empty-title">Find people</p>
+          <p>Type a nickname to search the directory.</p>
         </div>
       )}
 
-      <div className="card list">
-        {shown.map(person => (
-          <PersonRow key={person.id} person={person} href={`/profile/${person.id}`}>
-            <Icon name="arrow" size={16} />
-          </PersonRow>
-        ))}
-      </div>
+      {query && people === null && !error && <p className="loading">Loading…</p>}
+
+      {query && people !== null && people.length === 0 && (
+        <div className="empty">
+          <p className="empty-title">No one found</p>
+          <p>No one matches that nickname.</p>
+        </div>
+      )}
+
+      {people !== null && people.length > 0 && (
+        <div className="card list">
+          {people.map(person => (
+            <PersonRow key={person.id} person={person} href={`/profile/${person.id}`}>
+              <Icon name="arrow" size={16} />
+            </PersonRow>
+          ))}
+        </div>
+      )}
     </>
   )
 }

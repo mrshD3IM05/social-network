@@ -4,18 +4,20 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
-import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
+import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText, parseId } from '@/lib/validate'
 import { markRead } from '@/lib/unread'
 import { useThrottle } from '@/lib/timing'
 import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import EmojiPicker from '@/components/EmojiPicker'
+import NotFound from '@/components/NotFound'
 
 // A private conversation with one user, in real time over a WebSocket.
 export default function ConversationPage() {
   const { id } = useParams()
-  const otherId = Number(id)
+  // 0 when the url is not a real id, like /chat/abc or /chat/0
+  const otherId = parseId(id)
   const [me, setMe] = useState(null)
   const [other, setOther] = useState(null)
   const [messages, setMessages] = useState([])
@@ -23,6 +25,7 @@ export default function ConversationPage() {
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null) // useRef keeps the socket between renders
@@ -30,14 +33,25 @@ export default function ConversationPage() {
   const fileRef = useRef(null)
 
   useEffect(() => {
+    // there is nobody to talk to, so no request and no socket
+    if (!otherId) return
+
     apiGet('/me').then(setMe)
-    apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
+    // 400 = the id is not one the API accepts, 404 = nobody under it,
+    // 403 = a real user whose profile is private. The first two mean the same
+    // thing here: there is no conversation to show.
+    apiGet(`/user/${otherId}`)
+      .then(setOther)
+      .catch(err => {
+        if (err.status === 400 || err.status === 404) setNotFound(true)
+        else setError(err.message)
+      })
 
     // opening the conversation means you read it, so its dot goes away
     markRead(otherId)
 
     // the conversation is saved, so it is read back on every visit
-    apiGet(`/messages/${id}`)
+    apiGet(`/messages/${otherId}`)
       .then(setMessages)
       .catch(err => {
         // the API refuses when neither of you follows the other
@@ -75,7 +89,7 @@ export default function ConversationPage() {
       clearTimeout(typingTimer)
       socket.close()
     }
-  }, [id, otherId])
+  }, [otherId])
 
   // scroll to the newest message
   useEffect(() => {
@@ -140,7 +154,37 @@ export default function ConversationPage() {
     setSending(false)
   }
 
+  if (!otherId || notFound) {
+    return (
+      <NotFound
+        title="Conversation not found"
+        text="Nobody is here under that id."
+        back="/chat"
+        label="Back to messages"
+      />
+    )
+  }
+
+  // a load that failed leaves `other` null, so this has to come before the
+  // loading line below or the page would say "Loading…" forever
+  if (!other && error) return <p className="loading">{error}</p>
+
   if (!me || !other) return <p className="loading">Loading…</p>
+
+  // Your own id in the url. The list never links here — it holds everyone but
+  // you — so this is only reachable by typing it. The API refuses it like any
+  // other conversation, but "you are not following yourself" would be nonsense,
+  // so it gets its own wording.
+  if (otherId === me.id) {
+    return (
+      <div className="card locked">
+        <span className="locked-icon"><Icon name="lock" size={22} /></span>
+        <h2>You cannot message yourself</h2>
+        <p className="subtitle">Pick someone else to start a conversation.</p>
+        <Link href="/chat" className="btn">Back to messages</Link>
+      </div>
+    )
+  }
 
   if (blocked) {
     return (
