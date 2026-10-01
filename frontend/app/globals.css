@@ -415,9 +415,14 @@ a.list-item:hover { background: var(--paper); color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: 16px 16px 16px 4px;
   background: var(--surface);
+  overflow-wrap: anywhere;
   animation: rise .25s var(--ease);
 }
 .bubble.mine { align-self: flex-end; border-color: var(--ink); border-radius: 16px 16px 4px 16px; background: var(--ink); color: var(--paper); }
+.message-expand { display: block; margin: 5px 0 0; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.message-expand:hover { text-decoration: underline; }
+.message-expand:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }
+.bubble.mine .message-expand { color: inherit; opacity: .82; }
 .message-time { display: block; margin-top: 4px; font-size: 11px; line-height: 1.2; color: var(--muted); }
 .bubble.mine .message-time { color: inherit; opacity: .68; }
 .chat-error { padding: 0 16px; }

@@ -12,6 +12,7 @@ import CharCount from '@/components/CharCount'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import EmojiPicker from '@/components/EmojiPicker'
+import MessageContent from '@/components/MessageContent'
 
 // A private conversation with one user, in real time over a WebSocket.
 export default function ConversationPage() {
@@ -231,7 +232,7 @@ export default function ConversationPage() {
         {messages?.length === 0 && <p className="chat-note">No messages yet. Say hello.</p>}
         {messages?.map(msg => (
           <div key={msg.id} className={msg.from_user_id === me.id ? 'bubble mine' : 'bubble'}>
-            {msg.content && <span>{msg.content}</span>}
+            {msg.content && <MessageContent content={msg.content} />}
             {msg.images?.length > 0 && (
               <span className="bubble-images">
                 {msg.images.map(fileId => <img key={fileId} src={imageUrl(fileId)} alt="" />)}

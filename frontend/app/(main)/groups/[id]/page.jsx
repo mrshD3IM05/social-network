@@ -19,6 +19,7 @@ import EventCard from '@/components/EventCard'
 import EventFormModal from '@/components/EventFormModal'
 import { IMAGE_ACCEPT, LIMITS, checkImageFile, checkImageFiles, checkText } from '@/lib/validate'
 import EmojiPicker from '@/components/EmojiPicker'
+import MessageContent from '@/components/MessageContent'
 
 // One group: an identity header (who, what, how many, the actions) and one
 // tab per thing the group holds — posts, events, chat, members, and the
@@ -541,7 +542,7 @@ function GroupChat({ groupId, me, members }) {
               <div>
                 {!mine && <small className="meta">{author ? author.first_name : 'Former member'}</small>}
                 <div className={mine ? 'bubble mine' : 'bubble'}>
-                  {msg.content && <span>{msg.content}</span>}
+                  {msg.content && <MessageContent content={msg.content} />}
                   {msg.images?.length > 0 && (
                     <span className="bubble-images">
                       {msg.images.map(fileId => <img key={fileId} src={imageUrl(fileId)} alt="" />)}
