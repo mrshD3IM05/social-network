@@ -16,6 +16,20 @@ func (r *Repository) CreateMessage(message *model.Message) error {
 	return r.QueryRow(`SELECT created_at FROM messages WHERE id = ?`, message.ID).Scan(&message.CreatedAt)
 }
 
+// GetMessage returns one chat message for publishing after its HTTP images are
+// attached to a message created through the WebSocket.
+func (r *Repository) GetMessage(id int64) (*model.Message, error) {
+	message := new(model.Message)
+	err := r.QueryRow(`
+		SELECT id, from_user_id, to_user_id, group_id, content, created_at
+		FROM messages WHERE id = ?`, id,
+	).Scan(&message.ID, &message.FromUserID, &message.ToUserID, &message.GroupID, &message.Content, &message.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
 func (r *Repository) CanMessage(fromUserID int64, toUserID, groupID *int64) (bool, error) {
 	if toUserID != nil {
 		var allowed int

@@ -366,6 +366,7 @@ function GroupChat({ groupId, me, members }) {
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const socketRef = useRef(null)
+  const pendingUploadsRef = useRef(new Map())
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
 
@@ -398,6 +399,15 @@ function GroupChat({ groupId, me, members }) {
       }
 
       if (data.type === 'error') setError(data.error)
+
+      if (data.type === 'message_created') {
+        const files = pendingUploadsRef.current.get(data.client_id)
+        if (!files) return
+        pendingUploadsRef.current.delete(data.client_id)
+        const body = new FormData()
+        for (const file of files) body.append('files', file)
+        apiUpload(`/messages/${data.message_id}/images`, body).catch(err => setError(err.message))
+      }
     }
     return () => {
       clearTimeout(typingTimer)
@@ -434,9 +444,8 @@ function GroupChat({ groupId, me, members }) {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  // Sent over the API and not the socket: the message row has to exist before
-  // an upload can point at it, and the group is told once both are done.
-  async function send(e) {
+  // Message records use the socket; selected image files use multipart HTTP.
+  function send(e) {
     e.preventDefault()
 
     // a message needs text, a picture, or both
@@ -452,16 +461,24 @@ function GroupChat({ groupId, me, members }) {
     sendTyping.cancel()
     setError('')
     setSending(true)
+    let clientId = ''
     try {
-      const body = new FormData()
-      body.append('group_id', groupId)
-      body.append('content', text.trim())
-      for (const file of files) body.append('files', file)
-
-      await apiUpload('/messages', body)
+      if (socketRef.current?.readyState !== WebSocket.OPEN) {
+        throw new Error('Chat connection is not ready. Please try again.')
+      }
+      clientId = `${Date.now()}-${Math.random()}`
+      if (files.length > 0) pendingUploadsRef.current.set(clientId, files)
+      socketRef.current.send(JSON.stringify({
+        type: 'message',
+        group_id: groupId,
+        content: text.trim(),
+        has_images: files.length > 0,
+        client_id: clientId,
+      }))
       setText('')
       clearFiles()
     } catch (err) {
+      if (clientId) pendingUploadsRef.current.delete(clientId)
       setError(err.message)
     }
     setSending(false)

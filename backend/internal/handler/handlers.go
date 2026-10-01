@@ -37,9 +37,9 @@ type Handlers struct {
 // methods. Each service is created a single time and shared.
 func New(repo *repository.Repository) *Handlers {
 	session := sessionsvc.New(repo)
-	webSocket := ws.NewHub(repo, session)
 	postService := postsvc.New(repo)
 	fileService := filesvc.New(repo, "uploads")
+	webSocket := ws.NewHub(repo, session)
 	return &Handlers{
 		Auth:      authhandler.New(authsvc.New(repo), session, webSocket),
 		User:      userhandler.New(usersvc.New(repo), session, followsvc.New(repo, webSocket), postService),

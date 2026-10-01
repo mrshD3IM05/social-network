@@ -89,6 +89,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// direct message routes (the sender must follow, or be followed by, the recipient)
 	mux.Handle("GET /messages/{id}", auth.Authorized(http.HandlerFunc(h.Message.History)))
 	mux.Handle("POST /messages", auth.Authorized(http.HandlerFunc(h.Message.Send)))
+	mux.Handle("POST /messages/{id}/images", auth.Authorized(http.HandlerFunc(h.Message.AttachImages)))
 
 	// websocket routes
 	mux.Handle("GET /ws", auth.Authorized(h.WebSocket))
