@@ -74,7 +74,7 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <PageHeader label="Activity" title="Notifications" subtitle="Requests to answer and what happened lately." />
+      <PageHeader title="Notifications" subtitle="Requests to answer and what happened lately." />
 
       {error && <p className="error">{error}</p>}
 

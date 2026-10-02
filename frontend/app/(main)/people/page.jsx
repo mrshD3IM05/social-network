@@ -17,7 +17,7 @@ export default function PeoplePage() {
 
   return (
     <>
-      <PageHeader label="Directory" title="People" subtitle="Everyone on the network." />
+      <PageHeader title="People" subtitle="Everyone on the network." />
 
       <div className="search">
         <Icon name="search" />

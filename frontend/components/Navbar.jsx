@@ -7,6 +7,7 @@ import Avatar from './Avatar'
 import Icon from './Icon'
 import MessageDot from './MessageDot'
 import NotificationBadge from './NotificationBadge'
+import ThemeToggle from './ThemeToggle'
 
 const links = [
   { href: '/home', label: 'Feed', icon: 'home' },
@@ -17,7 +18,9 @@ const links = [
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ]
 
-// The sidebar on the left (it becomes a top bar on phones, see globals.css)
+// The sidebar on the left. On phones the links become a tab bar at the
+// bottom, and the logo and your avatar move to a slim bar at the top
+// (see globals.css).
 export default function Navbar({ user }) {
   const pathname = usePathname() // the current URL, to highlight the active link
   const router = useRouter()
@@ -27,37 +30,59 @@ export default function Navbar({ user }) {
     router.push('/login')
   }
 
+  const logoutButton = (
+    <button className="icon-button" onClick={logout} title="Log out" aria-label="Log out">
+      <Icon name="logout" />
+    </button>
+  )
+
   return (
-    <aside className="sidebar">
-      <Link href="/home" className="brand">social-network<span>.</span></Link>
-
-      <nav className="menu">
-        {links.map(link => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={pathname.startsWith(link.href) ? 'menu-item active' : 'menu-item'}
-          >
-            <Icon name={link.icon} />
-            <span>{link.label}</span>
-            {link.href === '/chat' && <MessageDot myId={user.id} />}
-            {link.href === '/notifications' && <NotificationBadge />}
+    <>
+      <header className="topbar">
+        <Link href="/home" className="brand">social-network<span>.</span></Link>
+        <div className="topbar-user">
+          <Link href={`/profile/${user.id}`} aria-label="Your profile">
+            <Avatar user={user} size={32} />
           </Link>
-        ))}
-      </nav>
+          <ThemeToggle />
+          {logoutButton}
+        </div>
+      </header>
 
-      <div className="sidebar-user">
-        <Link href={`/profile/${user.id}`} className="user-chip">
-          <Avatar user={user} size={36} />
-          <span>
-            <strong>{user.first_name} {user.last_name}</strong>
-            <small>@{user.nickname}</small>
-          </span>
-        </Link>
-        <button className="icon-button" onClick={logout} title="Log out">
-          <Icon name="logout" />
-        </button>
-      </div>
-    </aside>
+      <aside className="rail">
+        <Link href="/home" className="brand">social-network<span>.</span></Link>
+
+        <nav className="menu">
+          {links.map(link => {
+            const active = pathname.startsWith(link.href)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={active ? 'menu-item active' : 'menu-item'}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon name={link.icon} size={20} />
+                <span className="menu-label">{link.label}</span>
+                {link.href === '/chat' && <MessageDot myId={user.id} />}
+                {link.href === '/notifications' && <NotificationBadge />}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="rail-user">
+          <Link href={`/profile/${user.id}`} className="user-chip">
+            <Avatar user={user} size={38} />
+            <span>
+              <strong>{user.first_name} {user.last_name}</strong>
+              <small>@{user.nickname}</small>
+            </span>
+          </Link>
+          <ThemeToggle />
+          {logoutButton}
+        </div>
+      </aside>
+    </>
   )
 }

@@ -21,7 +21,7 @@ export default function HomePage() {
 
   return (
     <>
-      <PageHeader label="Feed" title={`Good to see you, ${me.first_name}.`} subtitle="The latest from you and the people you follow." />
+      <PageHeader title={`Good to see you, ${me.first_name}.`} subtitle="The latest from you and the people you follow." />
 
       <PostForm onPosted={posts.reload} />
 

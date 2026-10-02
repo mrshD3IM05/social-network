@@ -155,8 +155,13 @@ export default function ProfilePage() {
 
           <div className="profile-stats">
             <span><strong>{user.post_count}</strong> posts</span>
-            <span><strong>{user.follower_count}</strong> followers</span>
-            <span><strong>{user.following_count}</strong> following</span>
+            {/* the counts open their list below */}
+            <button type="button" className="stat-link" onClick={() => setTab('followers')}>
+              <strong>{user.follower_count}</strong> followers
+            </button>
+            <button type="button" className="stat-link" onClick={() => setTab('following')}>
+              <strong>{user.following_count}</strong> following
+            </button>
             <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
             <span>{user.email}</span>
             {user.date_of_birth && <span>Born {new Date(user.date_of_birth + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
@@ -182,7 +187,11 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {tab === 'posts' && (
+      {tab === 'posts' && posts.error && (
+        <p className="error">Could not load the posts. {posts.error.message}</p>
+      )}
+
+      {tab === 'posts' && !posts.error && (
         posts.items?.length === 0 ? (
           <div className="empty">
             <p className="empty-title">No posts to show</p>
@@ -200,7 +209,11 @@ export default function ProfilePage() {
 
       {tab !== 'posts' && (() => {
         const people = tab === 'followers' ? followers : following
-        if (people.items?.length === 0) {
+        if (people.error) {
+          return <p className="error">Could not load this list. {people.error.message}</p>
+        }
+        if (people.items === null) return <p className="loading">Loading…</p>
+        if (people.items.length === 0) {
           return (
             <div className="empty">
               <p className="empty-title">

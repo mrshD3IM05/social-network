@@ -30,15 +30,12 @@ export default function AuthLayout({ children }) {
       </div>
 
       <aside className="auth-aside">
-        <p className="eyebrow">A quieter social network</p>
-        <p className="auth-quote">
-          Share what matters with the <em>people who matter.</em>
-        </p>
-        <ol className="auth-list">
-          <li><span>01</span> Private profiles and follower-only posts</li>
-          <li><span>02</span> Real-time private messages</li>
-          <li><span>03</span> Groups and events, coming soon</li>
-        </ol>
+        <p className="auth-quote">Share what matters with the people who matter.</p>
+        <ul className="auth-list">
+          <li>Only my followers can see this one 🔒</li>
+          <li>Saw it. Coming to the group event on Friday?</li>
+          <li>Wouldn't miss it.</li>
+        </ul>
       </aside>
     </div>
   )

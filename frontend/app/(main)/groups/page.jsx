@@ -62,7 +62,7 @@ export default function GroupsPage() {
 
   return (
     <>
-      <PageHeader label="Communities" title="Groups" subtitle="Find your people, or start a space of your own." />
+      <PageHeader title="Groups" subtitle="Find your people, or start a space of your own." />
 
       <div className="section-bar">
         <p className="eyebrow">

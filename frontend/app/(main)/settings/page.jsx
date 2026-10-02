@@ -53,7 +53,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader label="Account" title="Settings" subtitle="Your photo and account details." />
+      <PageHeader title="Settings" subtitle="Your photo and account details." />
 
       <section className="card settings-section">
         <div className="settings-label">

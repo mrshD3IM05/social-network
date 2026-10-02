@@ -20,6 +20,8 @@ const icons = {
   arrow: 'M5 12h14 M12 5l7 7-7 7',
   plus: 'M12 5v14 M5 12h14',
   x: 'M18 6 6 18 M6 6l12 12',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41',
+  moon: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z',
 }
 
 export default function Icon({ name, size = 18 }) {

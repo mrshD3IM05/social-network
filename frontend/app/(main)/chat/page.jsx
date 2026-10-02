@@ -25,7 +25,7 @@ export default function ChatListPage() {
 
   return (
     <>
-      <PageHeader label="Inbox" title="Messages" subtitle="Pick someone you follow, or who follows you." />
+      <PageHeader title="Messages" subtitle="Pick someone you follow, or who follows you." />
 
       {people === null && <p className="loading">Loading…</p>}
 
