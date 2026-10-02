@@ -9,7 +9,6 @@ import (
 	"sn-backend/internal/service/sessionsvc"
 	"sn-backend/internal/service/usersvc"
 	"strconv"
-	"strings"
 )
 
 type Handler struct {
@@ -77,53 +76,6 @@ func (h *Handler) UserPosts(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, posts)
 }
 
-// Contacts handles GET /contacts: the people the caller can start a private
-// conversation with, which is what the Messages list shows. The rule is the one
-// /messages and /ws apply before accepting a message (CanMessage): at least one
-// of the two follows the other, accepted. Anyone outside it would only get a 403
-// from /messages/{id}, so they are left out here.
-func (h *Handler) Contacts(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	users, err := h.Follow.Messageable(viewerID)
-	if err != nil {
-		http.Error(w, "could not list contacts", http.StatusInternalServerError)
-		return
-	}
-	writePeople(w, users)
-}
-
-// Followers handles GET /users/{id}/followers and Following GET
-// /users/{id}/following: the two lists a profile shows. They sit behind the same
-// privacy gate as the profile itself, so a private one stays hidden.
-func (h *Handler) Followers(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.visibleUser(w, r)
-	if !ok {
-		return
-	}
-	users, err := h.Follow.Followers(user.ID, common.LastID(r))
-	if err != nil {
-		http.Error(w, "could not list followers", http.StatusInternalServerError)
-		return
-	}
-	writePeople(w, users)
-}
-func (h *Handler) Following(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.visibleUser(w, r)
-	if !ok {
-		return
-	}
-	users, err := h.Follow.Following(user.ID, common.LastID(r))
-	if err != nil {
-		http.Error(w, "could not list following", http.StatusInternalServerError)
-		return
-	}
-	writePeople(w, users)
-}
-
 // SetPrivacy handles PUT /me/privacy: the switch on your own profile that turns
 // it public or private. It always acts on the caller, so one user can never
 // change another user's privacy.
@@ -157,91 +109,6 @@ func (h *Handler) SetPrivacy(w http.ResponseWriter, r *http.Request) {
 	}
 	common.WriteJSON(w, http.StatusOK, common.PrivateUser(user))
 }
-func (h *Handler) FollowUser(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	targetID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
-	}
-	follow, err := h.Follow.Follow(viewerID, targetID)
-	if err != nil {
-		if err == followsvc.ErrCannotFollowSelf || err == followsvc.ErrExists {
-			http.Error(w, err.Error(), http.StatusConflict)
-		} else {
-			http.Error(w, "could not follow user", http.StatusInternalServerError)
-		}
-		return
-	}
-	common.WriteJSON(w, http.StatusCreated, follow)
-}
-
-// FollowStatus handles GET /users/{id}/follow: {"status": "accepted" | "pending" | ""}
-// so the profile page knows which button to show.
-func (h *Handler) FollowStatus(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	targetID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
-	}
-	status, err := h.Follow.Status(viewerID, targetID)
-	if err != nil {
-		http.Error(w, "could not get follow status", http.StatusInternalServerError)
-		return
-	}
-	common.WriteJSON(w, http.StatusOK, map[string]string{"status": status})
-}
-func (h *Handler) UnfollowUser(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	targetID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return
-	}
-	if err := h.Follow.Unfollow(viewerID, targetID); err != nil {
-		http.Error(w, "could not unfollow user", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	requestID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid follow request id", http.StatusBadRequest)
-		return
-	}
-	status := model.FollowAccepted
-	if strings.HasSuffix(r.URL.Path, "/decline") {
-		status = model.FollowDeclined
-	}
-	if err := h.Follow.Respond(viewerID, requestID, status); err != nil {
-		if err == followsvc.ErrNotRecipient {
-			http.Error(w, "not the follow request recipient", http.StatusForbidden)
-		} else {
-			http.Error(w, "could not respond to follow request", http.StatusConflict)
-		}
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
 
 // Notifications handles GET /notifications: the caller's latest notifications.
 func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
@@ -256,56 +123,6 @@ func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.WriteJSON(w, http.StatusOK, notifications)
-}
-
-// UnreadNotifications handles GET /notifications/unread: {"count": n}, the
-// number on the bell in the sidebar.
-func (h *Handler) UnreadNotifications(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	count, err := h.Service.UnreadNotifications(userID)
-	if err != nil {
-		http.Error(w, "could not count notifications", http.StatusInternalServerError)
-		return
-	}
-	common.WriteJSON(w, http.StatusOK, map[string]int{"count": count})
-}
-
-// ReadNotifications handles POST /notifications/read: marks them all as seen.
-func (h *Handler) ReadNotifications(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	if err := h.Service.MarkNotificationsRead(userID); err != nil {
-		http.Error(w, "could not update notifications", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// FollowRequests handles GET /follow-requests: the requests waiting for the
-// caller to accept or decline, each with the public profile of its sender.
-func (h *Handler) FollowRequests(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	requests, err := h.Follow.PendingRequests(userID)
-	if err != nil {
-		http.Error(w, "could not list follow requests", http.StatusInternalServerError)
-		return
-	}
-	list := make([]map[string]any, 0, len(requests))
-	for _, request := range requests {
-		list = append(list, map[string]any{"id": request.ID, "created_at": request.CreatedAt, "user": common.PublicUser(request.From)})
-	}
-	common.WriteJSON(w, http.StatusOK, list)
 }
 
 // visibleUser resolves the {id} in the path and checks the caller may see that
