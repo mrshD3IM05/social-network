@@ -9,14 +9,15 @@ import (
 )
 
 // FollowRequests handles GET /follow-requests: the requests waiting for the
-// caller to accept or decline, each with the public profile of its sender.
+// caller to accept or decline, each with the public profile of its sender and
+// the relation the caller already has with them.
 func (h *Handler) FollowRequests(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
+	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	requests, err := h.Follow.PendingRequests(userID)
+	requests, err := h.Follow.PendingRequests(viewerID, viewerID)
 	if err != nil {
 		http.Error(w, "could not list follow requests", http.StatusInternalServerError)
 		return

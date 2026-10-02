@@ -25,7 +25,8 @@ func New(service *usersvc.Service, session *sessionsvc.Service, follow *followsv
 // ListUsers handles GET /users?q=&last=: one page of the people directory
 // every "pick a person" screen reads from (People, Messages, group invites),
 // searched by name or nickname. It never includes the caller and only exposes
-// the public profile fields.
+// the public profile fields, plus the follow counts and the relation the caller
+// has with each row.
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
@@ -40,34 +41,30 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	writePeople(w, users)
 }
 
+// GetUser handles GET /user/{id}: the profile page, always answered. A private
+// profile is not a 403 here — common.Profile leaves out the contact details the
+// caller is not entitled to, and the client reads what it may show off the
+// private and is_following fields.
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.visibleUser(w, r)
+	user, viewerID, ok := h.resolveUser(w, r)
 	if !ok {
 		return
 	}
-	viewerID, _ := common.CurrentUserID(r, h.Session)
-	posts, followers, following, err := h.Service.ProfileCounts(viewerID, user.ID)
-	if err != nil {
-		http.Error(w, "could not count profile activity", http.StatusInternalServerError)
-		return
-	}
-	// the subject wants every register field on the profile (never the
-	// password), and visibleUser already checked the caller may see it
-	profile := common.PrivateUser(user)
-	profile["post_count"] = posts
-	profile["follower_count"] = followers
-	profile["following_count"] = following
+	profile := common.Profile(user, viewerID)
+	// the two counts the profile page has always read, kept so it needs no change
+	profile["follower_count"] = user.Followers
+	profile["following_count"] = user.Following
 	common.WriteJSON(w, http.StatusOK, profile)
 }
 
 // UserPosts handles GET /users/{id}/posts?last=: one page of the posts on a
-// profile, behind the same privacy gate as the profile itself.
+// profile, behind the privacy gate that is left for the content itself — the
+// profile above opens up to everyone.
 func (h *Handler) UserPosts(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.visibleUser(w, r)
+	user, viewerID, ok := h.visibleUser(w, r)
 	if !ok {
 		return
 	}
-	viewerID, _ := common.CurrentUserID(r, h.Session)
 	posts, err := h.Post.UserPosts(viewerID, user.ID, common.LastID(r))
 	if err != nil {
 		http.Error(w, "could not list posts", http.StatusInternalServerError)
@@ -125,23 +122,19 @@ func (h *Handler) Notifications(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, notifications)
 }
 
-// visibleUser resolves the {id} in the path and checks the caller may see that
-// profile: a private one only opens up to its followers. It writes the error
-// itself and answers false once the caller should stop.
-func (h *Handler) visibleUser(w http.ResponseWriter, r *http.Request) (*model.User, bool) {
+// resolveUser resolves the {id} in the path, reads the caller out of the cookie
+// and loads that profile with the relation the two of them have. It writes the
+// error itself and answers false once the caller should stop. A private profile
+// is no obstacle here: the profile is answered to everyone, and common.Profile
+// is what holds the contact details back.
+// The cookie is read leniently, so a caller with no usable session reads the
+// profile as anonymous — the relations then come back 0 — rather than being
+// turned away.
+func (h *Handler) resolveUser(w http.ResponseWriter, r *http.Request) (*model.User, int64, bool) {
 	id, err := common.PathID(r, "id")
 	if err != nil {
 		http.Error(w, "invalid user id", http.StatusBadRequest)
-		return nil, false
-	}
-	user, err := h.Service.GetUser(id)
-	if err != nil {
-		if usersvc.IsNotFound(err) {
-			http.Error(w, "user not found", http.StatusNotFound)
-		} else {
-			http.Error(w, "could not get user", http.StatusInternalServerError)
-		}
-		return nil, false
+		return nil, 0, false
 	}
 	viewerID := int64(0)
 	if cookie, cookieErr := r.Cookie(sessionsvc.CookieName); cookieErr == nil {
@@ -149,16 +142,36 @@ func (h *Handler) visibleUser(w http.ResponseWriter, r *http.Request) (*model.Us
 			viewerID = session.UserID
 		}
 	}
+	user, err := h.Service.GetUser(viewerID, id)
+	if err != nil {
+		if usersvc.IsNotFound(err) {
+			http.Error(w, "user not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "could not get user", http.StatusInternalServerError)
+		}
+		return nil, 0, false
+	}
+	return user, viewerID, true
+}
+
+// visibleUser is resolveUser plus the gate left on the content behind a private
+// profile: only its followers may read it. The profile itself does not go
+// through here.
+func (h *Handler) visibleUser(w http.ResponseWriter, r *http.Request) (*model.User, int64, bool) {
+	user, viewerID, ok := h.resolveUser(w, r)
+	if !ok {
+		return nil, 0, false
+	}
 	visible, err := h.Service.CanViewProfile(viewerID, user)
 	if err != nil {
 		http.Error(w, "could not check profile access", http.StatusInternalServerError)
-		return nil, false
+		return nil, 0, false
 	}
 	if !visible {
 		http.Error(w, "profile is private", http.StatusForbidden)
-		return nil, false
+		return nil, 0, false
 	}
-	return user, true
+	return user, viewerID, true
 }
 
 // writePeople answers with the public profile of every user in the list.

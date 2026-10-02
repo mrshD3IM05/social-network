@@ -9,28 +9,24 @@ import (
 
 type Service struct{ users *repository.Repository }
 
-func New(users *repository.Repository) *Service          { return &Service{users: users} }
-func (s *Service) GetUser(id int64) (*model.User, error) { return s.users.GetUserByID(id) }
+func New(users *repository.Repository) *Service { return &Service{users: users} }
+
+// GetUser reads one user as the viewer may see them, with the follow counts
+// and the relation the two of them have.
+func (s *Service) GetUser(viewerID, id int64) (*model.User, error) {
+	return s.users.GetUserForViewer(viewerID, id)
+}
 
 // ListUsers is the directory behind GET /users: every registered user except
-// the viewer. Private profiles stay in the list — CanViewProfile still gates
-// the profile itself.
+// the viewer. Private profiles stay in the list — common.Profile decides what
+// each row may show about itself.
 func (s *Service) ListUsers(viewerID int64, search string, lastID int64) ([]*model.User, error) {
 	return s.users.ListUsers(viewerID, strings.TrimSpace(search), lastID)
 }
 
-// ProfileCounts are the numbers shown on a profile: the posts viewerID can
-// see, the followers and the followed users.
-func (s *Service) ProfileCounts(viewerID, userID int64) (posts, followers, following int, err error) {
-	if posts, err = s.users.CountVisiblePosts(viewerID, userID); err != nil {
-		return
-	}
-	if followers, err = s.users.CountFollowers(userID); err != nil {
-		return
-	}
-	following, err = s.users.CountFollowing(userID)
-	return
-}
+// CanViewProfile is whether viewerID may read the content of a profile: a
+// private one only opens up to its followers. The profile itself is always
+// answered — this gate is for the posts behind it.
 func (s *Service) CanViewProfile(viewerID int64, user *model.User) (bool, error) {
 	if !user.Private || viewerID == user.ID {
 		return true, nil

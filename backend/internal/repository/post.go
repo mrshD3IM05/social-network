@@ -216,18 +216,6 @@ func (r *Repository) ListVisiblePosts(viewerID, authorID, lastID int64) ([]*mode
 	return r.enrichPosts(posts, viewerID)
 }
 
-// CountVisiblePosts is how many posts of authorID viewerID may see.
-func (r *Repository) CountVisiblePosts(viewerID, authorID int64) (int, error) {
-	var count int
-	args := append([]any{authorID}, postVisibleArgs(viewerID)...)
-	err := r.QueryRow(`
-		SELECT COUNT(*) FROM posts p
-		WHERE p.group_id IS NULL AND p.author_id = ? AND `+postVisibleCondition,
-		args...,
-	).Scan(&count)
-	return count, err
-}
-
 // ListGroupPosts returns one page of the posts of one group, newest first,
 // starting after the post lastID (0: the first page). The service
 // layer checks group membership before calling this — the query itself is

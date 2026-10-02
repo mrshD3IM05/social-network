@@ -123,7 +123,7 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 // AcceptAllPending accepts every request waiting for userID. It runs when a
 // profile turns public: a public profile has no requests to answer.
 func (s *Service) AcceptAllPending(userID int64) error {
-	requests, err := s.repo.ListPendingFollowRequests(userID)
+	requests, err := s.repo.ListPendingFollowRequests(userID, userID)
 	if err != nil {
 		return err
 	}
@@ -135,18 +135,20 @@ func (s *Service) AcceptAllPending(userID int64) error {
 	return nil
 }
 
-// PendingRequests are the follow requests waiting for userID to answer.
-func (s *Service) PendingRequests(userID int64) ([]*model.FollowRequest, error) {
-	return s.repo.ListPendingFollowRequests(userID)
+// PendingRequests are the follow requests waiting for userID to answer, read
+// as userID, so each sender carries the relation they have with them.
+func (s *Service) PendingRequests(viewerID, userID int64) ([]*model.FollowRequest, error) {
+	return s.repo.ListPendingFollowRequests(viewerID, userID)
 }
 
 // Followers are the users who follow userID, Following the ones userID follows.
-// Both only count accepted requests, so a pending one shows up in neither.
-func (s *Service) Followers(userID, lastID int64) ([]*model.User, error) {
-	return s.repo.ListFollowers(userID, lastID)
+// Both only count accepted requests, so a pending one shows up in neither. The
+// viewer is who is asking, which is not necessarily userID.
+func (s *Service) Followers(viewerID, userID, lastID int64) ([]*model.User, error) {
+	return s.repo.ListFollowers(viewerID, userID, lastID)
 }
-func (s *Service) Following(userID, lastID int64) ([]*model.User, error) {
-	return s.repo.ListFollowing(userID, lastID)
+func (s *Service) Following(viewerID, userID, lastID int64) ([]*model.User, error) {
+	return s.repo.ListFollowing(viewerID, userID, lastID)
 }
 
 // Messageable are the users userID can start a private chat with: at least one
