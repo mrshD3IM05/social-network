@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/api'
+import { closeSocket } from '@/lib/socket'
 import Avatar from './Avatar'
 import Icon from './Icon'
 import MessageDot from './MessageDot'
@@ -27,6 +28,7 @@ export default function Navbar({ user }) {
 
   async function logout() {
     await apiPost('/logout')
+    closeSocket()
     router.push('/login')
   }
 

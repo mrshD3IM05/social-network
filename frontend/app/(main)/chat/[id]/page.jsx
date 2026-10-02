@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { apiGet, apiUpload, imageUrl, socketUrl } from '@/lib/api'
+import { apiGet, apiUpload, imageUrl } from '@/lib/api'
+import { sendWs, subscribe } from '@/lib/socket'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
 import { markRead } from '@/lib/unread'
 import { useThrottle } from '@/lib/timing'
@@ -26,7 +27,6 @@ export default function ConversationPage() {
   const [blocked, setBlocked] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
-  const socketRef = useRef(null) // useRef keeps the socket between renders
   const pendingUploadsRef = useRef(new Map())
   const messageListRef = useRef(null)
   const loadMoreButtonRef = useRef(null)
@@ -42,14 +42,10 @@ export default function ConversationPage() {
     // opening the conversation means you read it, so its dot goes away
     markRead(otherId)
 
-    // Connect straight to the Go server (the cookie is sent automatically)
-    const socket = new WebSocket(socketUrl())
-    socketRef.current = socket
-
+    // The one app-wide connection lives in lib/socket; this page only listens.
     let typingTimer = null
 
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
+    const unsub = subscribe(data => {
       if (data.type === 'message') {
         const msg = data.message
         // keep only the messages of this conversation
@@ -74,12 +70,12 @@ export default function ConversationPage() {
         for (const file of files) body.append('files', file)
         apiUpload(`/messages/${data.message_id}/images`, body).catch(err => setError(err.message))
       }
-    }
+    })
 
-    // close the connection when we leave the page
+    // stop listening when we leave the page; the connection itself stays up
     return () => {
       clearTimeout(typingTimer)
-      socket.close()
+      unsub()
     }
   }, [id, otherId])
 
@@ -135,8 +131,7 @@ export default function ConversationPage() {
   // Tell the other side we are writing, at most once every two seconds.
   // The trailing call keeps "typing…" alive until the last keystroke.
   const sendTyping = useThrottle(() => {
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return
-    socketRef.current.send(JSON.stringify({ type: 'typing', to_user_id: otherId }))
+    sendWs({ type: 'typing', to_user_id: otherId })
   }, 2000)
 
   function onType(e) {
@@ -176,18 +171,16 @@ export default function ConversationPage() {
     setSending(true)
     let clientId = ''
     try {
-      if (socketRef.current?.readyState !== WebSocket.OPEN) {
-        throw new Error('Chat connection is not ready. Please try again.')
-      }
       clientId = `${Date.now()}-${Math.random()}`
       if (files.length > 0) pendingUploadsRef.current.set(clientId, files)
-      socketRef.current.send(JSON.stringify({
+      const sent = sendWs({
         type: 'message',
         to_user_id: otherId,
         content: text.trim(),
         has_images: files.length > 0,
         client_id: clientId,
-      }))
+      })
+      if (!sent) throw new Error('Chat connection is not ready. Please try again.')
       setText('')
       clearFiles()
     } catch (err) {

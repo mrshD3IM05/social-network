@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl, socketUrl } from '@/lib/api'
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
+import { sendWs, subscribe } from '@/lib/socket'
 import usePaged from '@/lib/usePaged'
 import { useDebouncedValue, useThrottle } from '@/lib/timing'
 import useMessageHistory from '@/lib/useMessageHistory'
@@ -366,7 +367,6 @@ function GroupChat({ groupId, me, members }) {
   const [typing, setTyping] = useState('')
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
-  const socketRef = useRef(null)
   const pendingUploadsRef = useRef(new Map())
   const messageListRef = useRef(null)
   const loadMoreButtonRef = useRef(null)
@@ -379,12 +379,10 @@ function GroupChat({ groupId, me, members }) {
   const people = Object.fromEntries(members.map(m => [m.user_id, m]))
 
   useEffect(() => {
-    const socket = new WebSocket(socketUrl())
-    socketRef.current = socket
+    // The one app-wide connection lives in lib/socket; this page only listens.
     let typingTimer = null
 
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
+    const unsub = subscribe(data => {
       if (data.type === 'message' && data.message.group_id === groupId) {
         const msg = data.message
         setMessages(list => ((list || []).some(m => m.id === msg.id) ? list : [...(list || []), msg]))
@@ -406,10 +404,12 @@ function GroupChat({ groupId, me, members }) {
         for (const file of files) body.append('files', file)
         apiUpload(`/messages/${data.message_id}/images`, body).catch(err => setError(err.message))
       }
-    }
+    })
+
+    // stop listening when we leave the page; the connection itself stays up
     return () => {
       clearTimeout(typingTimer)
-      socket.close()
+      unsub()
     }
   }, [groupId])
 
@@ -461,8 +461,7 @@ function GroupChat({ groupId, me, members }) {
   // Tell the group we are writing, at most once every two seconds.
   // The trailing call keeps "typing…" alive until the last keystroke.
   const sendTyping = useThrottle(() => {
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return
-    socketRef.current.send(JSON.stringify({ type: 'typing', group_id: groupId }))
+    sendWs({ type: 'typing', group_id: groupId })
   }, 2000)
 
   function onType(e) {
@@ -502,18 +501,16 @@ function GroupChat({ groupId, me, members }) {
     setSending(true)
     let clientId = ''
     try {
-      if (socketRef.current?.readyState !== WebSocket.OPEN) {
-        throw new Error('Chat connection is not ready. Please try again.')
-      }
       clientId = `${Date.now()}-${Math.random()}`
       if (files.length > 0) pendingUploadsRef.current.set(clientId, files)
-      socketRef.current.send(JSON.stringify({
+      const sent = sendWs({
         type: 'message',
         group_id: groupId,
         content: text.trim(),
         has_images: files.length > 0,
         client_id: clientId,
-      }))
+      })
+      if (!sent) throw new Error('Chat connection is not ready. Please try again.')
       setText('')
       clearFiles()
     } catch (err) {

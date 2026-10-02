@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMe } from '@/lib/useMe'
 import { ensureSocket } from '@/lib/socket'
@@ -12,13 +12,17 @@ import SidePanel from '@/components/SidePanel'
 export default function MainLayout({ children }) {
   const router = useRouter()
   const { me, loading } = useMe()
+  const ensuredRef = useRef(false)
 
   useEffect(() => {
     if (!loading && !me) router.push('/login')
   }, [loading, me, router])
 
   useEffect(() => {
-    if (me) ensureSocket()
+    if (me && !ensuredRef.current) {
+      ensuredRef.current = true
+      ensureSocket()
+    }
   }, [me])
 
   if (!me) return <p className="loading">Loading…</p>

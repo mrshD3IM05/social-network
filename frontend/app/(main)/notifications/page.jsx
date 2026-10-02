@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { apiGet, apiPost, socketUrl } from '@/lib/api'
+import { apiGet, apiPost } from '@/lib/api'
+import { subscribe } from '@/lib/socket'
 import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import LoadMore from '@/components/LoadMore'
@@ -38,16 +39,14 @@ export default function NotificationsPage() {
   useEffect(() => {
     loadRequests()
 
-    // new ones arrive in real time while the page is open
-    const socket = new WebSocket(socketUrl())
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
+    // new ones arrive in real time over the one app-wide connection
+    const unsub = subscribe(data => {
       if (data.type !== 'notification') return
       notifications.setItems(list => [data.notification, ...(list || [])])
       apiPost('/notifications/read').catch(() => {})
       if (REQUEST_TYPES.includes(data.notification.type)) loadRequests()
-    }
-    return () => socket.close()
+    })
+    return unsub
   }, [])
 
   // answer a request, then drop it from its list
