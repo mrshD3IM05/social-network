@@ -75,7 +75,7 @@ func (r *Repository) ListFollowers(userID, lastID int64) ([]*model.User, error) 
 		 WHERE f.to_user_id = ? AND f.status = ? AND `+afterUserCondition+`
 		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
 		 LIMIT ?`,
-		userID, lastID,
+		userID, model.FollowAccepted, lastID, lastID, PageSize,
 	)
 }
 
@@ -87,7 +87,7 @@ func (r *Repository) ListFollowing(userID, lastID int64) ([]*model.User, error) 
 		 WHERE f.from_user_id = ? AND f.status = ? AND `+afterUserCondition+`
 		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id
 		 LIMIT ?`,
-		userID, lastID,
+		userID, model.FollowAccepted, lastID, lastID, PageSize,
 	)
 }
 
