@@ -51,9 +51,6 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	profile := common.Profile(user, viewerID)
-	// the two counts the profile page has always read, kept so it needs no change
-	profile["follower_count"] = user.Followers
-	profile["following_count"] = user.Following
 	common.WriteJSON(w, http.StatusOK, profile)
 }
 

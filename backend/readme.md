@@ -22,7 +22,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 |---|---|---|---|
 | GET | /users | query: q (search by name or nickname), last | 10 users except you, public shape, ordered by name |
 | GET | /contacts | - | users you can message: at least one of you follows the other (accepted), public shape, ordered by name |
-| GET | /user/{id} | - | profile with every register field except the password, plus post_count, follower_count, following_count; 403 if the profile is private and you don't follow them |
+| GET | /user/{id} | - | profile with every register field except the password, plus post_count; 403 if the profile is private and you don't follow them |
 | GET | /users/{id}/posts | query: last | 10 of their posts you may see, same privacy gate as the profile |
 | GET | /users/{id}/followers | query: last | 10 users following them, same privacy gate as the profile |
 | GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |

@@ -12,7 +12,19 @@ import (
 // of birth or the password, plus the follow counts and the relation the viewer
 // has with the user it was read for.
 func PublicUser(user *model.User) map[string]any {
-	return map[string]any{"id": user.ID, "first_name": user.FirstName, "last_name": user.LastName, "avatar": user.Avatar, "nickname": user.Nickname, "about_me": user.AboutMe, "private": user.Private, "created_at": user.CreatedAt, "is_followed": user.IsFollowed, "is_following": user.IsFollowing, "followers": user.Followers, "following": user.Following}
+	return map[string]any{
+		"id":           user.ID,
+		"first_name":   user.FirstName,
+		"last_name":    user.LastName,
+		"avatar":       user.Avatar,
+		"nickname":     user.Nickname,
+		"about_me":     user.AboutMe,
+		"private":      user.Private,
+		"created_at":   user.CreatedAt,
+		"is_followed":  user.IsFollowed,
+		"is_following": user.IsFollowing,
+		"followers":    user.Followers,
+		"following":    user.Following /*"post_count": user.PostCount*/}
 }
 
 // PrivateUser is the profile with the contact details on it, for the endpoints
@@ -21,6 +33,7 @@ func PrivateUser(user *model.User) map[string]any {
 	profile := PublicUser(user)
 	profile["email"] = user.Email
 	profile["date_of_birth"] = user.DateOfBirth
+
 	return profile
 }
 
