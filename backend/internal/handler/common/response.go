@@ -24,7 +24,9 @@ func PublicUser(user *model.User) map[string]any {
 		"is_followed":  user.IsFollowed,
 		"is_following": user.IsFollowing,
 		"followers":    user.Followers,
-		"following":    user.Following /*"post_count": user.PostCount*/}
+		"following":    user.Following,
+		"post_count":   user.PostCount,
+	}
 }
 
 // PrivateUser is the profile with the contact details on it, for the endpoints
@@ -51,7 +53,11 @@ func Profile(user *model.User, viewerID int64) map[string]any {
 	} else {
 		profile = PrivateUser(user)
 	}
-	profile["post_count"] = user.PostCount
+	if viewerID == user.ID {
+		// remove is followed and is_following from the profile of the subject, so it never sees itself as following or followed by anyone
+		delete(profile, "is_followed")
+		delete(profile, "is_following")
+	}
 	return profile
 }
 
