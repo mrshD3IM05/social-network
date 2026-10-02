@@ -5,17 +5,16 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
-	"github.com/gorilla/websocket"
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/sessionsvc"
+
+	"github.com/gorilla/websocket"
 )
 
 var ErrInvalidMessage = errors.New("websocket: invalid message")
@@ -48,7 +47,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	connection, err := (&websocket.Upgrader{CheckOrigin: checkOrigin}).Upgrade(w, r, nil)
+	connection, err := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}).Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
@@ -57,46 +56,6 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	trackClient(cookie.Value, client)
 	go client.writePump()
 	client.readPump()
-}
-
-// allowedOrigins are the pages on another host that may open the socket.
-// ALLOWED_ORIGINS (comma separated) replaces the default list. Any port on
-// this machine is accepted too, see checkOrigin.
-var allowedOrigins = loadAllowedOrigins()
-
-func loadAllowedOrigins() []string {
-	if value := os.Getenv("ALLOWED_ORIGINS"); value != "" {
-		return strings.Split(value, ",")
-	}
-	return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
-}
-
-// checkOrigin stops another website from opening a socket with the visitor's
-// cookie: the page must come from this host or from an allowed origin.
-func checkOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true // not a browser, so no cookie of someone else to borrow
-	}
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-	if strings.EqualFold(parsed.Host, r.Host) {
-		return true
-	}
-	// the frontend in dev runs on this machine, on whichever port is free;
-	// a page that attacks a visitor is never served from their own computer
-	switch parsed.Hostname() {
-	case "localhost", "127.0.0.1", "::1":
-		return true
-	}
-	for _, allowed := range allowedOrigins {
-		if strings.EqualFold(strings.TrimSpace(allowed), origin) {
-			return true
-		}
-	}
-	return false
 }
 
 // Notify saves the notification and sends it right away to the user's open
