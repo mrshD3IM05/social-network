@@ -105,9 +105,9 @@ func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
 				SELECT 1
 				FROM follow_requests f
 				WHERE (
-					(f.from_user_id = ? AND f.to_user_id = u.id AND f.status != "pending")
+					(f.from_user_id = ? AND f.to_user_id = u.id)
 					OR
-					(f.from_user_id = u.id AND f.to_user_id = ? AND f.status != "pending")
+					(f.from_user_id = u.id AND f.to_user_id = ?)
 				)
 				AND f.status = ?
 		   )
@@ -116,7 +116,7 @@ func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
 				FROM messages m
 				WHERE
 					(m.from_user_id = ? AND m.to_user_id = u.id)
-					ORZS
+					OR
 					(m.from_user_id = u.id AND m.to_user_id = ?)
 		   ) DESC,
 		   u.first_name COLLATE NOCASE,
