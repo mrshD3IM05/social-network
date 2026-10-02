@@ -100,14 +100,31 @@ func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
 	return r.listFollowUsers(
 		`SELECT `+userColumnsPrefixed+`
 		 FROM users u
-		 WHERE u.id != ? AND EXISTS (
-			SELECT 1 FROM follow_requests f
-			WHERE (f.from_user_id = ? AND f.to_user_id = u.id
-			    OR f.from_user_id = u.id AND f.to_user_id = ?)
-			  AND f.status = ?
-		 )
-		 ORDER BY u.first_name COLLATE NOCASE, u.last_name COLLATE NOCASE, u.id`,
-		userID, userID, userID, model.FollowAccepted,
+		 WHERE u.id != ?
+		   AND EXISTS (
+				SELECT 1
+				FROM follow_requests f
+				WHERE (
+					(f.from_user_id = ? AND f.to_user_id = u.id)
+					OR
+					(f.from_user_id = u.id AND f.to_user_id = ?)
+				)
+				AND f.status = ?
+		   )
+		 ORDER BY (
+				SELECT MAX(m.created_at)
+				FROM messages m
+				WHERE
+					(m.from_user_id = ? AND m.to_user_id = u.id)
+					OR
+					(m.from_user_id = u.id AND m.to_user_id = ?)
+		   ) DESC,
+		   u.first_name COLLATE NOCASE,
+		   u.last_name COLLATE NOCASE,
+		   u.id`,
+		userID,
+		userID, userID, model.FollowAccepted,
+		userID, userID,
 	)
 }
 
