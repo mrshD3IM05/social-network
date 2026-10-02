@@ -15,7 +15,6 @@ export default function ProfilePage() {
   const { id } = useParams() // the [id] from the URL, e.g. /profile/3
   const [me, setMe] = useState(null)
   const [user, setUser] = useState(null)
-  const [isPrivate, setIsPrivate] = useState(false)
   const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
   // the three lists come 10 at a time; a private profile answers 403 to them
   const posts = usePaged(`/users/${id}/posts`)
@@ -31,12 +30,11 @@ export default function ProfilePage() {
       .then(result => setFollowStatus(result.status))
       .catch(() => {})
     try {
-      // the profile with its counts (posts, followers, following)
+      // the profile with its counts (posts, followers, following), always
+      // answered: a private one just leaves out the contact details
       setUser(await apiGet(`/user/${id}`))
-      setIsPrivate(false)
     } catch (err) {
-      if (err.status === 403) setIsPrivate(true) // private profile you don't follow
-      else setMessage(err.message)
+      setMessage(err.message)
     }
   }
 
@@ -101,24 +99,17 @@ export default function ProfilePage() {
     ) : followStatus === 'pending' ? (
       <button className="btn btn-light" onClick={unfollow} title="Cancel the request">Requested</button>
     ) : (
-      <button className="btn" onClick={follow}>{isPrivate ? 'Request to follow' : 'Follow'}</button>
+      <button className="btn" onClick={follow}>{user?.private ? 'Request to follow' : 'Follow'}</button>
     )
-
-  if (isPrivate) {
-    return (
-      <div className="card locked">
-        <span className="locked-icon"><Icon name="lock" size={22} /></span>
-        <h2>This profile is private</h2>
-        <p className="subtitle">Send a follow request to see their profile and posts.</p>
-        {followButton}
-        {message && <p className="notice">{message}</p>}
-      </div>
-    )
-  }
 
   if (!user || !me) return <p className="loading">{message || 'Loading…'}</p>
 
   const isMe = me.id === user.id
+  // like Instagram: a private profile you don't follow shows only its header
+  // and counts, the posts and the lists stay locked
+  const locked = user.private && !isMe && followStatus !== 'accepted'
+  // chat needs one of the two to follow the other
+  const canMessage = followStatus === 'accepted' || user.is_following === 1
 
   return (
     <>
@@ -145,7 +136,7 @@ export default function ProfilePage() {
               ) : (
                 <>
                   {followButton}
-                  <Link href={`/chat/${user.id}`} className="btn btn-light">Message</Link>
+                  {canMessage && <Link href={`/chat/${user.id}`} className="btn btn-light">Message</Link>}
                 </>
               )}
             </div>
@@ -155,15 +146,24 @@ export default function ProfilePage() {
 
           <div className="profile-stats">
             <span><strong>{user.post_count}</strong> posts</span>
-            {/* the counts open their list below */}
-            <button type="button" className="stat-link" onClick={() => setTab('followers')}>
-              <strong>{user.follower_count}</strong> followers
-            </button>
-            <button type="button" className="stat-link" onClick={() => setTab('following')}>
-              <strong>{user.following_count}</strong> following
-            </button>
+            {locked ? (
+              <>
+                <span><strong>{user.followers}</strong> followers</span>
+                <span><strong>{user.following}</strong> following</span>
+              </>
+            ) : (
+              <>
+                {/* the counts open their list below */}
+                <button type="button" className="stat-link" onClick={() => setTab('followers')}>
+                  <strong>{user.followers}</strong> followers
+                </button>
+                <button type="button" className="stat-link" onClick={() => setTab('following')}>
+                  <strong>{user.following}</strong> following
+                </button>
+              </>
+            )}
             <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
-            <span>{user.email}</span>
+            {user.email && <span>{user.email}</span>}
             {user.date_of_birth && <span>Born {new Date(user.date_of_birth + 'T00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
           </div>
         </div>
@@ -171,11 +171,18 @@ export default function ProfilePage() {
 
       {message && <p className="notice">{message}</p>}
 
+      {locked ? (
+        <div className="card locked">
+          <span className="locked-icon"><Icon name="lock" size={22} /></span>
+          <h2>This account is private</h2>
+          <p className="subtitle">Follow this account to see their posts, followers and following.</p>
+        </div>
+      ) : (<>
       <div className="profile-tabs">
         {[
           ['posts', 'Posts', user.post_count],
-          ['followers', 'Followers', user.follower_count],
-          ['following', 'Following', user.following_count],
+          ['followers', 'Followers', user.followers],
+          ['following', 'Following', user.following],
         ].map(([key, label, count]) => (
           <button
             key={key}
@@ -240,6 +247,7 @@ export default function ProfilePage() {
           </>
         )
       })()}
+      </>)}
     </>
   )
 }
