@@ -92,14 +92,17 @@ export default function ProfilePage() {
     setSavingPrivacy(false)
   }
 
-  // One button that changes with the relation: Follow → Requested / Unfollow
+  // One button that changes with the relation: Follow (or Follow back when they
+  // already follow you) → Requested / Unfollow
   const followButton =
     followStatus === 'accepted' ? (
       <button className="btn btn-light" onClick={unfollow}>Unfollow</button>
     ) : followStatus === 'pending' ? (
       <button className="btn btn-light" onClick={unfollow} title="Cancel the request">Requested</button>
     ) : (
-      <button className="btn" onClick={follow}>{user?.private ? 'Request to follow' : 'Follow'}</button>
+      <button className="btn" onClick={follow}>
+        {user?.is_following === 1 ? 'Follow back' : user?.private ? 'Request to follow' : 'Follow'}
+      </button>
     )
 
   if (!user || !me) return <p className="loading">{message || 'Loading…'}</p>
