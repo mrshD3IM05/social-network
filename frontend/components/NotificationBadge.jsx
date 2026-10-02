@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { apiGet, socketUrl } from '@/lib/api'
+import { apiGet } from '@/lib/api'
+import { subscribe } from '@/lib/socket'
 
 // The number of unread notifications, next to Notifications in the sidebar,
 // so they can be seen from every page. It is a number and not a dot to look
@@ -19,14 +20,12 @@ export default function NotificationBadge() {
       })
       .catch(() => {})
 
-    const socket = new WebSocket(socketUrl())
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
-      if (data.type === 'notification' && window.location.pathname !== '/notifications') {
+    const unsub = subscribe((data) => {
+      if (data && data.type === 'notification' && window.location.pathname !== '/notifications') {
         setCount(c => c + 1)
       }
-    }
-    return () => socket.close()
+    })
+    return unsub
   }, [])
 
   useEffect(() => {

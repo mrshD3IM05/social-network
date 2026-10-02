@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { apiGet } from '@/lib/api'
 import { fetchContacts } from '@/lib/people'
 import { getUnread, onUnreadChange } from '@/lib/unread'
+import { subscribe } from '@/lib/socket'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
@@ -13,8 +15,10 @@ import PersonRow from '@/components/PersonRow'
 export default function ChatListPage() {
   const [people, setPeople] = useState(null)
   const [unread, setUnread] = useState(getUnread())
+  const [me, setMe] = useState(null)
 
   useEffect(() => {
+    apiGet('/me').then(setMe).catch(() => setMe(null))
     fetchContacts()
       .then(setPeople)
       .catch(() => setPeople([]))
@@ -22,6 +26,18 @@ export default function ChatListPage() {
 
   // a dot on every person whose message has not been opened yet
   useEffect(() => onUnreadChange(setUnread), [])
+
+  useEffect(() => {
+    if (!me) return
+    const unsub = subscribe((data) => {
+      if (!data || data.type !== 'message') return
+      const msg = data.message
+      if (msg.to_user_id === me.id || msg.from_user_id === me.id) {
+        fetchContacts().then(setPeople).catch(() => {})
+      }
+    })
+    return unsub
+  }, [me])
 
   return (
     <>

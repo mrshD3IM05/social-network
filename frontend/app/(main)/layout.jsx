@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMe } from '@/lib/useMe'
+import { ensureSocket } from '@/lib/socket'
 import Navbar from '@/components/Navbar'
 import SidePanel from '@/components/SidePanel'
 
@@ -15,6 +16,10 @@ export default function MainLayout({ children }) {
   useEffect(() => {
     if (!loading && !me) router.push('/login')
   }, [loading, me, router])
+
+  useEffect(() => {
+    if (me) ensureSocket()
+  }, [me])
 
   if (!me) return <p className="loading">Loading…</p>
 

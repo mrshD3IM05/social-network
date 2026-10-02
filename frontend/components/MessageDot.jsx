@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { socketUrl } from '@/lib/api'
 import { getUnread, markUnread, onUnreadChange } from '@/lib/unread'
+import { subscribe } from '@/lib/socket'
 
 // A small dot next to Messages while somebody's message is still unread.
 //
@@ -17,21 +17,15 @@ export default function MessageDot({ myId }) {
   useEffect(() => onUnreadChange(setUnread), [])
 
   useEffect(() => {
-    const socket = new WebSocket(socketUrl())
-
-    socket.onmessage = event => {
-      const data = JSON.parse(event.data)
-      if (data.type !== 'message') return
-
+    const unsub = subscribe((data) => {
+      if (!data || data.type !== 'message') return
       const msg = data.message
       const sentToMe = msg.to_user_id === myId && msg.from_user_id !== myId
-      // a message you are reading right now is already read
-      const reading = window.location.pathname === `/chat/${msg.from_user_id}`
+      const reading = typeof window !== 'undefined' && window.location.pathname === `/chat/${msg.from_user_id}`
 
       if (sentToMe && !reading) markUnread(msg.from_user_id)
-    }
-
-    return () => socket.close()
+    })
+    return unsub
   }, [myId])
 
   if (unread.size === 0) return null
