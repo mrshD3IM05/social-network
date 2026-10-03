@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"sn-backend/internal/model"
 )
 
@@ -63,6 +65,45 @@ func (r *Repository) ListGroupEvents(groupID, viewerID int64) ([]*model.EventLis
 			return nil, err
 		}
 		events = append(events, item)
+	}
+	return events, rows.Err()
+}
+
+// ListUpcomingEvents returns the next `limit` events, soonest first, across
+// every group the viewer is a member of. The future check is done in Go so it
+// does not depend on how the driver formats stored timestamps.
+func (r *Repository) ListUpcomingEvents(viewerID int64, after time.Time, limit int) ([]*model.UpcomingEvent, error) {
+	rows, err := r.db.Query(
+		`SELECT e.id, e.group_id, e.creator_id, e.title, e.description, e.date_time, e.created_at, g.title
+		 FROM group_events e
+		 JOIN group_members gm ON gm.group_id = e.group_id AND gm.user_id = ?
+		 JOIN groups g ON g.id = e.group_id
+		 ORDER BY e.date_time, e.id`,
+		viewerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]*model.UpcomingEvent, 0, limit)
+	for rows.Next() && len(events) < limit {
+		item := new(model.UpcomingEvent)
+		if err := rows.Scan(
+			&item.ID,
+			&item.GroupID,
+			&item.CreatorID,
+			&item.Title,
+			&item.Description,
+			&item.DateTime,
+			&item.CreatedAt,
+			&item.GroupTitle,
+		); err != nil {
+			return nil, err
+		}
+		if item.DateTime.After(after) {
+			events = append(events, item)
+		}
 	}
 	return events, rows.Err()
 }

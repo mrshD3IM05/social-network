@@ -25,27 +25,13 @@ export default function SidePanel() {
       .catch(() => setPeople([]))
 
     apiGet('/groups')
-      .then(async list => {
-        const mine = (list || []).filter(g => g.is_member || g.is_creator)
-        setGroups(mine)
+      .then(list => setGroups((list || []).filter(g => g.is_member || g.is_creator)))
+      .catch(() => setGroups([]))
 
-        // there is no "all my events" endpoint, so ask the first few groups
-        const now = Date.now()
-        const lists = await Promise.all(
-          mine.slice(0, 4).map(g =>
-            apiGet(`/groups/${g.id}/events`)
-              .then(evts => (evts || []).map(e => ({ ...e, group: g })))
-              .catch(() => []),
-          ),
-        )
-        setEvents(
-          lists.flat()
-            .filter(e => new Date(e.date_time).getTime() > now)
-            .sort((a, b) => new Date(a.date_time) - new Date(b.date_time))
-            .slice(0, 3),
-        )
-      })
-      .catch(() => { setGroups([]); setEvents([]) })
+    // one call for the next events across all your groups, soonest first
+    apiGet('/events/upcoming')
+      .then(list => setEvents(list || []))
+      .catch(() => setEvents([]))
   }, [])
 
   return (
@@ -56,7 +42,7 @@ export default function SidePanel() {
           {events.map(event => {
             const when = new Date(event.date_time)
             return (
-              <Link key={event.id} href={`/groups/${event.group.id}`} className="panel-event">
+              <Link key={event.id} href={`/groups/${event.group_id}`} className="panel-event">
                 <span className="date-tile">
                   <small>{when.toLocaleDateString(undefined, { month: 'short' })}</small>
                   <strong>{when.getDate()}</strong>
@@ -64,7 +50,7 @@ export default function SidePanel() {
                 <span className="list-text">
                   <strong>{event.title}</strong>
                   <small>
-                    {event.group.title}, {when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                    {event.group_title},{when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                   </small>
                 </span>
               </Link>

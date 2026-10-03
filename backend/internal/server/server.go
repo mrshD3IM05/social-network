@@ -84,6 +84,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	// group event routes (members only, enforced in the services)
 	mux.Handle("GET /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.ListEvents)))
 	mux.Handle("POST /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.CreateEvent)))
+	mux.Handle("GET /events/upcoming", auth.Authorized(http.HandlerFunc(h.Group.UpcomingEvents)))
 	mux.Handle("POST /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.RespondEvent)))
 	mux.Handle("GET /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.MyEventResponse)))
 

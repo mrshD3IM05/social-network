@@ -272,7 +272,7 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 | Invitations | `POST /groups/{id}/invitations`, `GET /group-invitations`, `POST /group-invitations/{id}/accept`, `POST /group-invitations/{id}/decline` |
 | Join requests | `POST/GET /groups/{id}/join-requests`, `GET /group-join-requests`, `POST /group-join-requests/{id}/accept`, `POST /group-join-requests/{id}/decline` |
 | Group posts | `GET/POST /groups/{id}/posts`, `DELETE /groups/{id}/posts/{post_id}` |
-| Events | `GET/POST /groups/{id}/events`, `GET/POST /events/{id}/response` |
+| Events | `GET/POST /groups/{id}/events`, `GET /events/upcoming`, `GET/POST /events/{id}/response` |
 | Messages | `GET /messages/{id}`, `GET /groups/{id}/messages`, `POST /messages` |
 | Realtime | `GET /ws` |
 

@@ -27,6 +27,13 @@ type EventResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// UpcomingEvent is one row of GET /events/upcoming: an event from one of the
+// viewer's groups, with the group title so the side panel needs no extra call.
+type UpcomingEvent struct {
+	GroupEvent
+	GroupTitle string `json:"group_title"`
+}
+
 // EventListItem is one row of GET /groups/{id}/events: the event plus the
 // response counts and the viewer's own choice ("", "going" or "not_going").
 type EventListItem struct {

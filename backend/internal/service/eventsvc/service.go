@@ -14,6 +14,7 @@ import (
 const (
 	maxTitleLen       = 100
 	maxDescriptionLen = 1000
+	upcomingLimit     = 3
 )
 
 var (
@@ -88,6 +89,12 @@ func (s *Service) List(viewerID, groupID int64) ([]*model.EventListItem, error) 
 		return nil, ErrNotGroupMember
 	}
 	return s.repo.ListGroupEvents(groupID, viewerID)
+}
+
+// Upcoming returns the next few events across all of the viewer's groups.
+// Membership is enforced by the query itself.
+func (s *Service) Upcoming(viewerID int64) ([]*model.UpcomingEvent, error) {
+	return s.repo.ListUpcomingEvents(viewerID, time.Now(), upcomingLimit)
 }
 
 // Respond sets or changes the viewer's going / not-going answer. One row per

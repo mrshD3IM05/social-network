@@ -510,6 +510,22 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, events)
 }
 
+// UpcomingEvents handles GET /events/upcoming: the next events across all of
+// the viewer's groups, in one request.
+func (h *Handler) UpcomingEvents(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	events, err := h.Events.Upcoming(userID)
+	if err != nil {
+		writeEventError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, events)
+}
+
 // RespondEvent handles POST /events/{id}/response (group members only).
 func (h *Handler) RespondEvent(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
