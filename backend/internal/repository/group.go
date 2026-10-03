@@ -55,24 +55,6 @@ func (r *Repository) GetGroup(id int64) (*model.Group, error) {
 	return group, nil
 }
 
-func (r *Repository) ListGroups() ([]*model.Group, error) {
-	rows, err := r.db.Query(`SELECT ` + groupColumns + ` FROM groups g ORDER BY g.created_at DESC, g.id DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	groups := make([]*model.Group, 0)
-	for rows.Next() {
-		group, err := scanGroup(rows)
-		if err != nil {
-			return nil, err
-		}
-		groups = append(groups, group)
-	}
-	return groups, rows.Err()
-}
-
 func (r *Repository) UpdateGroup(group *model.Group) error {
 	if group == nil {
 		return errors.New("group is nil")
@@ -537,49 +519,6 @@ func (r *Repository) CountGroupMembers(groupID int64) (int, error) {
 	return count, err
 }
 
-// GroupMemberships returns the group IDs userID belongs to (used to flag
-// list/detail responses without N+1 queries).
-func (r *Repository) GroupMemberships(userID int64) (map[int64]bool, error) {
-	rows, err := r.db.Query(`SELECT group_id FROM group_members WHERE user_id = ?`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	memberships := make(map[int64]bool)
-	for rows.Next() {
-		var groupID int64
-		if err := rows.Scan(&groupID); err != nil {
-			return nil, err
-		}
-		memberships[groupID] = true
-	}
-	return memberships, rows.Err()
-}
-
-// PendingJoinRequestGroups returns the group IDs where userID has a pending
-// join request.
-func (r *Repository) PendingJoinRequestGroups(userID int64) (map[int64]bool, error) {
-	rows, err := r.db.Query(
-		`SELECT group_id FROM group_join_requests WHERE user_id = ? AND status = ?`,
-		userID, model.GroupJoinPending,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	pending := make(map[int64]bool)
-	for rows.Next() {
-		var groupID int64
-		if err := rows.Scan(&groupID); err != nil {
-			return nil, err
-		}
-		pending[groupID] = true
-	}
-	return pending, rows.Err()
-}
-
 // --------------------------------------------------- detail and browsing
 
 func (r *Repository) GroupDetailPayload(groupID, viewerID int64) (*model.GroupDetail, error) {
@@ -624,56 +563,60 @@ func (r *Repository) GroupDetailPayload(groupID, viewerID int64) (*model.GroupDe
 	return detail, nil
 }
 
-func (r *Repository) GroupListPayload(viewerID int64) ([]*model.GroupListItem, error) {
-	groups, err := r.ListGroups()
-	if err != nil {
-		return nil, err
-	}
+// GroupFilter narrows GET /groups to the groups the viewer is in, the ones
+// they are not in, or every group.
+type GroupFilter int
 
-	counts, err := r.GroupMemberCounts()
-	if err != nil {
-		return nil, err
-	}
-	memberships, err := r.GroupMemberships(viewerID)
-	if err != nil {
-		return nil, err
-	}
-	pendingJoins, err := r.PendingJoinRequestGroups(viewerID)
-	if err != nil {
-		return nil, err
-	}
+const (
+	AllGroups GroupFilter = iota
+	JoinedGroups
+	OtherGroups
+)
 
-	items := make([]*model.GroupListItem, 0, len(groups))
-	for _, group := range groups {
-		item := &model.GroupListItem{
-			Group:       *group,
-			MemberCount: counts[group.ID],
-			IsMember:    memberships[group.ID],
-			PendingJoin: pendingJoins[group.ID],
-			IsCreator:   group.CreatorID == viewerID,
-		}
-		items = append(items, item)
-	}
-	return items, nil
-}
-
-func (r *Repository) GroupMemberCounts() (map[int64]int, error) {
-	rows, err := r.db.Query(`SELECT group_id, COUNT(*) FROM group_members GROUP BY group_id`)
+// GroupListPayload returns one page of groups, newest first, starting after
+// the group lastID, each with its member count and the viewer's relation to it.
+// One query: the counts and flags are subqueries on the page's rows only.
+func (r *Repository) GroupListPayload(viewerID int64, filter GroupFilter, lastID int64) ([]*model.GroupListItem, error) {
+	rows, err := r.db.Query(
+		`SELECT `+groupColumns+`,
+			(SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id),
+			EXISTS(SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?) AS joined,
+			EXISTS(SELECT 1 FROM group_join_requests j WHERE j.group_id = g.id AND j.user_id = ? AND j.status = ?)
+		 FROM groups g
+		 WHERE (? = 0 OR joined = (? = 1))
+		   AND (? = 0 OR (g.created_at, g.id) < (SELECT created_at, id FROM groups WHERE id = ?))
+		 ORDER BY g.created_at DESC, g.id DESC
+		 LIMIT ?`,
+		viewerID, viewerID, model.GroupJoinPending,
+		filter, filter,
+		lastID, lastID,
+		PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	counts := make(map[int64]int)
+	items := make([]*model.GroupListItem, 0)
 	for rows.Next() {
-		var groupID int
-		var count int
-		if err := rows.Scan(&groupID, &count); err != nil {
+		item := new(model.GroupListItem)
+		if err := rows.Scan(
+			&item.ID,
+			&item.CreatorID,
+			&item.Title,
+			&item.Description,
+			&item.Avatar,
+			&item.CreatedAt,
+			&item.MemberCount,
+			&item.IsMember,
+			&item.PendingJoin,
+		); err != nil {
 			return nil, err
 		}
-		counts[int64(groupID)] = count
+		item.IsCreator = item.CreatorID == viewerID
+		items = append(items, item)
 	}
-	return counts, rows.Err()
+	return items, rows.Err()
 }
 
 // ----------------------------------------------------------- consistency

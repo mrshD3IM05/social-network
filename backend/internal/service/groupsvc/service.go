@@ -143,8 +143,10 @@ func (s *Service) CheckCreator(userID, groupID int64) error {
 	return err
 }
 
-func (s *Service) List(viewerID int64) ([]*model.GroupListItem, error) {
-	return s.repo.GroupListPayload(viewerID)
+// List returns one page of groups (newest first) after lastID, narrowed by
+// filter to the viewer's groups, the others, or all of them.
+func (s *Service) List(viewerID int64, filter repository.GroupFilter, lastID int64) ([]*model.GroupListItem, error) {
+	return s.repo.GroupListPayload(viewerID, filter, lastID)
 }
 
 // Detail returns one group for a viewer. Every group is listed on the groups

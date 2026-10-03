@@ -53,7 +53,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | method | path | request | response |
 |---|---|---|---|
 | POST | /groups | form: title, description | 201 + group json, creator joins the group automatically |
-| GET | /groups | - | all groups with member_count, is_member, pending_join, is_creator for you |
+| GET | /groups | query: joined (true = yours, false = the others, empty = all), last | 10 groups, newest first, with member_count, is_member, pending_join, is_creator for you |
 | GET | /groups/{id} | - | group (with avatar) + creator + members + your status; outsiders get the header with an empty member list |
 | PUT | /groups/{id} | form: title, description | 200 + group json, creator only |
 | DELETE | /groups/{id} | - | 204, creator only; members, invitations, requests, posts, comments, events, messages and notifications are deleted by the database cascade |

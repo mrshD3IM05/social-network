@@ -51,13 +51,23 @@ func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusCreated, group)
 }
 
+// ListGroups handles GET /groups?joined=&last=: 10 groups at a time, newest
+// first, each with its member count and the caller's relation to it.
 func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	groups, err := h.Service.List(userID)
+	// ?joined=true: the caller's groups, ?joined=false: the others, none: all
+	filter := repository.AllGroups
+	switch r.URL.Query().Get("joined") {
+	case "true":
+		filter = repository.JoinedGroups
+	case "false":
+		filter = repository.OtherGroups
+	}
+	groups, err := h.Service.List(userID, filter, common.LastID(r))
 	if err != nil {
 		http.Error(w, "could not list groups", http.StatusInternalServerError)
 		return

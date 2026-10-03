@@ -20,8 +20,8 @@ export default function SidePanel() {
       .then(list => setPeople(list || []))
       .catch(() => setPeople([]))
 
-    apiGet('/groups')
-      .then(list => setGroups((list || []).filter(g => g.is_member || g.is_creator)))
+    apiGet('/groups?joined=true') // the first page is plenty: the panel shows 5
+      .then(list => setGroups(list || []))
       .catch(() => setGroups([]))
 
     // one call for the next events across all your groups, soonest first

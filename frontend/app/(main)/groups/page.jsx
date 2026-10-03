@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
+import usePaged from '@/lib/usePaged'
 import { LIMITS, checkText } from '@/lib/validate'
 import Modal from '@/components/Modal'
 import GroupCard from '@/components/GroupCard'
 import Icon from '@/components/Icon'
+import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
 import RequestRow from '@/components/RequestRow'
 import CharCount from '@/components/CharCount'
@@ -13,16 +15,15 @@ import CharCount from '@/components/CharCount'
 // Groups hub: your invitations first, then the groups you belong to, then the
 // ones left to discover — so the list you act on is never mixed with the rest.
 export default function GroupsPage() {
-  const [groups, setGroups] = useState(null)
+  // two lists, 10 at a time each: the groups you are in, and the rest
+  const mine = usePaged('/groups?joined=true')
+  const others = usePaged('/groups?joined=false')
   const [invitations, setInvitations] = useState([])
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [joiningId, setJoiningId] = useState(null) // id of the group being joined
 
   function load() {
-    apiGet('/groups')
-      .then(setGroups)
-      .catch(err => setError(err.message))
     apiGet('/group-invitations')
       .then(setInvitations)
       .catch(() => {}) // the inbox is secondary; the lists below still show
@@ -37,7 +38,11 @@ export default function GroupsPage() {
     try {
       await apiPost(`/group-invitations/${id}/${accept ? 'accept' : 'decline'}`)
       setInvitations(list => list.filter(inv => inv.id !== id))
-      load() // membership changed → the group moves to "Your groups"
+      if (accept) {
+        // membership changed → the group moves to "Your groups"
+        mine.reload()
+        others.reload()
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -48,7 +53,7 @@ export default function GroupsPage() {
     setJoiningId(group.id)
     try {
       await apiPost(`/groups/${group.id}/join-requests`)
-      setGroups(list =>
+      others.setItems(list =>
         list.map(g => (g.id === group.id ? { ...g, pending_join: true } : g)),
       )
     } catch (err) {
@@ -57,17 +62,12 @@ export default function GroupsPage() {
     setJoiningId(null)
   }
 
-  const mine = groups?.filter(group => group.is_member || group.is_creator) || []
-  const others = groups?.filter(group => !group.is_member && !group.is_creator) || []
-
   return (
     <>
       <PageHeader title="Groups" subtitle="Find your people, or start a space of your own." />
 
       <div className="section-bar">
-        <p className="eyebrow">
-          {groups === null ? 'Loading…' : `${mine.length} joined · ${others.length} to discover`}
-        </p>
+        <p className="eyebrow">Your groups and the ones to discover</p>
         <button type="button" className="btn" onClick={() => setShowCreate(true)}>
           <Icon name="plus" size={16} /> Create a group
         </button>
@@ -91,18 +91,20 @@ export default function GroupsPage() {
         </section>
       )}
 
-      {groups !== null && (
+      {(mine.error || others.error) && <p className="error">{(mine.error || others.error).message}</p>}
+
+      {mine.items !== null && others.items !== null && (
         <>
           <GroupSection
             label="Your groups"
-            groups={mine}
+            list={mine}
             empty="You have not joined a group yet. Pick one below, or create your own."
             onJoin={join}
             joiningId={joiningId}
           />
           <GroupSection
             label="Discover"
-            groups={others}
+            list={others}
             empty="Nothing left to discover — you are in every group."
             onJoin={join}
             joiningId={joiningId}
@@ -115,7 +117,7 @@ export default function GroupsPage() {
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false)
-            load() // the new group shows up under "Your groups" (as creator)
+            mine.reload() // the new group shows up under "Your groups" (as creator)
           }}
         />
       )}
@@ -123,19 +125,22 @@ export default function GroupsPage() {
   )
 }
 
-// One titled list of groups, or a one-line reason why it is empty.
-function GroupSection({ label, groups, empty, onJoin, joiningId }) {
+// One titled list of groups (10 at a time), or a one-line reason why it is empty.
+function GroupSection({ label, list, empty, onJoin, joiningId }) {
   return (
     <>
       <p className="eyebrow section-label">{label}</p>
-      {groups.length === 0 ? (
+      {list.items.length === 0 ? (
         <p className="meta section-empty">{empty}</p>
       ) : (
-        <div className="card list">
-          {groups.map(group => (
-            <GroupCard key={group.id} group={group} onJoin={onJoin} joining={joiningId === group.id} />
-          ))}
-        </div>
+        <>
+          <div className="card list">
+            {list.items.map(group => (
+              <GroupCard key={group.id} group={group} onJoin={onJoin} joining={joiningId === group.id} />
+            ))}
+          </div>
+          <LoadMore list={list} />
+        </>
       )}
     </>
   )
