@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
-import { PAGE_SIZE } from '@/lib/usePaged'
+import usePaged, { PAGE_SIZE } from '@/lib/usePaged'
 import Avatar from './Avatar'
 import CharCount from './CharCount'
 import Icon from './Icon'
+import LoadMore from './LoadMore'
 import Modal from './Modal'
 
 const privacyNames = { public: 'Public', almost_private: 'Followers', private: 'Chosen followers' }
@@ -31,6 +32,9 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
   const [editContent, setEditContent] = useState(post.content)
   const [editPrivacy, setEditPrivacy] = useState(post.privacy)
   const [editError, setEditError] = useState('')
+  // who may read this post, while the author is editing a "private" one
+  const [editViewers, setEditViewers] = useState([])
+  const editFollowers = usePaged(editing && editPrivacy === 'private' && !post.group_id ? `/users/${myId}/followers` : null)
   const [saving, setSaving] = useState(false)
   const [open, setOpen] = useState(false)
   const [comments, setComments] = useState(null) // null = not loaded yet, oldest first
@@ -75,6 +79,16 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
     setEditPrivacy(privacy)
     setEditError('')
     setEditing(true)
+    // a private post already has people chosen: tick them
+    if (privacy === 'private' && !post.group_id) {
+      apiGet(`/posts/${post.id}/viewers`).then(setEditViewers).catch(() => setEditViewers([]))
+    } else {
+      setEditViewers([])
+    }
+  }
+
+  function toggleViewer(id) {
+    setEditViewers(list => (list.includes(id) ? list.filter(v => v !== id) : [...list, id]))
   }
 
   async function saveEdit(e) {
@@ -82,6 +96,11 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
     const problem = checkText('Your post', editContent, LIMITS.post)
     if (problem) {
       setEditError(problem)
+      return
+    }
+    // a private post has to reach somebody
+    if (!post.group_id && editPrivacy === 'private' && editViewers.length === 0) {
+      setEditError('Choose at least one follower.')
       return
     }
     setEditError('')
@@ -92,6 +111,7 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
       const updated = await apiPut(`/posts/${post.id}`, {
         content: editContent.trim(),
         privacy: post.group_id ? privacy : editPrivacy,
+        viewers: !post.group_id && editPrivacy === 'private' ? editViewers : [],
       })
       setContent(updated.content)
       setPrivacy(updated.privacy)
@@ -252,6 +272,24 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
+          {!post.group_id && editPrivacy === 'private' && editFollowers.items !== null && (
+            <div className="viewer-picker">
+              <p className="hint">Who can see this post?</p>
+              {editFollowers.items.length === 0 && <p className="hint">You have no followers yet.</p>}
+              {editFollowers.items.map(person => (
+                <label key={person.id} className={editViewers.includes(person.id) ? 'viewer-chip active' : 'viewer-chip'}>
+                  <input
+                    type="checkbox"
+                    checked={editViewers.includes(person.id)}
+                    onChange={() => toggleViewer(person.id)}
+                  />
+                  {person.first_name} {person.last_name}
+                </label>
+              ))}
+              <LoadMore list={editFollowers} />
+            </div>
+          )}
+
           {editError && <p className="error">{editError}</p>}
         </form>
       ) : (
