@@ -32,6 +32,9 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
   const [editContent, setEditContent] = useState(post.content)
   const [editPrivacy, setEditPrivacy] = useState(post.privacy)
   const [editError, setEditError] = useState('')
+  // the comment being rewritten, and the text while it is being rewritten
+  const [editingComment, setEditingComment] = useState(null)
+  const [commentDraft, setCommentDraft] = useState('')
   // who may read this post, while the author is editing a "private" one
   const [editViewers, setEditViewers] = useState([])
   const editFollowers = usePaged(editing && editPrivacy === 'private' && !post.group_id ? `/users/${myId}/followers` : null)
@@ -120,6 +123,36 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
       setEditError(err.message)
     }
     setSaving(false)
+  }
+
+  // A comment can be rewritten by whoever wrote it, and removed by its author
+  // or by the author of the post. The API checks the same thing.
+  async function saveComment(id) {
+    const problem = checkText('Comment', commentDraft, LIMITS.comment)
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError('')
+    try {
+      const updated = await apiPut(`/comments/${id}`, { content: commentDraft.trim() })
+      setComments(list => list.map(c => (c.id === id ? { ...c, content: updated.content } : c)))
+      setEditingComment(null)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function removeComment(id) {
+    if (!confirm('Delete this comment?')) return
+    setError('')
+    try {
+      await apiDelete(`/comments/${id}`)
+      setComments(list => list.filter(c => c.id !== id))
+      setCommentCount(count => Math.max(0, count - 1))
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   // Opens the confirmation dialog; the actual delete happens in confirmDelete
@@ -346,10 +379,49 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
                     })}
                   </span>
                 </div>
-                <p className="comment-content">{comment.content}</p>
+                {editingComment === comment.id ? (
+                  <form
+                    className="comment-edit"
+                    onSubmit={e => { e.preventDefault(); saveComment(comment.id) }}
+                    noValidate
+                  >
+                    <textarea
+                      value={commentDraft}
+                      maxLength={LIMITS.comment}
+                      onChange={e => setCommentDraft(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="comment-bar">
+                      <CharCount value={commentDraft} max={LIMITS.comment} />
+                      <button type="button" className="btn btn-sm btn-light" onClick={() => setEditingComment(null)}>
+                        Cancel
+                      </button>
+                      <button className="btn btn-sm" disabled={!commentDraft.trim()}>Save</button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="comment-content">{comment.content}</p>
+                )}
                 {comment.images?.length > 0 && (
                   <div className="comment-images">
                     {comment.images.map(id => <img key={id} src={imageUrl(id)} alt="" />)}
+                  </div>
+                )}
+
+                {editingComment !== comment.id && (comment.author_id === myId || post.author_id === myId) && (
+                  <div className="comment-actions">
+                    {comment.author_id === myId && (
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => { setEditingComment(comment.id); setCommentDraft(comment.content) }}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <button type="button" className="link-button" onClick={() => removeComment(comment.id)}>
+                      Delete
+                    </button>
                   </div>
                 )}
               </div>

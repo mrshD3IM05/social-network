@@ -967,3 +967,7 @@ a.list-item:hover { background: var(--surface-soft); color: var(--ink); }
 /* the name above a chat message opens that person's profile */
 .chat-name { color: inherit; }
 .chat-name:hover { text-decoration: underline; }
+
+/* Edit / Delete under a comment you may change */
+.comment-actions { display: flex; gap: 12px; margin-top: 4px; font-size: 13px; }
+.comment-edit textarea { width: 100%; min-height: 56px; }
