@@ -10,8 +10,13 @@ import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
 
-// notifications that come with something to accept or decline
-const REQUEST_TYPES = ['follow_request', 'group_invitation', 'group_join_request']
+// notifications that come with something to accept or decline, and the one
+// list each of them adds to
+const REQUEST_LISTS = {
+  follow_request: '/follow-requests',
+  group_invitation: '/group-invitations',
+  group_join_request: '/group-join-requests',
+}
 
 export default function NotificationsPage() {
   const notifications = usePaged('/notifications') // 10 at a time
@@ -21,10 +26,13 @@ export default function NotificationsPage() {
   const [joinRequests, setJoinRequests] = useState([])
   const [error, setError] = useState('')
 
-  function loadRequests() {
-    apiGet('/follow-requests').then(setFollowRequests).catch(() => {})
-    apiGet('/group-invitations').then(setInvitations).catch(() => {})
-    apiGet('/group-join-requests').then(setJoinRequests).catch(() => {})
+  const setters = {
+    '/follow-requests': setFollowRequests,
+    '/group-invitations': setInvitations,
+    '/group-join-requests': setJoinRequests,
+  }
+  function loadRequests(path) {
+    apiGet(path).then(setters[path]).catch(() => {})
   }
 
   // once the first page is shown with its "read" flags (so the new ones are
@@ -37,14 +45,16 @@ export default function NotificationsPage() {
   }, [notifications.items])
 
   useEffect(() => {
-    loadRequests()
+    Object.values(REQUEST_LISTS).forEach(loadRequests)
 
     // new ones arrive in real time over the one app-wide connection
     const unsub = subscribe(data => {
       if (data.type !== 'notification') return
       notifications.setItems(list => [data.notification, ...(list || [])])
       apiPost('/notifications/read').catch(() => {})
-      if (REQUEST_TYPES.includes(data.notification.type)) loadRequests()
+      // only the list this notification belongs to changed
+      const path = REQUEST_LISTS[data.notification.type]
+      if (path) loadRequests(path)
     })
     return unsub
   }, [])
