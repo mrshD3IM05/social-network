@@ -15,6 +15,7 @@ import Icon from '@/components/Icon'
 import CharCount from '@/components/CharCount'
 import LoadMore from '@/components/LoadMore'
 import PersonRow from '@/components/PersonRow'
+import RequestRow from '@/components/RequestRow'
 import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 import EventCard from '@/components/EventCard'
@@ -41,6 +42,7 @@ export default function GroupDetailPage() {
   const [showInvite, setShowInvite] = useState(false)
   const [showEventForm, setShowEventForm] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [answering, setAnswering] = useState(false) // answering an invitation
 
   const isMember = group?.is_member || group?.is_creator
 
@@ -100,11 +102,23 @@ export default function GroupDetailPage() {
   const postDeleted = postId => posts.setItems(list => (list ? list.filter(p => p.id !== postId) : list))
 
   function respondJoinRequest(request, accept) {
-    setRequests(list => list.filter(r => r.id !== request.id))
     return run(
-      () => apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`),
+      async () => {
+        await apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`)
+        setRequests(list => list.filter(r => r.id !== request.id))
+      },
       accept ? `${request.first_name} is now a member.` : 'Request declined.',
     )
+  }
+
+  // an invitation to this group, answered right here instead of on /groups
+  async function respondInvitation(accept) {
+    setAnswering(true)
+    await run(
+      () => apiPost(`/group-invitations/${group.invitation_id}/${accept ? 'accept' : 'decline'}`),
+      accept ? `Welcome to ${group.title}!` : 'Invitation declined.',
+    )
+    setAnswering(false)
   }
 
   function removeMember(member) {
@@ -196,7 +210,15 @@ export default function GroupDetailPage() {
           ) : group.pending_join ? (
             <p className="meta group-hero-note">Join request sent — waiting for the creator.</p>
           ) : group.pending_invite ? (
-            <p className="meta group-hero-note">You are invited — answer it from the groups page.</p>
+            <div className="group-hero-buttons">
+              <p className="meta group-hero-note">You are invited to this group.</p>
+              <button type="button" className="btn" disabled={answering} onClick={() => respondInvitation(true)}>
+                Accept
+              </button>
+              <button type="button" className="btn btn-light" disabled={answering} onClick={() => respondInvitation(false)}>
+                Decline
+              </button>
+            </div>
           ) : (
             <button type="button" className="btn" onClick={requestJoin}>Request to join</button>
           )}
@@ -306,12 +328,14 @@ export default function GroupDetailPage() {
             ) : (
               <div className="card list">
                 {requests.map(request => (
-                  <PersonRow key={request.id} person={request} size={40}>
-                    <div className="invitation-actions">
-                      <button className="btn btn-sm" onClick={() => respondJoinRequest(request, true)}>Accept</button>
-                      <button className="btn btn-light btn-sm" onClick={() => respondJoinRequest(request, false)}>Decline</button>
-                    </div>
-                  </PersonRow>
+                  <RequestRow
+                    key={request.id}
+                    person={request}
+                    href={`/profile/${request.user_id}`}
+                    title={`${request.first_name} ${request.last_name}`}
+                    subtitle={`@${request.nickname} · wants to join`}
+                    onRespond={accept => respondJoinRequest(request, accept)}
+                  />
                 ))}
               </div>
             )
@@ -324,10 +348,7 @@ export default function GroupDetailPage() {
           groupId={id}
           memberIds={new Set(group.members.map(m => m.user_id))}
           onClose={() => setShowInvite(false)}
-          onInvited={name => {
-            setShowInvite(false)
-            setNotice(`Invitation sent to ${name}.`)
-          }}
+          onInvited={name => setNotice(`Invitation sent to ${name}.`)}
         />
       )}
 
@@ -733,7 +754,9 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
       setInvited(state => ({ ...state, [person.id]: true }))
       onInvited(person.first_name)
     } catch (err) {
-      setError(err.message)
+      // 409: already invited (members are not listed), so show it as done
+      if (err.status === 409) setInvited(state => ({ ...state, [person.id]: true }))
+      else setError(err.message)
     }
     setBusyId(null)
   }

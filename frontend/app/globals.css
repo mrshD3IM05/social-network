@@ -669,6 +669,7 @@ a.list-item:hover { background: var(--surface-soft); color: var(--ink); }
 .group-hero-note { text-align: right; }
 .group-hero-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .group-hero-buttons .btn { margin-left: 0; }
+.group-hero-buttons .group-hero-note { align-self: center; margin: 0 4px 0 0; }
 
 /* the faces of the group, overlapping like a deck of cards */
 .avatar-stack { display: flex; align-items: center; }
