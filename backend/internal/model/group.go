@@ -70,6 +70,7 @@ type GroupJoinRequest struct {
 	FirstName  string    `json:"first_name"`
 	LastName   string    `json:"last_name"`
 	Nickname   string    `json:"nickname"`
+	Avatar     string    `json:"avatar"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 }
@@ -84,7 +85,10 @@ type GroupDetail struct {
 	IsMember      bool          `json:"is_member"`
 	IsCreator     bool          `json:"is_creator"`
 	PendingInvite bool          `json:"pending_invite"`
-	PendingJoin   bool          `json:"pending_join"`
+	// InvitationID is the pending invitation to answer from the group page,
+	// set only together with PendingInvite
+	InvitationID int64 `json:"invitation_id,omitempty"`
+	PendingJoin  bool  `json:"pending_join"`
 }
 
 type GroupListItem struct {

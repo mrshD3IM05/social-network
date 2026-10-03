@@ -160,6 +160,9 @@ func (s *Service) Detail(viewerID, groupID int64) (*model.GroupDetail, error) {
 		pendingInvitation, err := s.repo.PendingGroupInvitation(groupID, viewerID)
 		if err == nil {
 			detail.PendingInvite = pendingInvitation.Status == model.GroupInvitationPending
+			if detail.PendingInvite {
+				detail.InvitationID = pendingInvitation.ID
+			}
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return nil, err
 		}

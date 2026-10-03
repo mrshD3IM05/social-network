@@ -318,7 +318,7 @@ func (r *Repository) UpdateGroupInvitationStatus(id int64, status string) error 
 
 // --------------------------------------------------------- join requests
 
-const groupJoinRequestColumns = `gj.id, gj.group_id, g.title, gj.user_id, u.first_name, u.last_name, u.nickname, gj.status, gj.created_at`
+const groupJoinRequestColumns = `gj.id, gj.group_id, g.title, gj.user_id, u.first_name, u.last_name, u.nickname, COALESCE(u.avatar, ''), gj.status, gj.created_at`
 
 func scanGroupJoinRequest(s scanner) (*model.GroupJoinRequest, error) {
 	request := new(model.GroupJoinRequest)
@@ -330,6 +330,7 @@ func scanGroupJoinRequest(s scanner) (*model.GroupJoinRequest, error) {
 		&request.FirstName,
 		&request.LastName,
 		&request.Nickname,
+		&request.Avatar,
 		&request.Status,
 		&request.CreatedAt,
 	); err != nil {
