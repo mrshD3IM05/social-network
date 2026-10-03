@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchContacts } from '@/lib/people'
 import { useMe } from '@/lib/useMe'
 import { getUnread, onUnreadChange } from '@/lib/unread'
@@ -16,6 +16,8 @@ export default function ChatListPage() {
   const [people, setPeople] = useState(null)
   const [unread, setUnread] = useState(getUnread())
   const { me } = useMe()
+  const peopleRef = useRef(people) // the socket handler reads the current list
+  peopleRef.current = people
 
   useEffect(() => {
     fetchContacts()
@@ -31,9 +33,15 @@ export default function ChatListPage() {
     const unsub = subscribe((data) => {
       if (!data || data.type !== 'message') return
       const msg = data.message
-      if (msg.to_user_id === me.id || msg.from_user_id === me.id) {
-        fetchContacts().then(setPeople).catch(() => {})
-      }
+      if (msg.group_id || (msg.to_user_id !== me.id && msg.from_user_id !== me.id)) return
+      // the list is newest conversation first: move that person to the top here
+      // instead of asking for the whole list again on every message
+      const otherId = msg.from_user_id === me.id ? msg.to_user_id : msg.from_user_id
+      const list = peopleRef.current
+      const person = list?.find(p => p.id === otherId)
+      if (person) setPeople([person, ...list.filter(p => p.id !== otherId)])
+      // someone not listed yet (followed after this page loaded): ask once
+      else fetchContacts().then(setPeople).catch(() => {})
     })
     return unsub
   }, [me])
