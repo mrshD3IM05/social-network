@@ -29,7 +29,9 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /follow-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
 	mux.Handle("POST /follow-requests/{id}/decline", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
 	mux.Handle("PUT /me/privacy", auth.Authorized(http.HandlerFunc(h.User.SetPrivacy)))
-	mux.Handle("GET /follow-requests", auth.Authorized(http.HandlerFunc(h.User.FollowRequests)))
+
+	// everything waiting for the caller to accept or decline, in one response
+	mux.Handle("GET /requests", auth.Authorized(http.HandlerFunc(h.Request.Pending)))
 
 	// notification routes
 	mux.Handle("GET /notifications", auth.Authorized(http.HandlerFunc(h.User.Notifications)))
@@ -73,7 +75,6 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /groups/{id}/join-requests", auth.Authorized(http.HandlerFunc(h.Group.RequestJoin)))
 	mux.Handle("POST /group-join-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.Group.RespondJoinRequest)))
 	mux.Handle("POST /group-join-requests/{id}/decline", auth.Authorized(http.HandlerFunc(h.Group.RespondJoinRequest)))
-	mux.Handle("GET /group-join-requests", auth.Authorized(http.HandlerFunc(h.Group.MyJoinRequests)))
 	mux.Handle("GET /groups/{id}/join-requests", auth.Authorized(http.HandlerFunc(h.Group.PendingJoinRequests)))
 
 	// group post routes (members only, enforced in the services)

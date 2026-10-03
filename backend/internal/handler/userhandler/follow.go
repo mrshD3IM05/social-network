@@ -8,27 +8,6 @@ import (
 	"strings"
 )
 
-// FollowRequests handles GET /follow-requests: the requests waiting for the
-// caller to accept or decline, each with the public profile of its sender and
-// the relation the caller already has with them.
-func (h *Handler) FollowRequests(w http.ResponseWriter, r *http.Request) {
-	viewerID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	requests, err := h.Follow.PendingRequests(viewerID, viewerID)
-	if err != nil {
-		http.Error(w, "could not list follow requests", http.StatusInternalServerError)
-		return
-	}
-	list := make([]map[string]any, 0, len(requests))
-	for _, request := range requests {
-		list = append(list, map[string]any{"id": request.ID, "created_at": request.CreatedAt, "user": common.PublicUser(request.From)})
-	}
-	common.WriteJSON(w, http.StatusOK, list)
-}
-
 func (h *Handler) RespondFollow(w http.ResponseWriter, r *http.Request) {
 	viewerID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

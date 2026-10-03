@@ -7,6 +7,7 @@ import (
 	"sn-backend/internal/handler/grouphandler"
 	"sn-backend/internal/handler/messagehandler"
 	"sn-backend/internal/handler/posthandler"
+	"sn-backend/internal/handler/requesthandler"
 	"sn-backend/internal/handler/userhandler"
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/authsvc"
@@ -30,6 +31,7 @@ type Handlers struct {
 	File      *filehandler.Handler
 	Group     *grouphandler.Handler
 	Message   *messagehandler.Handler
+	Request   *requesthandler.Handler
 	WebSocket *ws.Hub
 }
 
@@ -40,14 +42,17 @@ func New(repo *repository.Repository) *Handlers {
 	postService := postsvc.New(repo)
 	fileService := filesvc.New(repo, "uploads")
 	webSocket := ws.NewHub(repo, session)
+	followService := followsvc.New(repo, webSocket)
+	groupService := groupsvc.New(repo, webSocket)
 	return &Handlers{
 		Auth:      authhandler.New(authsvc.New(repo), session, webSocket),
-		User:      userhandler.New(usersvc.New(repo), session, followsvc.New(repo, webSocket), postService),
+		User:      userhandler.New(usersvc.New(repo), session, followService, postService),
 		Post:      posthandler.New(postService, session),
 		Comment:   commenthandler.New(commentsvc.New(repo, webSocket), session),
 		File:      filehandler.New(fileService, session),
-		Group:     grouphandler.New(groupsvc.New(repo, webSocket), postService, eventsvc.New(repo, webSocket), fileService, session),
+		Group:     grouphandler.New(groupService, postService, eventsvc.New(repo, webSocket), fileService, session),
 		Message:   messagehandler.New(messagesvc.New(repo), fileService, session, webSocket),
+		Request:   requesthandler.New(followService, groupService, session),
 		WebSocket: webSocket,
 	}
 }

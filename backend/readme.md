@@ -29,7 +29,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
-| GET | /follow-requests | - | [{id, created_at, user}] requests waiting for you to answer |
+| GET | /requests | - | {follow_requests: [{id, created_at, user}], group_invitations, group_join_requests}: everything waiting for you to accept or decline |
 | POST | /follow-requests/{id}/accept | - | 204 |
 | POST | /follow-requests/{id}/decline | - | 204 |
 | PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private; going public accepts every pending follow request |

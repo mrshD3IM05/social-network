@@ -262,15 +262,15 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 |---|---|
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
 | Users | `GET /users`, `GET /users/suggestions`, `GET /user/{id}`, `GET /users/{id}/posts`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
-| Follows | `POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
-| Notifications | `GET /notifications`, `GET /notifications/unread`, `POST /notifications/read` |
+| Follows | `POST/DELETE /users/{id}/follow`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
+| Notifications | `GET /requests` (follow requests, invitations and join requests in one response), `GET /notifications`, `GET /notifications/unread`, `POST /notifications/read` |
 | Posts | `GET/POST /posts`, `GET/PUT/DELETE /posts/{id}` |
 | Comments | `GET/POST /posts/{id}/comments` |
 | Reactions | `POST/DELETE /posts/{id}/reactions` |
 | Files | `POST /files`, `POST /avatar`, `GET /fs/{id}` |
 | Groups | `GET/POST /groups`, `GET/PUT/DELETE /groups/{id}`, `POST /groups/{id}/avatar`, `GET /groups/{id}/members`, `DELETE /groups/{id}/members/{userID}` |
 | Invitations | `POST /groups/{id}/invitations`, `GET /group-invitations`, `POST /group-invitations/{id}/accept`, `POST /group-invitations/{id}/decline` |
-| Join requests | `POST/GET /groups/{id}/join-requests`, `GET /group-join-requests`, `POST /group-join-requests/{id}/accept`, `POST /group-join-requests/{id}/decline` |
+| Join requests | `POST/GET /groups/{id}/join-requests`, `POST /group-join-requests/{id}/accept`, `POST /group-join-requests/{id}/decline` |
 | Group posts | `GET/POST /groups/{id}/posts`, `DELETE /groups/{id}/posts/{post_id}` |
 | Events | `GET/POST /groups/{id}/events`, `GET /events/upcoming`, `POST /events/{id}/response` |
 | Messages | `GET /messages/{id}`, `GET /groups/{id}/messages`, `POST /messages` |

@@ -338,22 +338,6 @@ func (h *Handler) PendingInvitations(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusOK, invitations)
 }
 
-// MyJoinRequests handles GET /group-join-requests: the pending join requests
-// of every group the caller created, answered from the notifications page.
-func (h *Handler) MyJoinRequests(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	requests, err := h.Service.MyJoinRequests(userID)
-	if err != nil {
-		http.Error(w, "could not list join requests", http.StatusInternalServerError)
-		return
-	}
-	common.WriteJSON(w, http.StatusOK, requests)
-}
-
 func (h *Handler) PendingJoinRequests(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
