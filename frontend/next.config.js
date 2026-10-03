@@ -2,6 +2,8 @@
 const nextConfig = {
   // stops Next from writing extra generated files into the repo
   agentRules: false,
+  // a stray lockfile in a parent folder must not be picked as the workspace root
+  turbopack: { root: __dirname },
   // the dev-only "N" badge would sit on top of the log out button in the nav rail
   devIndicators: { position: 'bottom-right' },
   // no MIME sniffing, no framing (clickjacking), no referrer to other sites
