@@ -133,29 +133,6 @@ func (s *Service) Respond(viewerID, eventID int64, choice string) (going, notGoi
 	return going, notGoing, err
 }
 
-// MyResponse returns the viewer's current answer for an event.
-func (s *Service) MyResponse(viewerID, eventID int64) (*model.EventResponse, error) {
-	groupID, err := s.repo.GetGroupIDForEvent(eventID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	member, err := s.repo.IsGroupMember(groupID, viewerID)
-	if err != nil {
-		return nil, err
-	}
-	if !member {
-		return nil, ErrNotGroupMember
-	}
-	response, err := s.repo.GetEventResponse(eventID, viewerID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil // member who has not answered yet
-	}
-	return response, err
-}
-
 // notifyMembers tells every member except the creator that a new event was
 // scheduled (subject requirement). Non-members never receive it because the
 // recipients come straight from group_members.

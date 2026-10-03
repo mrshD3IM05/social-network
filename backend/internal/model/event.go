@@ -19,14 +19,6 @@ type GroupEvent struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-type EventResponse struct {
-	ID        int64     `json:"id"`
-	EventID   int64     `json:"event_id"`
-	UserID    int64     `json:"user_id"`
-	Choice    string    `json:"choice"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 // UpcomingEvent is one row of GET /events/upcoming: an event from one of the
 // viewer's groups, with the group title so the side panel needs no extra call.
 type UpcomingEvent struct {

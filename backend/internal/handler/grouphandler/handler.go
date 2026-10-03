@@ -570,31 +570,6 @@ func parseEventDateTime(date, clock string) time.Time {
 	return value
 }
 
-// MyEventResponse handles GET /events/{id}/response: the caller's current
-// going / not-going answer (null before they answer).
-func (h *Handler) MyEventResponse(w http.ResponseWriter, r *http.Request) {
-	userID, err := common.CurrentUserID(r, h.Session)
-	if err != nil {
-		http.Error(w, "authentication required", http.StatusUnauthorized)
-		return
-	}
-	eventID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid event id", http.StatusBadRequest)
-		return
-	}
-	response, err := h.Events.MyResponse(userID, eventID)
-	if err != nil {
-		writeEventError(w, err)
-		return
-	}
-	var choice *string
-	if response != nil {
-		choice = &response.Choice
-	}
-	common.WriteJSON(w, http.StatusOK, map[string]any{"event_id": eventID, "my_choice": choice})
-}
-
 func writeEventError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, eventsvc.ErrInvalidTitle),

@@ -127,24 +127,10 @@ func (r *Repository) SetEventResponse(eventID, userID int64, choice string) erro
 	return nil
 }
 
-// GetEventResponse returns the user's current response to an event,
-// ErrNotFound when they have not responded yet.
+// DeleteEventResponse removes the user's answer to an event, if any.
 func (r *Repository) DeleteEventResponse(eventID, userID int64) error {
 	_, err := r.db.Exec(`DELETE FROM event_responses WHERE event_id = ? AND user_id = ?`, eventID, userID)
 	return err
-}
-
-func (r *Repository) GetEventResponse(eventID, userID int64) (*model.EventResponse, error) {
-	response := new(model.EventResponse)
-	err := r.QueryRow(
-		`SELECT id, event_id, user_id, choice, created_at
-		 FROM event_responses WHERE event_id = ? AND user_id = ?`,
-		eventID, userID,
-	).Scan(&response.ID, &response.EventID, &response.UserID, &response.Choice, &response.CreatedAt)
-	if err != nil {
-		return nil, notFound(err)
-	}
-	return response, nil
 }
 
 // EventResponseCounts returns going / not-going counts for one event.

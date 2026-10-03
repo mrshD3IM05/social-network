@@ -86,7 +86,6 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("POST /groups/{id}/events", auth.Authorized(http.HandlerFunc(h.Group.CreateEvent)))
 	mux.Handle("GET /events/upcoming", auth.Authorized(http.HandlerFunc(h.Group.UpcomingEvents)))
 	mux.Handle("POST /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.RespondEvent)))
-	mux.Handle("GET /events/{id}/response", auth.Authorized(http.HandlerFunc(h.Group.MyEventResponse)))
 
 	// direct message routes (the sender must follow, or be followed by, the recipient)
 	mux.Handle("GET /messages/{id}", auth.Authorized(http.HandlerFunc(h.Message.History)))

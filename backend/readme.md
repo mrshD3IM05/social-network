@@ -72,11 +72,10 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | GET | /groups/{id}/posts | query: last | 10 group posts, newest first, members only |
 | POST | /groups/{id}/posts | form: content | 201 + post json, members only |
 | DELETE | /groups/{id}/posts/{post_id} | - | 204, the post author or the group creator |
-| GET | /groups/{id}/events | - | group events, members only |
+| GET | /groups/{id}/events | - | group events with going_count, not_going_count and your my_choice, members only |
 | POST | /groups/{id}/events | form: title, description, event_time | 201 + event json, members only |
 | GET | /events/upcoming | - | your next 3 events across all your groups, soonest first, each with group_title |
 | POST | /events/{id}/response | form: choice = going \| not_going, or empty to remove your answer | 200 + {my_choice, going_count, not_going_count}, one response per user |
-| GET | /events/{id}/response | - | your response to that event |
 
 Groups notifications (group_invitation, group_join_request, group_invite_response, group_join_response) are stored in the notifications table and pushed live over /ws with the standard `{"type":"notification", ...}` event.
 
