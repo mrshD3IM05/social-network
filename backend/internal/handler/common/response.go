@@ -48,7 +48,8 @@ func PrivateUser(user *model.User) map[string]any {
 // counts every privacy level: the posts tab behind it may show fewer.
 func Profile(user *model.User, viewerID int64) map[string]any {
 	var profile map[string]any
-	if user.Private && viewerID != user.ID && user.IsFollowing != model.FollowStateActive {
+	// IsFollowed is the viewer following this user, the same rule CanViewProfile applies
+	if user.Private && viewerID != user.ID && user.IsFollowed != model.FollowStateActive {
 		profile = PublicUser(user)
 	} else {
 		profile = PrivateUser(user)
