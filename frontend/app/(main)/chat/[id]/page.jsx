@@ -26,6 +26,7 @@ export default function ConversationPage() {
   const [files, setFiles] = useState([])
   const [typing, setTyping] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const [missing, setMissing] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const pendingUploadsRef = useRef(new Map())
@@ -37,7 +38,13 @@ export default function ConversationPage() {
   const { messages, setMessages, hasMore, loadingMore, error: historyError, loadMore } = history
 
   useEffect(() => {
-    apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
+    apiGet(`/user/${id}`)
+      .then(setOther)
+      // 400 = the id is not a number, 404 = nobody has that id
+      .catch(err => {
+        if (err.status === 400 || err.status === 404) setMissing(true)
+        else setOther({ first_name: 'User', last_name: id })
+      })
 
     // opening the conversation means you read it, so its dot goes away
     markRead(otherId)
@@ -190,13 +197,24 @@ export default function ConversationPage() {
     setSending(false)
   }
 
+  if (missing) {
+    return (
+      <div className="card locked">
+        <span className="locked-icon"><Icon name="lock" size={22} /></span>
+        <h2>This user does not exist</h2>
+        <p className="subtitle">The link is wrong, or the account was removed.</p>
+        <Link href="/chat" className="btn">Back to messages</Link>
+      </div>
+    )
+  }
+
   if (!me || !other) return <p className="loading">Loading…</p>
 
   if (blocked) {
     return (
       <div className="card locked">
         <span className="locked-icon"><Icon name="lock" size={22} /></span>
-        <h2>You cannot message {other.first_name} yet</h2>
+        <h2>{other.first_name} is not in your contacts</h2>
         <p className="subtitle">
           One of you has to follow the other before you can write to each other.
         </p>
