@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { apiGet, apiPost } from '@/lib/api'
 import { subscribe } from '@/lib/socket'
-import usePaged from '@/lib/usePaged'
+import usePaged, { PAGE_SIZE } from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
@@ -19,17 +19,54 @@ export default function NotificationsPage() {
   const [followRequests, setFollowRequests] = useState([])
   const [invitations, setInvitations] = useState([])
   const [joinRequests, setJoinRequests] = useState([])
+  const [more, setMore] = useState({}) // list name → a full page came, there may be more
+  const [loadingMore, setLoadingMore] = useState('')
   const [error, setError] = useState('')
 
-  // the three request lists come in one response
+  // the first 10 of each request list come in one response
   function loadRequests() {
     apiGet('/requests')
       .then(all => {
         setFollowRequests(all.follow_requests)
         setInvitations(all.group_invitations)
         setJoinRequests(all.group_join_requests)
+        setMore({
+          follow_requests: all.follow_requests.length === PAGE_SIZE,
+          group_invitations: all.group_invitations.length === PAGE_SIZE,
+          group_join_requests: all.group_join_requests.length === PAGE_SIZE,
+        })
       })
       .catch(() => {})
+  }
+
+  // the next 10 of one list, after the last one shown
+  async function loadMoreOf(type, list, setList) {
+    setLoadingMore(type)
+    try {
+      const page = await apiGet(`/requests?type=${type}&last=${list.at(-1).id}`)
+      setList(old => [...old, ...page])
+      setMore(state => ({ ...state, [type]: page.length === PAGE_SIZE }))
+    } catch (err) {
+      setError(err.message)
+    }
+    setLoadingMore('')
+  }
+
+  // every shown request of a list answered while more are waiting: fetch them
+  useEffect(() => {
+    if ((more.follow_requests && followRequests.length === 0)
+      || (more.group_invitations && invitations.length === 0)
+      || (more.group_join_requests && joinRequests.length === 0)) loadRequests()
+  }, [more, followRequests.length, invitations.length, joinRequests.length])
+
+  function moreButton(type, list, setList) {
+    if (!more[type] || list.length === 0) return null
+    return (
+      <button type="button" className="btn btn-light btn-sm load-more" disabled={loadingMore === type}
+        onClick={() => loadMoreOf(type, list, setList)}>
+        {loadingMore === type ? 'Loading…' : 'Load more'}
+      </button>
+    )
   }
 
   // once the first page is shown with its "read" flags (so the new ones are
@@ -87,6 +124,7 @@ export default function NotificationsPage() {
               onRespond={accept => respond('/follow-requests', accept, request.id, setFollowRequests)}
             />
           ))}
+          {moreButton('follow_requests', followRequests, setFollowRequests)}
 
           {invitations.map(inv => (
             <RequestRow
@@ -98,6 +136,7 @@ export default function NotificationsPage() {
               onRespond={accept => respond('/group-invitations', accept, inv.id, setInvitations)}
             />
           ))}
+          {moreButton('group_invitations', invitations, setInvitations)}
 
           {joinRequests.map(request => (
             <RequestRow
@@ -109,6 +148,7 @@ export default function NotificationsPage() {
               onRespond={accept => respond('/group-join-requests', accept, request.id, setJoinRequests)}
             />
           ))}
+          {moreButton('group_join_requests', joinRequests, setJoinRequests)}
         </section>
       )}
 

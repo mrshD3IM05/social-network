@@ -112,22 +112,28 @@ func (s *Service) Respond(recipient, requestID int64, status string) error {
 // AcceptAllPending accepts every request waiting for userID. It runs when a
 // profile turns public: a public profile has no requests to answer.
 func (s *Service) AcceptAllPending(userID int64) error {
-	requests, err := s.repo.ListPendingFollowRequests(userID, userID)
-	if err != nil {
-		return err
-	}
-	for _, request := range requests {
-		if err := s.Respond(userID, request.ID, model.FollowAccepted); err != nil {
+	// the list comes a page at a time; every accepted request leaves it, so
+	// the first page is asked for again until nothing is pending
+	for {
+		requests, err := s.repo.ListPendingFollowRequests(userID, userID, 0)
+		if err != nil {
 			return err
 		}
+		if len(requests) == 0 {
+			return nil
+		}
+		for _, request := range requests {
+			if err := s.Respond(userID, request.ID, model.FollowAccepted); err != nil {
+				return err
+			}
+		}
 	}
-	return nil
 }
 
 // PendingRequests are the follow requests waiting for userID to answer, read
 // as userID, so each sender carries the relation they have with them.
-func (s *Service) PendingRequests(viewerID, userID int64) ([]*model.FollowRequest, error) {
-	return s.repo.ListPendingFollowRequests(viewerID, userID)
+func (s *Service) PendingRequests(viewerID, userID, lastID int64) ([]*model.FollowRequest, error) {
+	return s.repo.ListPendingFollowRequests(viewerID, userID, lastID)
 }
 
 // Followers are the users who follow userID, Following the ones userID follows.

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiPost } from '@/lib/api'
 import usePaged from '@/lib/usePaged'
 import { LIMITS, checkText } from '@/lib/validate'
 import Modal from '@/components/Modal'
@@ -18,26 +18,20 @@ export default function GroupsPage() {
   // two lists, 10 at a time each: the groups you are in, and the rest
   const mine = usePaged('/groups?joined=true')
   const others = usePaged('/groups?joined=false')
-  const [invitations, setInvitations] = useState([])
+  const invitations = usePaged('/group-invitations') // the inbox, 10 at a time
+  // all shown invitations answered while more are waiting: fetch them
+  useEffect(() => {
+    if (invitations.items?.length === 0 && invitations.hasMore) invitations.reload()
+  }, [invitations.items?.length, invitations.hasMore])
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [joiningId, setJoiningId] = useState(null) // id of the group being joined
-
-  function load() {
-    apiGet('/group-invitations')
-      .then(setInvitations)
-      .catch(() => {}) // the inbox is secondary; the lists below still show
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
 
   async function respondInvitation(id, accept) {
     setError('')
     try {
       await apiPost(`/group-invitations/${id}/${accept ? 'accept' : 'decline'}`)
-      setInvitations(list => list.filter(inv => inv.id !== id))
+      invitations.setItems(list => list.filter(inv => inv.id !== id))
       if (accept) {
         // membership changed → the group moves to "Your groups"
         mine.reload()
@@ -75,10 +69,10 @@ export default function GroupsPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {invitations.length > 0 && (
+      {invitations.items?.length > 0 && (
         <section className="card invitations">
           <h2>Group invitations</h2>
-          {invitations.map(inv => (
+          {invitations.items.map(inv => (
             <RequestRow
               key={inv.id}
               person={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }}
@@ -88,6 +82,7 @@ export default function GroupsPage() {
               onRespond={accept => respondInvitation(inv.id, accept)}
             />
           ))}
+          <LoadMore list={invitations} />
         </section>
       )}
 

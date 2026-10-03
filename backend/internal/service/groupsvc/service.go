@@ -390,11 +390,11 @@ func (s *Service) RespondJoinRequest(creatorID, requestID int64, accept bool) er
 	return nil
 }
 
-func (s *Service) PendingInvitations(userID int64) ([]*model.GroupInvitation, error) {
-	return s.repo.GetPendingInvitationsForUser(userID)
+func (s *Service) PendingInvitations(userID, lastID int64) ([]*model.GroupInvitation, error) {
+	return s.repo.GetPendingInvitationsForUser(userID, lastID)
 }
 
-func (s *Service) PendingJoinRequests(viewerID, groupID int64) ([]*model.GroupJoinRequest, error) {
+func (s *Service) PendingJoinRequests(viewerID, groupID, lastID int64) ([]*model.GroupJoinRequest, error) {
 	group, err := s.repo.GetGroup(groupID)
 	if err != nil {
 		return nil, err
@@ -402,12 +402,12 @@ func (s *Service) PendingJoinRequests(viewerID, groupID int64) ([]*model.GroupJo
 	if group.CreatorID != viewerID {
 		return nil, ErrNotGroupCreator
 	}
-	return s.repo.GetPendingJoinRequestsForGroup(groupID)
+	return s.repo.GetPendingJoinRequestsForGroup(groupID, lastID)
 }
 
 // MyJoinRequests are the pending join requests of every group userID created.
-func (s *Service) MyJoinRequests(userID int64) ([]*model.GroupJoinRequest, error) {
-	return s.repo.GetPendingJoinRequestsForCreator(userID)
+func (s *Service) MyJoinRequests(userID, lastID int64) ([]*model.GroupJoinRequest, error) {
+	return s.repo.GetPendingJoinRequestsForCreator(userID, lastID)
 }
 
 // creatorGroup loads the group and checks userID is its creator.

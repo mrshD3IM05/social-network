@@ -29,7 +29,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
-| GET | /requests | - | {follow_requests: [{id, created_at, user}], group_invitations, group_join_requests}: everything waiting for you to accept or decline |
+| GET | /requests | query: type, last | {follow_requests: [{id, created_at, user}], group_invitations, group_join_requests}: the first 10 of each list waiting for you to accept or decline. With type=follow_requests\|group_invitations\|group_join_requests and last, the next 10 of that list only, as an array |
 | POST | /follow-requests/{id}/accept | - | 204 |
 | POST | /follow-requests/{id}/decline | - | 204 |
 | PUT | /me/privacy | form: private = true \| false | 200 + private user json, turns your own profile public or private; going public accepts every pending follow request |
@@ -62,11 +62,11 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
 | GET | /groups/{id}/messages | optional `last` oldest loaded message id | 15 newest messages before `last`, each with from_first_name, from_last_name, from_avatar; members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
-| GET | /group-invitations | - | your pending invitations |
+| GET | /group-invitations | query: last | 10 of your pending invitations, newest first |
 | POST | /group-invitations/{id}/accept | - | 204, recipient only, joins atomically |
 | POST | /group-invitations/{id}/decline | - | 204, recipient only |
 | POST | /groups/{id}/join-requests | - | 201 + request json, non-members only; members/duplicates rejected |
-| GET | /groups/{id}/join-requests | - | pending requests, creator only |
+| GET | /groups/{id}/join-requests | query: last | 10 pending requests, newest first, creator only |
 | POST | /group-join-requests/{id}/accept | - | 204, group creator only, joins atomically |
 | POST | /group-join-requests/{id}/decline | - | 204, group creator only |
 | GET | /groups/{id}/posts | query: last | 10 group posts, newest first, members only |

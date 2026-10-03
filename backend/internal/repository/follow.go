@@ -210,15 +210,16 @@ func (r *Repository) listFollowUsers(viewerID int64, query string, args ...any) 
 // ListPendingFollowRequests returns the follow requests waiting for userID to
 // accept or decline them, with the user who sent each one, carrying the
 // relation userID has with that sender.
-func (r *Repository) ListPendingFollowRequests(viewerID, userID int64) ([]*model.FollowRequest, error) {
+func (r *Repository) ListPendingFollowRequests(viewerID, userID, lastID int64) ([]*model.FollowRequest, error) {
 	rows, err := r.db.Query(
 		`SELECT f.id, f.created_at, `+userColumns+viewerStateColumns+`
 		 FROM follow_requests f
 		 JOIN `+userTable+` ON v.id = f.from_user_id
 		 `+viewerStateJoins+`
-		 WHERE f.to_user_id = ? AND f.status = ?
-		 ORDER BY f.id DESC`,
-		viewerID, viewerID, userID, model.FollowPending,
+		 WHERE f.to_user_id = ? AND f.status = ? AND (? = 0 OR f.id < ?)
+		 ORDER BY f.id DESC
+		 LIMIT ?`,
+		viewerID, viewerID, userID, model.FollowPending, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err

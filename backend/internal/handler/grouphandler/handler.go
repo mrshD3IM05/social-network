@@ -340,7 +340,7 @@ func (h *Handler) PendingInvitations(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	invitations, err := h.Service.PendingInvitations(userID)
+	invitations, err := h.Service.PendingInvitations(userID, common.LastID(r))
 	if err != nil {
 		http.Error(w, "could not list pending invitations", http.StatusInternalServerError)
 		return
@@ -359,7 +359,7 @@ func (h *Handler) PendingJoinRequests(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	requests, err := h.Service.PendingJoinRequests(userID, groupID)
+	requests, err := h.Service.PendingJoinRequests(userID, groupID, common.LastID(r))
 	if err != nil {
 		if errors.Is(err, groupsvc.ErrNotGroupCreator) {
 			http.Error(w, "only the group creator can view join requests", http.StatusForbidden)

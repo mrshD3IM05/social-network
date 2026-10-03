@@ -34,7 +34,6 @@ export default function GroupDetailPage() {
   const { me } = useMe()
   const [group, setGroup] = useState(null)
   const [eventsOpened, setEventsOpened] = useState(false) // events load on first visit of their tab
-  const [requests, setRequests] = useState([])
   const [tab, setTab] = useState('posts')
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState('')
@@ -66,10 +65,12 @@ export default function GroupDetailPage() {
 
   // events too, once their tab was opened (the tab count comes with the group)
   const events = usePaged(isMember && (eventsOpened || tab === 'events') ? `/groups/${id}/events` : null)
-  const loadRequests = useCallback(
-    () => apiGet(`/groups/${id}/join-requests`).then(setRequests).catch(() => setRequests([])),
-    [id],
-  )
+  // join requests, for the creator only, 10 at a time
+  const requests = usePaged(group?.is_creator ? `/groups/${id}/join-requests` : null)
+  // every shown request answered while more are waiting: fetch them
+  useEffect(() => {
+    if (requests.items?.length === 0 && requests.hasMore) requests.reload()
+  }, [requests.items?.length, requests.hasMore])
 
   useEffect(() => {
     load()
@@ -79,9 +80,6 @@ export default function GroupDetailPage() {
     if (tab === 'events') setEventsOpened(true)
   }, [tab])
 
-  useEffect(() => {
-    if (group?.is_creator) loadRequests()
-  }, [group?.is_creator, loadRequests])
 
   // Every action reports through the same notice/error pair and reloads the
   // group, so the counts and the status chip stay in sync.
@@ -106,7 +104,7 @@ export default function GroupDetailPage() {
     return run(
       async () => {
         await apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`)
-        setRequests(list => list.filter(r => r.id !== request.id))
+        requests.setItems(list => list.filter(r => r.id !== request.id))
         if (accept && members.items) members.reload() // the new member joins the list
       },
       accept ? `${request.first_name} is now a member.` : 'Request declined.',
@@ -168,7 +166,10 @@ export default function GroupDetailPage() {
     { key: 'events', label: 'Events', count: group.event_count },
     { key: 'chat', label: 'Chat' },
     { key: 'members', label: 'Members', count: group.member_count },
-    ...(group.is_creator ? [{ key: 'requests', label: 'Requests', count: requests.length }] : []),
+    // only the loaded ones are known: "10+" while more pages are waiting
+    ...(group.is_creator
+      ? [{ key: 'requests', label: 'Requests', count: requests.hasMore ? `${requests.items.length}+` : requests.items?.length }]
+      : []),
   ]
 
   return (
@@ -248,7 +249,7 @@ export default function GroupDetailPage() {
                 onClick={() => setTab(key)}
               >
                 {label}
-                {count > 0 && <span className="tab-count">{count}</span>}
+                {(typeof count === 'string' || count > 0) && <span className="tab-count">{count}</span>}
               </button>
             ))}
           </nav>
@@ -332,13 +333,16 @@ export default function GroupDetailPage() {
 
           {/* ---------------------------------------------- requests */}
           {tab === 'requests' && (
-            requests.length === 0 ? (
+            requests.items === null ? (
+              <p className="loading">Loading requests…</p>
+            ) : requests.items.length === 0 ? (
               <Empty title="No pending requests">
                 People asking to join this group land here.
               </Empty>
             ) : (
+              <>
               <div className="card list">
-                {requests.map(request => (
+                {requests.items.map(request => (
                   <RequestRow
                     key={request.id}
                     person={request}
@@ -349,6 +353,8 @@ export default function GroupDetailPage() {
                   />
                 ))}
               </div>
+              <LoadMore list={requests} />
+              </>
             )
           )}
         </>

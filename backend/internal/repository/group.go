@@ -241,15 +241,17 @@ func (r *Repository) PendingGroupInvitation(groupID, toUserID int64) (*model.Gro
 	return invitation, nil
 }
 
-func (r *Repository) GetPendingInvitationsForUser(userID int64) ([]*model.GroupInvitation, error) {
+func (r *Repository) GetPendingInvitationsForUser(userID, lastID int64) ([]*model.GroupInvitation, error) {
 	rows, err := r.db.Query(
 		`SELECT `+groupInvitationColumns+`
 		 FROM group_invitations gi
 		 JOIN groups g ON g.id = gi.group_id
 		 JOIN users fu ON fu.id = gi.from_user_id
 		 WHERE gi.to_user_id = ? AND gi.status = ?
-		 ORDER BY gi.created_at DESC, gi.id DESC`,
-		userID, model.GroupInvitationPending,
+		   AND (? = 0 OR (gi.created_at, gi.id) < (SELECT created_at, id FROM group_invitations WHERE id = ?))
+		 ORDER BY gi.created_at DESC, gi.id DESC
+		 LIMIT ?`,
+		userID, model.GroupInvitationPending, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err
@@ -374,15 +376,17 @@ func (r *Repository) PendingGroupJoinRequest(groupID, userID int64) (*model.Grou
 	return request, nil
 }
 
-func (r *Repository) GetPendingJoinRequestsForGroup(groupID int64) ([]*model.GroupJoinRequest, error) {
+func (r *Repository) GetPendingJoinRequestsForGroup(groupID, lastID int64) ([]*model.GroupJoinRequest, error) {
 	rows, err := r.db.Query(
 		`SELECT `+groupJoinRequestColumns+`
 		 FROM group_join_requests gj
 		 JOIN groups g ON g.id = gj.group_id
 		 JOIN users u ON u.id = gj.user_id
 		 WHERE gj.group_id = ? AND gj.status = ?
-		 ORDER BY gj.created_at DESC, gj.id DESC`,
-		groupID, model.GroupJoinPending,
+		   AND (? = 0 OR (gj.created_at, gj.id) < (SELECT created_at, id FROM group_join_requests WHERE id = ?))
+		 ORDER BY gj.created_at DESC, gj.id DESC
+		 LIMIT ?`,
+		groupID, model.GroupJoinPending, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err
@@ -402,15 +406,17 @@ func (r *Repository) GetPendingJoinRequestsForGroup(groupID int64) ([]*model.Gro
 
 // GetPendingJoinRequestsForCreator returns the pending join requests of every
 // group created by userID, so they can be answered from the notifications page.
-func (r *Repository) GetPendingJoinRequestsForCreator(userID int64) ([]*model.GroupJoinRequest, error) {
+func (r *Repository) GetPendingJoinRequestsForCreator(userID, lastID int64) ([]*model.GroupJoinRequest, error) {
 	rows, err := r.db.Query(
 		`SELECT `+groupJoinRequestColumns+`
 		 FROM group_join_requests gj
 		 JOIN groups g ON g.id = gj.group_id
 		 JOIN users u ON u.id = gj.user_id
 		 WHERE g.creator_id = ? AND gj.status = ?
-		 ORDER BY gj.created_at DESC, gj.id DESC`,
-		userID, model.GroupJoinPending,
+		   AND (? = 0 OR (gj.created_at, gj.id) < (SELECT created_at, id FROM group_join_requests WHERE id = ?))
+		 ORDER BY gj.created_at DESC, gj.id DESC
+		 LIMIT ?`,
+		userID, model.GroupJoinPending, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err
