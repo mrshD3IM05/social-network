@@ -16,8 +16,19 @@ async function request(path, options = {}) {
   return text ? JSON.parse(text) : null
 }
 
+// GETs already on their way, by path. A second apiGet for the same path while
+// the first is in flight gets the same answer instead of a new request: React
+// runs effects twice in dev, and several parts of a page can ask for the same
+// thing at once. Once it settles the entry is gone, so later calls ask again.
+const inFlight = new Map()
+
 export function apiGet(path) {
-  return request(path)
+  let pending = inFlight.get(path)
+  if (!pending) {
+    pending = request(path).finally(() => inFlight.delete(path))
+    inFlight.set(path, pending)
+  }
+  return pending
 }
 
 // The API reads form fields, so we send them like a normal form.
