@@ -28,7 +28,7 @@ func New(repo *repository.Repository, hub *ws.Hub) *Service {
 }
 
 // List returns the comments of a post the viewer can see.
-func (s *Service) List(viewerID, postID int64) ([]*model.Comment, error) {
+func (s *Service) List(viewerID, postID, lastID int64) ([]*model.Comment, error) {
 	visible, err := s.repo.CanViewPost(viewerID, postID)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *Service) List(viewerID, postID int64) ([]*model.Comment, error) {
 	if !visible {
 		return nil, ErrNoAccess
 	}
-	return s.repo.ListPostComments(postID)
+	return s.repo.ListPostComments(postID, lastID)
 }
 
 // Create adds a comment to a post the viewer can see. Authorization goes
@@ -80,14 +80,13 @@ func (s *Service) Create(authorID, postID int64, content string) (*model.Comment
 // reload re-reads the freshly inserted comment with its author fields and
 // images, mirroring how the list endpoint renders comments.
 func (s *Service) reload(commentID, postID int64) (*model.Comment, error) {
-	comments, err := s.repo.ListPostComments(postID)
+	comment, err := s.repo.GetComment(commentID)
 	if err != nil {
 		return nil, err
 	}
-	for _, comment := range comments {
-		if comment.ID == commentID {
-			return comment, nil
-		}
+	if comment.PostID != postID {
+		return nil, repository.ErrNotFound
 	}
-	return nil, repository.ErrNotFound
+	comment.Images, err = s.repo.ListCommentFileIDs(comment.ID)
+	return comment, err
 }

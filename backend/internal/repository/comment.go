@@ -51,14 +51,19 @@ func (r *Repository) GetComment(id int64) (*model.Comment, error) {
 	return comment, nil
 }
 
-func (r *Repository) ListPostComments(postID int64) ([]*model.Comment, error) {
+// ListPostComments returns one page of a post's comments, newest first,
+// older than the comment lastID (0 for the newest page). The client shows them
+// oldest at the top and asks for older ones with the id of the oldest it has,
+// so a comment just written never shifts a page.
+func (r *Repository) ListPostComments(postID, lastID int64) ([]*model.Comment, error) {
 	rows, err := r.db.Query(
 		`SELECT `+commentColumns+`
 		 FROM comments c
 		 JOIN users u ON u.id = c.author_id
-		 WHERE c.post_id = ?
-		 ORDER BY c.created_at, c.id`,
-		postID,
+		 WHERE c.post_id = ? AND (? = 0 OR c.id < ?)
+		 ORDER BY c.id DESC
+		 LIMIT ?`,
+		postID, lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err

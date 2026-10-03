@@ -32,7 +32,7 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid post id", http.StatusBadRequest)
 		return
 	}
-	comments, err := h.Service.List(userID, postID)
+	comments, err := h.Service.List(userID, postID, common.LastID(r))
 	if err != nil {
 		writeError(w, err)
 		return

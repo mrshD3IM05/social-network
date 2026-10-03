@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
+import { PAGE_SIZE } from '@/lib/usePaged'
 import Avatar from './Avatar'
 import CharCount from './CharCount'
 import Icon from './Icon'
@@ -32,7 +33,9 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
   const [editError, setEditError] = useState('')
   const [saving, setSaving] = useState(false)
   const [open, setOpen] = useState(false)
-  const [comments, setComments] = useState(null) // null = not loaded yet
+  const [comments, setComments] = useState(null) // null = not loaded yet, oldest first
+  const [hasOlder, setHasOlder] = useState(false) // more comments before the first shown
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [draft, setDraft] = useState('')
   const [files, setFiles] = useState([])
   const [error, setError] = useState('')
@@ -126,18 +129,38 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
     setDeleting(false)
   }
 
-  // First open loads the comments once; afterwards they are kept in state.
+  // The API answers newest first, 10 at a time; the list shows oldest first.
+  const commentsPath = `/posts/${post.id}/comments`
+
+  // First open loads the 10 newest comments; afterwards they are kept in state.
   function toggle() {
     const next = !open
     setOpen(next)
     if (next && comments === null) {
-      apiGet(`/posts/${post.id}/comments`)
-        .then(setComments)
+      apiGet(commentsPath)
+        .then(page => {
+          setComments([...page].reverse())
+          setHasOlder(page.length === PAGE_SIZE)
+        })
         .catch(err => {
           setError(err.message)
           setComments([])
         })
     }
+  }
+
+  // the 10 before the oldest one shown, added on top
+  async function loadOlder() {
+    if (!comments?.length) return
+    setLoadingOlder(true)
+    try {
+      const page = await apiGet(`${commentsPath}?last=${comments[0].id}`)
+      setComments(list => [...[...page].reverse(), ...list])
+      setHasOlder(page.length === PAGE_SIZE)
+    } catch (err) {
+      setError(err.message)
+    }
+    setLoadingOlder(false)
   }
 
   async function submitComment(e) {
@@ -156,9 +179,11 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
         for (const file of files) formData.append('files', file)
         formData.append('comment_id', comment.id)
         await apiUpload('/files', formData)
-        // the uploaded image is attached after the comment was created —
-        // reload the list so it shows up
-        setComments(await apiGet(`/posts/${post.id}/comments`))
+        // the image is attached after the comment was created: the newest
+        // page now holds the comment with it, so take that one copy from it
+        const newest = await apiGet(commentsPath)
+        const withImages = newest.find(c => c.id === comment.id) || comment
+        setComments(list => [...(list || []), withImages])
       } else {
         setComments(list => [...(list || []), comment])
       }
@@ -257,6 +282,12 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
 
           {comments !== null && comments.length === 0 && (
             <p className="meta comments-empty">No comments yet.</p>
+          )}
+
+          {hasOlder && (
+            <button type="button" className="btn btn-light btn-sm load-more" onClick={loadOlder} disabled={loadingOlder}>
+              {loadingOlder ? 'Loading…' : 'Show older comments'}
+            </button>
           )}
 
           {(comments || []).map(comment => (

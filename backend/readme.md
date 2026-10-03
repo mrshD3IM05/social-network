@@ -44,7 +44,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | POST | /posts/{id}/reactions | form: reaction = like \| dislike | 200 + summary, toggles: same reaction removes it, other switches; invisible post = 404 |
 | DELETE | /posts/{id}/reactions | - | 200 + summary after removing your reaction |
 | GET | /posts/{id} | - | one post, 404 if you cannot see it |
-| GET | /posts/{id}/comments | - | comments on the post, visibility follows the post |
+| GET | /posts/{id}/comments | query: last | 10 comments, newest first; last = id of the oldest you have gives the ones before it. Visibility follows the post |
 | POST | /posts/{id}/comments | form: content | 201 + comment json |
 
 Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`like`, `dislike`, or empty) for the requesting user.
