@@ -13,6 +13,9 @@ import LoadMore from '@/components/LoadMore'
 import PersonRow from '@/components/PersonRow'
 import PostCard from '@/components/PostCard'
 
+// is_followed on a user (model.FollowState) → the status POST /users/{id}/follow answers with
+const FOLLOW_STATUS = { 1: 'accepted', 2: 'pending' }
+
 export default function ProfilePage() {
   const { id } = useParams() // the [id] from the URL, e.g. /profile/3
   const { me } = useMe()
@@ -35,13 +38,13 @@ export default function ProfilePage() {
   const [savingPrivacy, setSavingPrivacy] = useState(false)
 
   async function load() {
-    apiGet(`/users/${id}/follow`)
-      .then(result => setFollowStatus(result.status))
-      .catch(() => {})
     try {
       // the profile with its counts (posts, followers, following), always
-      // answered: a private one just leaves out the contact details
-      setUser(await apiGet(`/user/${id}`))
+      // answered: a private one just leaves out the contact details. It also
+      // carries your follow state (is_followed), so no second request is needed.
+      const profile = await apiGet(`/user/${id}`)
+      setUser(profile)
+      setFollowStatus(FOLLOW_STATUS[profile.is_followed] || '')
     } catch (err) {
       setMessage(err.message)
     }

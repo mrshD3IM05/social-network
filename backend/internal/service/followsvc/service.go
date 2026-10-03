@@ -81,20 +81,6 @@ func (s *Service) name(userID int64) string {
 }
 func (s *Service) Unfollow(from, to int64) error { return s.repo.DeleteFollow(from, to) }
 
-// Status is "accepted", "pending" or "" (not following) for from -> to.
-func (s *Service) Status(from, to int64) (string, error) {
-	follow, err := s.repo.GetFollowRequest(from, to)
-	if errors.Is(err, repository.ErrNotFound) {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	if follow.Status == model.FollowDeclined {
-		return "", nil
-	}
-	return follow.Status, nil
-}
 func (s *Service) Respond(recipient, requestID int64, status string) error {
 	follow, err := s.repo.GetFollowRequestByID(requestID)
 	if err != nil {

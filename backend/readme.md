@@ -22,11 +22,10 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 |---|---|---|---|
 | GET | /users | query: q (search by name or nickname), last | 10 users except you, public shape, ordered by name |
 | GET | /contacts | - | users you can message: at least one of you follows the other (accepted), public shape, ordered by name |
-| GET | /user/{id} | - | profile with every register field except the password, plus post_count; 403 if the profile is private and you don't follow them |
+| GET | /user/{id} | - | profile with post_count, followers, following and your follow state (is_followed / is_following: 0 none, 1 accepted, 2 pending); a private profile you don't follow leaves out email and date_of_birth |
 | GET | /users/{id}/posts | query: last | 10 of their posts you may see, same privacy gate as the profile |
 | GET | /users/{id}/followers | query: last | 10 users following them, same privacy gate as the profile |
 | GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |
-| GET | /users/{id}/follow | - | {"status": "accepted" \| "pending" \| ""} your follow relation to that user |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |
 | DELETE | /users/{id}/follow | - | unfollows |
 | GET | /follow-requests | - | [{id, created_at, user}] requests waiting for you to answer |
@@ -74,6 +73,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | DELETE | /groups/{id}/posts/{post_id} | - | 204, the post author or the group creator |
 | GET | /groups/{id}/events | - | group events, members only |
 | POST | /groups/{id}/events | form: title, description, event_time | 201 + event json, members only |
+| GET | /events/upcoming | - | your next 3 events across all your groups, soonest first, each with group_title |
 | POST | /events/{id}/response | form: choice = going \| not_going, or empty to remove your answer | 200 + {my_choice, going_count, not_going_count}, one response per user |
 | GET | /events/{id}/response | - | your response to that event |
 

@@ -262,7 +262,7 @@ Every path below is relative to the backend. From the browser, add the `/api/v1`
 |---|---|
 | Auth | `POST /register`, `POST /login`, `POST /logout`, `GET /me` |
 | Users | `GET /users`, `GET /user/{id}`, `GET /users/{id}/posts`, `GET /users/{id}/followers`, `GET /users/{id}/following`, `PUT /me/privacy` |
-| Follows | `GET/POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
+| Follows | `POST/DELETE /users/{id}/follow`, `GET /follow-requests`, `POST /follow-requests/{id}/accept`, `POST /follow-requests/{id}/decline` |
 | Notifications | `GET /notifications`, `GET /notifications/unread`, `POST /notifications/read` |
 | Posts | `GET/POST /posts`, `GET/PUT/DELETE /posts/{id}` |
 | Comments | `GET/POST /posts/{id}/comments` |

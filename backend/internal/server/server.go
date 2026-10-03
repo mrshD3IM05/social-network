@@ -23,7 +23,6 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("GET /users/{id}/followers", auth.Authorized(http.HandlerFunc(h.User.Followers)))
 	mux.Handle("GET /users/{id}/following", auth.Authorized(http.HandlerFunc(h.User.Following)))
 	mux.Handle("GET /contacts", auth.Authorized(http.HandlerFunc(h.User.Contacts)))
-	mux.Handle("GET /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowStatus)))
 	mux.Handle("POST /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.FollowUser)))
 	mux.Handle("DELETE /users/{id}/follow", auth.Authorized(http.HandlerFunc(h.User.UnfollowUser)))
 	mux.Handle("POST /follow-requests/{id}/accept", auth.Authorized(http.HandlerFunc(h.User.RespondFollow)))
