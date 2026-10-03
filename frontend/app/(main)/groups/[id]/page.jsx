@@ -132,6 +132,17 @@ export default function GroupDetailPage() {
     )
   }
 
+  // a member leaves by removing themselves; the creator deletes the group instead
+  async function leaveGroup() {
+    if (!confirm(`Leave ${group.title}?`)) return
+    try {
+      await apiDelete(`/groups/${id}/members/${me.id}`)
+      router.push('/groups')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   async function deleteGroup() {
     if (!confirm('Delete this group? Its posts, events and messages are deleted too.')) return
     try {
@@ -208,6 +219,11 @@ export default function GroupDetailPage() {
                     <Icon name="trash" size={16} /> Delete
                   </button>
                 </>
+              )}
+              {!group.is_creator && (
+                <button type="button" className="btn btn-light" onClick={leaveGroup}>
+                  Leave
+                </button>
               )}
               <button type="button" className="btn" onClick={() => setShowInvite(true)}>
                 <Icon name="plus" size={16} /> Invite people
@@ -310,6 +326,17 @@ export default function GroupDetailPage() {
                 <PersonRow key={member.user_id} person={member} href={`/profile/${member.user_id}`}>
                   {member.user_id === group.creator_id ? (
                     <span className="chip chip-accent">Creator</span>
+                  ) : member.user_id === me.id ? (
+                    <button
+                      type="button"
+                      className="btn btn-light btn-sm"
+                      onClick={e => {
+                        e.preventDefault() // don't follow the profile link
+                        leaveGroup()
+                      }}
+                    >
+                      Leave
+                    </button>
                   ) : group.is_creator ? (
                     <button
                       type="button"

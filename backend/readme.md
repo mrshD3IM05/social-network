@@ -59,7 +59,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | DELETE | /groups/{id} | - | 204, creator only; members, invitations, requests, posts, comments, events, messages and notifications are deleted by the database cascade |
 | POST | /groups/{id}/avatar | multipart: avatar | 200 + group json, creator only, same image rules as /avatar |
 | GET | /groups/{id}/members | query: last (a member's user_id) | 10 members in joining order, members only (403 otherwise) |
-| DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
+| DELETE | /groups/{id}/members/{userID} | - | 204, the creator removes a member, or a member removes themselves to leave; the creator cannot be removed; the user can be invited again later |
 | GET | /groups/{id}/messages | optional `last` oldest loaded message id | 10 newest messages before `last`, each with from_first_name, from_last_name, from_avatar; members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
 | GET | /group-invitations | query: last | 10 of your pending invitations, newest first |

@@ -181,7 +181,8 @@ func (h *Handler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// RemoveMember handles DELETE /groups/{id}/members/{userID} (creator only).
+// RemoveMember handles DELETE /groups/{id}/members/{userID}: the creator
+// removes a member, or a member removes themselves to leave the group.
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

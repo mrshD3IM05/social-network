@@ -95,14 +95,20 @@ func (s *Service) Delete(creatorID, groupID int64) error {
 	return s.repo.DeleteGroup(groupID)
 }
 
-// RemoveMember lets the creator kick a member out of the group.
-func (s *Service) RemoveMember(creatorID, groupID, userID int64) error {
-	group, err := s.creatorGroup(creatorID, groupID)
+// RemoveMember lets the creator kick a member out of the group, or a member
+// leave it by removing themselves. The creator can never be removed: they
+// delete the group instead.
+func (s *Service) RemoveMember(viewerID, groupID, userID int64) error {
+	group, err := s.repo.GetGroup(groupID)
 	if err != nil {
 		return err
 	}
-	if userID == creatorID {
+	if userID == group.CreatorID {
 		return ErrRemoveCreator
+	}
+	leaving := viewerID == userID
+	if !leaving && viewerID != group.CreatorID {
+		return ErrNotGroupCreator
 	}
 	isMember, err := s.repo.IsGroupMember(groupID, userID)
 	if err != nil {
@@ -114,10 +120,13 @@ func (s *Service) RemoveMember(creatorID, groupID, userID int64) error {
 	if err := s.repo.RemoveGroupMember(groupID, userID); err != nil {
 		return err
 	}
+	if leaving {
+		return nil
+	}
 	s.hub.Notify(&model.Notification{
 		UserID:  userID,
 		Type:    model.NotificationGroupRemoved,
-		ActorID: creatorID,
+		ActorID: viewerID,
 		Content: "you were removed from \"" + group.Title + "\"",
 		GroupID: &group.ID,
 	})
