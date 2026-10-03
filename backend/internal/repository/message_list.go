@@ -9,14 +9,17 @@ func (r *Repository) ListMessages(userID, otherID int64, limit int, lastID int64
 	// the inner query keeps the newest messages, the outer one puts them back
 	// in reading order (same shape as ListGroupMessages)
 	rows, err := r.db.Query(`
-		SELECT id, from_user_id, to_user_id, group_id, content, created_at FROM (
+		SELECT m.id, m.from_user_id, m.to_user_id, m.group_id, m.content, m.created_at,
+			u.first_name, u.last_name, COALESCE(u.avatar, '')
+		FROM (
 			SELECT id, from_user_id, to_user_id, group_id, content, created_at
 			FROM messages
 			WHERE group_id IS NULL
 			  AND ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
 			  AND (? = 0 OR id < ?)
 			ORDER BY id DESC LIMIT ?
-		) ORDER BY id`,
+		) m JOIN users u ON u.id = m.from_user_id
+		ORDER BY m.id`,
 		userID, otherID, otherID, userID, lastID, lastID, limit,
 	)
 	if err != nil {
@@ -30,6 +33,7 @@ func (r *Repository) ListMessages(userID, otherID int64, limit int, lastID int64
 		if err := rows.Scan(
 			&message.ID, &message.FromUserID, &message.ToUserID,
 			&message.GroupID, &message.Content, &message.CreatedAt,
+			&message.FromFirstName, &message.FromLastName, &message.FromAvatar,
 		); err != nil {
 			return nil, err
 		}

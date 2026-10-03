@@ -13,7 +13,10 @@ func (r *Repository) CreateMessage(message *model.Message) error {
 	if err != nil {
 		return err
 	}
-	return r.QueryRow(`SELECT created_at FROM messages WHERE id = ?`, message.ID).Scan(&message.CreatedAt)
+	return r.QueryRow(
+		`SELECT m.created_at, u.first_name, u.last_name, COALESCE(u.avatar, '')
+		 FROM messages m JOIN users u ON u.id = m.from_user_id WHERE m.id = ?`, message.ID,
+	).Scan(&message.CreatedAt, &message.FromFirstName, &message.FromLastName, &message.FromAvatar)
 }
 
 // GetMessage returns one chat message for publishing after its HTTP images are
@@ -21,9 +24,11 @@ func (r *Repository) CreateMessage(message *model.Message) error {
 func (r *Repository) GetMessage(id int64) (*model.Message, error) {
 	message := new(model.Message)
 	err := r.QueryRow(`
-		SELECT id, from_user_id, to_user_id, group_id, content, created_at
-		FROM messages WHERE id = ?`, id,
-	).Scan(&message.ID, &message.FromUserID, &message.ToUserID, &message.GroupID, &message.Content, &message.CreatedAt)
+		SELECT m.id, m.from_user_id, m.to_user_id, m.group_id, m.content, m.created_at,
+			u.first_name, u.last_name, COALESCE(u.avatar, '')
+		FROM messages m JOIN users u ON u.id = m.from_user_id WHERE m.id = ?`, id,
+	).Scan(&message.ID, &message.FromUserID, &message.ToUserID, &message.GroupID, &message.Content, &message.CreatedAt,
+		&message.FromFirstName, &message.FromLastName, &message.FromAvatar)
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +87,14 @@ func (r *Repository) CanAttachToMessage(messageID, userID int64) (bool, error) {
 // ListGroupMessages returns one older-to-newer page of a group chat.
 func (r *Repository) ListGroupMessages(groupID, lastID int64) ([]*model.Message, error) {
 	rows, err := r.db.Query(`
-		SELECT id, from_user_id, group_id, content, created_at FROM (
+		SELECT m.id, m.from_user_id, m.group_id, m.content, m.created_at,
+			u.first_name, u.last_name, COALESCE(u.avatar, '')
+		FROM (
 			SELECT id, from_user_id, group_id, content, created_at
 			FROM messages WHERE group_id = ? AND (? = 0 OR id < ?)
 			ORDER BY id DESC LIMIT ?
-		) ORDER BY id`, groupID, lastID, lastID, MessagePageSize)
+		) m JOIN users u ON u.id = m.from_user_id
+		ORDER BY m.id`, groupID, lastID, lastID, MessagePageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +102,8 @@ func (r *Repository) ListGroupMessages(groupID, lastID int64) ([]*model.Message,
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
 		message := new(model.Message)
-		if err := rows.Scan(&message.ID, &message.FromUserID, &message.GroupID, &message.Content, &message.CreatedAt); err != nil {
+		if err := rows.Scan(&message.ID, &message.FromUserID, &message.GroupID, &message.Content, &message.CreatedAt,
+			&message.FromFirstName, &message.FromLastName, &message.FromAvatar); err != nil {
 			return nil, err
 		}
 		// a group message can carry pictures, like a private one

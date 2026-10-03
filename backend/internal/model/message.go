@@ -10,6 +10,11 @@ type Message struct {
 	Content    string    `json:"content"`
 	Images     []string  `json:"images"`
 	CreatedAt  time.Time `json:"created_at"`
+	// the sender, so a group chat can name who wrote each message without
+	// loading every member of the group
+	FromFirstName string `json:"from_first_name"`
+	FromLastName  string `json:"from_last_name"`
+	FromAvatar    string `json:"from_avatar"`
 }
 
 const (
