@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { apiGet } from '@/lib/api'
+import { useEffect, useState } from 'react'
 import { fetchContacts } from '@/lib/people'
+import { useMe } from '@/lib/useMe'
 import { getUnread, onUnreadChange } from '@/lib/unread'
 import { subscribe } from '@/lib/socket'
 import Icon from '@/components/Icon'
@@ -15,10 +15,9 @@ import PersonRow from '@/components/PersonRow'
 export default function ChatListPage() {
   const [people, setPeople] = useState(null)
   const [unread, setUnread] = useState(getUnread())
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
 
   useEffect(() => {
-    apiGet('/me').then(setMe).catch(() => setMe(null))
     fetchContacts()
       .then(setPeople)
       .catch(() => setPeople([]))

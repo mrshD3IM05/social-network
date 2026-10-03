@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { apiGet } from '@/lib/api'
+import { useMe } from '@/lib/useMe'
 import usePaged from '@/lib/usePaged'
 import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
@@ -9,13 +8,8 @@ import PostForm from '@/components/PostForm'
 import PostCard from '@/components/PostCard'
 
 export default function HomePage() {
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
   const posts = usePaged('/posts') // the feed, 10 posts at a time
-
-  // runs once when the page opens
-  useEffect(() => {
-    apiGet('/me').then(setMe)
-  }, [])
 
   if (!me) return <p className="loading">Loading…</p>
 

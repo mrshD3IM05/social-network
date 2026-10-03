@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { apiGet, apiPost, apiUpload } from '@/lib/api'
+import { apiPost, apiUpload } from '@/lib/api'
+import { useMe } from '@/lib/useMe'
 import usePaged from '@/lib/usePaged'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkImages, checkText } from '@/lib/validate'
 import CharCount from './CharCount'
@@ -15,8 +16,11 @@ export default function PostForm({ onPosted, groupId }) {
   const [content, setContent] = useState('')
   const [privacy, setPrivacy] = useState('public')
   const [files, setFiles] = useState([])
-  const [myId, setMyId] = useState(null) // known once "Chosen followers" is picked
-  const followers = usePaged(myId ? `/users/${myId}/followers` : null) // 10 at a time
+  const { me } = useMe()
+  // The follower list is only needed for "Chosen followers", so it is not asked
+  // for until that privacy is picked.
+  const [pickingViewers, setPickingViewers] = useState(false)
+  const followers = usePaged(pickingViewers && me ? `/users/${me.id}/followers` : null) // 10 at a time
   const [viewers, setViewers] = useState([]) // ids of the followers who can see a private post
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -34,16 +38,9 @@ export default function PostForm({ onPosted, groupId }) {
     if (imageError) e.target.value = '' // let the user pick again
   }
 
-  async function changePrivacy(e) {
+  function changePrivacy(e) {
     setPrivacy(e.target.value)
-    if (e.target.value === 'private' && !myId) {
-      try {
-        const me = await apiGet('/me')
-        setMyId(me.id)
-      } catch (err) {
-        setError(err.message)
-      }
-    }
+    setPickingViewers(e.target.value === 'private')
   }
 
   function toggleViewer(id) {

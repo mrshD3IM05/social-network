@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiPost, apiUpload } from '@/lib/api'
+import { setMe } from '@/lib/userStore'
 import Icon from '@/components/Icon'
 import {
   IMAGE_ACCEPT,
@@ -71,14 +72,16 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      await apiPost('/register', values)
+      let user = await apiPost('/register', values)
       // registering also logs you in, so the photo can be sent right after
       if (avatar) {
         const formData = new FormData()
         formData.append('avatar', avatar)
         // the account exists already: if the photo fails it can be set in settings
-        await apiUpload('/avatar', formData).catch(() => {})
+        user = await apiUpload('/avatar', formData).catch(() => user)
       }
+      // either answer is your user, so the feed does not have to ask again
+      setMe(user)
       router.push('/home')
     } catch (err) {
       setError(err.message)

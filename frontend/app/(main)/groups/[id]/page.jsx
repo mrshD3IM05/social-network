@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { apiDelete, apiGet, apiPost, apiPut, apiUpload, imageUrl } from '@/lib/api'
 import { sendWs, subscribe } from '@/lib/socket'
+import { useMe } from '@/lib/useMe'
 import usePaged from '@/lib/usePaged'
 import { useDebouncedValue, useThrottle } from '@/lib/timing'
 import useMessageHistory from '@/lib/useMessageHistory'
@@ -29,7 +30,7 @@ import MessageContent from '@/components/MessageContent'
 export default function GroupDetailPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
   const [group, setGroup] = useState(null)
   const [events, setEvents] = useState(null)
   const [requests, setRequests] = useState([])
@@ -45,9 +46,7 @@ export default function GroupDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const [detail, current] = await Promise.all([apiGet(`/groups/${id}`), apiGet('/me')])
-      setGroup(detail)
-      setMe(current)
+      setGroup(await apiGet(`/groups/${id}`))
     } catch (err) {
       if (err.status === 404) setNotFound(true)
       else setError(err.message)

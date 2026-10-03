@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api'
+import { useMe } from '@/lib/useMe'
+import { setMe } from '@/lib/userStore'
 import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
@@ -13,7 +15,7 @@ import PostCard from '@/components/PostCard'
 
 export default function ProfilePage() {
   const { id } = useParams() // the [id] from the URL, e.g. /profile/3
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
   const [user, setUser] = useState(null)
   const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
   // the three lists come 10 at a time; a private profile answers 403 to them
@@ -25,7 +27,6 @@ export default function ProfilePage() {
   const [savingPrivacy, setSavingPrivacy] = useState(false)
 
   async function load() {
-    setMe(await apiGet('/me'))
     apiGet(`/users/${id}/follow`)
       .then(result => setFollowStatus(result.status))
       .catch(() => {})

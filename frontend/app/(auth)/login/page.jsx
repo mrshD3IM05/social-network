@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/api'
+import { setMe } from '@/lib/userStore'
 import { LIMITS, firstError } from '@/lib/validate'
 
 export default function LoginPage() {
@@ -31,7 +32,8 @@ export default function LoginPage() {
 
     try {
       // the "email" field also accepts a nickname
-      await apiPost('/login', { email: email.trim(), password })
+      // the answer is your user, so the feed does not have to ask for it again
+      setMe(await apiPost('/login', { email: email.trim(), password }))
       router.push('/home')
     } catch (err) {
       setError(err.message)

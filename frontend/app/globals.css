@@ -277,6 +277,36 @@ a.list-item:hover { background: var(--surface-soft); color: var(--ink); }
    ========================================================= */
 .app { display: grid; grid-template-columns: 248px minmax(0, 1fr) 340px; min-height: 100vh; }
 
+/* Sits above the app, not inside it, so the three columns are left alone.
+   Colors are the shared ones, so it reads the same in either theme. */
+.conn-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--line);
+}
+.conn-banner.ended {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-bottom-color: transparent;
+}
+.conn-banner a,
+.conn-banner button {
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 .brand {
   font-family: var(--font-title), sans-serif;
   font-weight: 800;

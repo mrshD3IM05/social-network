@@ -1,19 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { apiGet, apiUpload } from '@/lib/api'
+import { useState } from 'react'
+import { apiUpload } from '@/lib/api'
+import { useMe } from '@/lib/useMe'
+import { setMe } from '@/lib/userStore'
 import { IMAGE_ACCEPT, checkImageFile } from '@/lib/validate'
 import Avatar from '@/components/Avatar'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
 
 export default function SettingsPage() {
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
   const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    apiGet('/me').then(setMe)
-  }, [])
 
   async function changeAvatar(e) {
     const file = e.target.files[0]
@@ -32,8 +30,8 @@ export default function SettingsPage() {
     formData.append('avatar', file)
 
     try {
-      const user = await apiUpload('/avatar', formData) // answers with the updated user
-      setMe(user)
+      // the answer is the updated user, so the header updates with it
+      setMe(await apiUpload('/avatar', formData))
       setMessage('Photo updated.')
     } catch (err) {
       setMessage(err.message)

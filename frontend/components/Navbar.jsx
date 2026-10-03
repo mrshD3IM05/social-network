@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/api'
-import { closeSocket } from '@/lib/socket'
+import { closeSocket, ensureSocket } from '@/lib/socket'
+import { forgetMe } from '@/lib/userStore'
 import Avatar from './Avatar'
 import Icon from './Icon'
 import MessageDot from './MessageDot'
@@ -27,8 +28,18 @@ export default function Navbar({ user }) {
   const router = useRouter()
 
   async function logout() {
-    await apiPost('/logout')
+    // Close first: the server ends this session's sockets the moment it sees the
+    // logout, and we must not read that as a session that ended by itself.
     closeSocket()
+    try {
+      await apiPost('/logout')
+    } catch (err) {
+      // The logout never happened, so the session is still good and the page
+      // should keep receiving. Nothing to tell the user: nothing changed.
+      ensureSocket()
+      return
+    }
+    forgetMe()
     router.push('/login')
   }
 

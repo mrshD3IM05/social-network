@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiGet, apiUpload, imageUrl } from '@/lib/api'
+import { useMe } from '@/lib/useMe'
 import { sendWs, subscribe } from '@/lib/socket'
 import { IMAGE_ACCEPT, LIMITS, checkImageFiles, checkText } from '@/lib/validate'
 import { markRead } from '@/lib/unread'
@@ -19,7 +20,7 @@ import MessageContent from '@/components/MessageContent'
 export default function ConversationPage() {
   const { id } = useParams()
   const otherId = Number(id)
-  const [me, setMe] = useState(null)
+  const { me } = useMe()
   const [other, setOther] = useState(null)
   const [text, setText] = useState('')
   const [files, setFiles] = useState([])
@@ -36,7 +37,6 @@ export default function ConversationPage() {
   const { messages, setMessages, hasMore, loadingMore, error: historyError, loadMore } = history
 
   useEffect(() => {
-    apiGet('/me').then(setMe)
     apiGet(`/user/${id}`).then(setOther).catch(() => setOther({ first_name: 'User', last_name: id }))
 
     // opening the conversation means you read it, so its dot goes away

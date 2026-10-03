@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMe } from '@/lib/useMe'
 import { ensureSocket } from '@/lib/socket'
+import ConnectionBanner from '@/components/ConnectionBanner'
 import Navbar from '@/components/Navbar'
 import SidePanel from '@/components/SidePanel'
 
@@ -28,12 +29,15 @@ export default function MainLayout({ children }) {
   if (!me) return <p className="loading">Loading…</p>
 
   return (
-    <div className="app">
-      <Navbar user={me} />
-      <main className="main">
-        <div className="page">{children}</div>
-      </main>
-      <SidePanel />
-    </div>
+    <>
+      <ConnectionBanner />
+      <div className="app">
+        <Navbar user={me} />
+        <main className="main">
+          <div className="page">{children}</div>
+        </main>
+        <SidePanel />
+      </div>
+    </>
   )
 }
