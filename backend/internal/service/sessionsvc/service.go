@@ -1,14 +1,14 @@
 package sessionsvc
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"time"
 
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+
+	"github.com/gofrs/uuid"
 )
 
 const (
@@ -26,14 +26,14 @@ type Service struct {
 	ttl  time.Duration
 }
 
-func New(repo *repository.Repository) *Service { return &Service{repo: repo, ttl: DefaultTTL} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo, ttl: 15 * time.Second} }
 
 func (s *Service) Create(userID int64) (*model.Session, error) {
-	var token [32]byte
-	if _, err := rand.Read(token[:]); err != nil {
+	id, err := uuid.NewV4()
+	if err != nil {
 		return nil, err
 	}
-	session := &model.Session{ID: hex.EncodeToString(token[:]), UserID: userID, ExpiresAt: time.Now().Add(s.ttl)}
+	session := &model.Session{ID: id.String(), UserID: userID, ExpiresAt: time.Now().Add(s.ttl)}
 	if err := s.repo.CreateSession(session); err != nil {
 		return nil, err
 	}

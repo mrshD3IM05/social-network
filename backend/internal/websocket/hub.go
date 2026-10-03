@@ -14,6 +14,7 @@ import (
 	"sn-backend/internal/repository"
 	"sn-backend/internal/service/sessionsvc"
 
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -30,14 +31,27 @@ type Hub struct {
 }
 
 func NewHub(repo *repository.Repository, sessions *sessionsvc.Service) *Hub {
-	return &Hub{clients: make(map[int64]map[*Client]struct{}), repo: repo, sessions: sessions}
+	return &Hub{
+		clients:  make(map[int64]map[*Client]struct{}),
+		repo:     repo,
+		sessions: sessions,
+	}
 }
 
 // ServeHTTP upgrades GET /ws to a websocket. The Hub is a plain http.Handler, so
-// it is routed like any other endpoint. The connection is tied to the session
-// that opened it, which is how logging out closes the socket straight away.
+// it is routed like any other endpoint. The connection carries the session that
+// opened it and the moment that session stops being valid, which is how both a
+// logout and an expiry close the socket straight away.
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionsvc.CookieName)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	// Parsed before the upgrade, so a token that is not a UUID never opens a
+	// connection, and so the connection can be keyed by the 16-byte value instead
+	// of by this string, which would otherwise stay alive as long as the socket.
+	sessionID, err := uuid.FromString(cookie.Value)
 	if err != nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -51,9 +65,18 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	client := &Client{hub: h, connection: connection, userID: session.UserID, send: make(chan []byte, 16)}
+	// Every field is set before the session is told about this connection: the
+	// expiry timer may close it from another goroutine the moment it is tracked.
+	client := &Client{
+		hub:        h,
+		connection: connection,
+		userID:     session.UserID,
+		sessionID:  sessionID,
+		expiresAt:  session.ExpiresAt,
+		send:       make(chan []byte, 16),
+	}
 	h.add(client)
-	trackClient(cookie.Value, client)
+	trackClient(sessionID, session.ExpiresAt, client)
 	go client.writePump()
 	client.readPump()
 }
@@ -108,6 +131,8 @@ type Client struct {
 	hub        *Hub
 	connection *websocket.Conn
 	userID     int64
+	sessionID  uuid.UUID
+	expiresAt  time.Time
 	send       chan []byte
 }
 
@@ -128,6 +153,15 @@ func (c *Client) readPump() {
 	for {
 		var input incomingMessage
 		if err := c.connection.ReadJSON(&input); err != nil {
+			return
+		}
+		// The expiry timer normally closes the connection first, but a frame can
+		// already be waiting when the session dies, and nothing may be processed
+		// on behalf of a session that is no longer valid. Comparing the deadline
+		// it was opened with costs nothing, where re-reading the session would be
+		// a query on every message.
+		if !time.Now().Before(c.expiresAt) {
+			c.closeWith(CloseSessionRevoked, "session expired")
 			return
 		}
 		// "someone is writing" is passed on and not stored
@@ -176,6 +210,19 @@ func (c *Client) sendError(message string) {
 	case c.send <- payload:
 	default:
 	}
+}
+
+// closeWith ends the connection with a status the page can read, rather than
+// just dropping it. A bare Close sends no status frame at all, which browsers
+// report as 1005 and which is indistinguishable from a lost connection. Safe to
+// call from any goroutine: WriteControl may run alongside writePump.
+func (c *Client) closeWith(code int, reason string) {
+	_ = c.connection.WriteControl(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(code, reason),
+		time.Now().Add(5*time.Second),
+	)
+	_ = c.connection.Close()
 }
 
 func (c *Client) writePump() {
