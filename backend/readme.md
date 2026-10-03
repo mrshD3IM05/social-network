@@ -60,7 +60,7 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 | POST | /groups/{id}/avatar | multipart: avatar | 200 + group json, creator only, same image rules as /avatar |
 | GET | /groups/{id}/members | query: last (a member's user_id) | 10 members in joining order, members only (403 otherwise) |
 | DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
-| GET | /groups/{id}/messages | optional `last` oldest loaded message id | 15 newest messages before `last`, each with from_first_name, from_last_name, from_avatar; members only (new ones arrive over /ws) |
+| GET | /groups/{id}/messages | optional `last` oldest loaded message id | 10 newest messages before `last`, each with from_first_name, from_last_name, from_avatar; members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
 | GET | /group-invitations | query: last | 10 of your pending invitations, newest first |
 | POST | /group-invitations/{id}/accept | - | 204, recipient only, joins atomically |
@@ -82,7 +82,7 @@ Groups notifications (group_invitation, group_join_request, group_invite_respons
 ### messages
 | method | path | request | response |
 |---|---|---|---|
-| GET | /messages/{id} | optional `last` oldest loaded message id | 15 newest messages before `last` in your conversation, each with its sender's name and avatar |
+| GET | /messages/{id} | optional `last` oldest loaded message id | 10 newest messages before `last` in your conversation, each with its sender's name and avatar |
 | POST | /messages | form: to_user_id, content | 201 + message json, pushed to both sides over /ws |
 | POST | /messages/{id}/images | multipart: files[] (max 3 images, 10 MB each) | 201 + completed message json, pushed to recipients over /ws |
 

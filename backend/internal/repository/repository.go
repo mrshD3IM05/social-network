@@ -16,9 +16,9 @@ var (
 // The next ones are asked for with ?last=<id of the last item already shown>.
 const PageSize = 10
 
-// MessagePageSize is larger than ordinary list pages so chat context remains
-// useful while still loading history incrementally.
-const MessagePageSize = 15
+// MessagePageSize is the chat history page: 10 like every other list, older
+// ones asked for with ?last=<id of the oldest message shown>.
+const MessagePageSize = PageSize
 
 type Repository struct {
 	db *sql.DB

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { apiGet } from './api'
 import { useThrottle } from './timing'
 
-export const MESSAGE_PAGE_SIZE = 15
+export const MESSAGE_PAGE_SIZE = 10 // MessagePageSize in backend/internal/repository
 
 // Chat history grows upward. The API returns the next older page when given
 // the id of the oldest message currently shown.
