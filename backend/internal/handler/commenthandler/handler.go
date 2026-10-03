@@ -80,3 +80,47 @@ func writeError(w http.ResponseWriter, err error) {
 		http.Error(w, "could not process comment", http.StatusInternalServerError)
 	}
 }
+
+// UpdateComment handles PUT /comments/{id}: the author rewrites their comment.
+func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	commentID, err := common.PathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid comment id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	comment, err := h.Service.Update(userID, commentID, r.FormValue("content"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, comment)
+}
+
+// DeleteComment handles DELETE /comments/{id}: its author, or the author of the
+// post it sits under, removes it.
+func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	commentID, err := common.PathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid comment id", http.StatusBadRequest)
+		return
+	}
+	if err := h.Service.Delete(userID, commentID); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

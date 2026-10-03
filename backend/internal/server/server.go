@@ -48,6 +48,8 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("GET /posts/{id}/viewers", auth.Authorized(http.HandlerFunc(h.Post.ListViewers)))
 	mux.Handle("GET /posts/{id}/comments", auth.Authorized(http.HandlerFunc(h.Comment.ListComments)))
 	mux.Handle("POST /posts/{id}/comments", auth.Authorized(http.HandlerFunc(h.Comment.CreateComment)))
+	mux.Handle("PUT /comments/{id}", auth.Authorized(http.HandlerFunc(h.Comment.UpdateComment)))
+	mux.Handle("DELETE /comments/{id}", auth.Authorized(http.HandlerFunc(h.Comment.DeleteComment)))
 	mux.Handle("GET /posts/{id}", auth.Authorized(http.HandlerFunc(h.Post.GetPost)))
 
 	// reaction routes

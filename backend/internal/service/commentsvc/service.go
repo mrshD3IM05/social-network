@@ -90,3 +90,30 @@ func (s *Service) reload(commentID, postID int64) (*model.Comment, error) {
 	comment.Images, err = s.repo.ListCommentFileIDs(comment.ID)
 	return comment, err
 }
+
+// Update changes the text of a comment the caller wrote.
+func (s *Service) Update(authorID, commentID int64, content string) (*model.Comment, error) {
+	content = strings.TrimSpace(content)
+	if content == "" || len(content) > maxContentLen {
+		return nil, ErrInvalidContent
+	}
+	if err := s.repo.UpdateCommentOwned(commentID, authorID, content); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return s.repo.GetComment(commentID)
+}
+
+// Delete removes a comment. Its author may delete it, and so may the author of
+// the post it sits under.
+func (s *Service) Delete(userID, commentID int64) error {
+	if err := s.repo.DeleteCommentOwned(commentID, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+	return nil
+}

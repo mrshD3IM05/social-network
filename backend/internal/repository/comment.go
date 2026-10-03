@@ -151,3 +151,42 @@ func (r *Repository) ListCommentFileIDs(commentID int64) ([]string, error) {
 	}
 	return ids, rows.Err()
 }
+
+// UpdateCommentOwned changes a comment the caller wrote.
+func (r *Repository) UpdateCommentOwned(commentID, authorID int64, content string) error {
+	result, err := r.db.Exec(
+		`UPDATE comments SET content = ? WHERE id = ? AND author_id = ?`,
+		content, commentID, authorID,
+	)
+	if err != nil {
+		return err
+	}
+	if count, err := result.RowsAffected(); err != nil {
+		return err
+	} else if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteCommentOwned removes a comment written by the caller, or any comment on
+// a post the caller wrote, together with the rows of its images.
+func (r *Repository) DeleteCommentOwned(commentID, userID int64) error {
+	result, err := r.db.Exec(
+		`DELETE FROM comments WHERE id = ? AND (
+			author_id = ?
+			OR EXISTS (SELECT 1 FROM posts p WHERE p.id = comments.post_id AND p.author_id = ?)
+		)`,
+		commentID, userID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if count, err := result.RowsAffected(); err != nil {
+		return err
+	} else if count == 0 {
+		return ErrNotFound
+	}
+	_, err = r.db.Exec(`DELETE FROM files WHERE comment_id = ?`, commentID)
+	return err
+}
