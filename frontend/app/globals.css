@@ -764,7 +764,8 @@ a.list-item:hover { background: var(--surface-soft); color: var(--ink); }
 
 .invitations { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); box-shadow: inset 3px 0 0 var(--accent); }
 .invitations h2 { margin-bottom: 4px; font-size: 18px; }
-.invitation-actions { display: flex; gap: 8px; }
+.invitation-actions { display: flex; flex-shrink: 0; gap: 8px; }
+.request-avatar { display: flex; flex-shrink: 0; border-radius: 999px; }
 
 .invite-list { max-height: 50vh; overflow-y: auto; }
 
@@ -936,8 +937,13 @@ a.list-item:hover { background: var(--surface-soft); color: var(--ink); }
   .settings-section { grid-template-columns: 1fr; gap: 16px; }
   .row { flex-direction: column; gap: 0; }
   .chat { height: calc(100dvh - 56px - 68px - 64px); }
-  .invitation-actions { flex-direction: column; width: 100%; }
-  .invitation-actions .btn { width: 100%; }
+  /* requests: avatar and text on top, Accept / Decline side by side below */
+  .request-item { flex-wrap: wrap; gap: 10px 12px; padding: 12px 4px; }
+  .request-item + .request-item { border-top: 1px solid var(--line); border-radius: 0; }
+  .request-item .list-text { flex: 1 1 0; }
+  .request-item .list-text strong { overflow-wrap: anywhere; }
+  .invitation-actions { width: 100%; padding-left: 52px; }
+  .invitation-actions .btn { flex: 1; height: 38px; }
   .section-bar { flex-direction: column; align-items: stretch; gap: 10px; }
   .group-hero { padding: 18px; }
   .group-hero-title h1 { font-size: 24px; }

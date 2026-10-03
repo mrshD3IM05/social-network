@@ -8,7 +8,6 @@ import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
-import PersonRow from '@/components/PersonRow'
 
 // notifications that come with something to accept or decline, and the one
 // list each of them adds to
@@ -92,14 +91,20 @@ export default function NotificationsPage() {
           <h2>Requests</h2>
 
           {followRequests.map(request => (
-            <PersonRow key={`f${request.id}`} person={request.user}>
-              <small className="meta">wants to follow you</small>
+            <div key={`f${request.id}`} className="list-item request-item">
+              <Link href={`/profile/${request.user.id}`} className="request-avatar">
+                <Avatar user={request.user} size={40} />
+              </Link>
+              <span className="list-text">
+                <strong>{request.user.first_name} {request.user.last_name} wants to follow you</strong>
+                <small>@{request.user.nickname}</small>
+              </span>
               {actions('/follow-requests', request.id, setFollowRequests)}
-            </PersonRow>
+            </div>
           ))}
 
           {invitations.map(inv => (
-            <div key={`i${inv.id}`} className="list-item">
+            <div key={`i${inv.id}`} className="list-item request-item">
               <Avatar user={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }} size={40} />
               <span className="list-text">
                 <strong>You are invited to join “{inv.group_title}”</strong>
@@ -110,7 +115,7 @@ export default function NotificationsPage() {
           ))}
 
           {joinRequests.map(request => (
-            <div key={`j${request.id}`} className="list-item">
+            <div key={`j${request.id}`} className="list-item request-item">
               <Avatar user={request} size={40} />
               <span className="list-text">
                 <strong>{request.first_name} {request.last_name} wants to join “{request.group_title}”</strong>
