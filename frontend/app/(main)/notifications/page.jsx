@@ -8,6 +8,7 @@ import usePaged from '@/lib/usePaged'
 import Avatar from '@/components/Avatar'
 import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
+import RequestRow from '@/components/RequestRow'
 
 // notifications that come with something to accept or decline
 const REQUEST_TYPES = ['follow_request', 'group_invitation', 'group_join_request']
@@ -53,7 +54,7 @@ export default function NotificationsPage() {
     return unsub
   }, [])
 
-  // answer a request, then drop it from its list
+  // answer a request, then drop it from its list once the API agreed
   async function respond(path, accept, id, setList) {
     setError('')
     try {
@@ -62,15 +63,6 @@ export default function NotificationsPage() {
     } catch (err) {
       setError(err.message)
     }
-  }
-
-  function actions(path, id, setList) {
-    return (
-      <div className="invitation-actions">
-        <button className="btn btn-sm" onClick={() => respond(path, true, id, setList)}>Accept</button>
-        <button className="btn btn-light btn-sm" onClick={() => respond(path, false, id, setList)}>Decline</button>
-      </div>
-    )
   }
 
   const requestCount = followRequests.length + invitations.length + joinRequests.length
@@ -86,38 +78,36 @@ export default function NotificationsPage() {
           <h2>Requests</h2>
 
           {followRequests.map(request => (
-            <div key={`f${request.id}`} className="list-item request-item">
-              <Link href={`/profile/${request.user.id}`} className="request-avatar">
-                <Avatar user={request.user} size={40} />
-              </Link>
-              <span className="list-text">
-                <strong>{request.user.first_name} {request.user.last_name} wants to follow you</strong>
-                <small>@{request.user.nickname}</small>
-              </span>
-              {actions('/follow-requests', request.id, setFollowRequests)}
-            </div>
+            <RequestRow
+              key={`f${request.id}`}
+              person={request.user}
+              href={`/profile/${request.user.id}`}
+              title={`${request.user.first_name} ${request.user.last_name} wants to follow you`}
+              subtitle={`@${request.user.nickname}`}
+              onRespond={accept => respond('/follow-requests', accept, request.id, setFollowRequests)}
+            />
           ))}
 
           {invitations.map(inv => (
-            <div key={`i${inv.id}`} className="list-item request-item">
-              <Avatar user={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }} size={40} />
-              <span className="list-text">
-                <strong>You are invited to join “{inv.group_title}”</strong>
-                <small>{inv.from_first_name} {inv.from_last_name} invited you</small>
-              </span>
-              {actions('/group-invitations', inv.id, setInvitations)}
-            </div>
+            <RequestRow
+              key={`i${inv.id}`}
+              person={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }}
+              href={`/groups/${inv.group_id}`}
+              title={`You are invited to join “${inv.group_title}”`}
+              subtitle={`${inv.from_first_name} ${inv.from_last_name} invited you`}
+              onRespond={accept => respond('/group-invitations', accept, inv.id, setInvitations)}
+            />
           ))}
 
           {joinRequests.map(request => (
-            <div key={`j${request.id}`} className="list-item request-item">
-              <Avatar user={request} size={40} />
-              <span className="list-text">
-                <strong>{request.first_name} {request.last_name} wants to join “{request.group_title}”</strong>
-                <small>@{request.nickname}</small>
-              </span>
-              {actions('/group-join-requests', request.id, setJoinRequests)}
-            </div>
+            <RequestRow
+              key={`j${request.id}`}
+              person={request}
+              href={`/profile/${request.user_id}`}
+              title={`${request.first_name} ${request.last_name} wants to join “${request.group_title}”`}
+              subtitle={`@${request.nickname}`}
+              onRespond={accept => respond('/group-join-requests', accept, request.id, setJoinRequests)}
+            />
           ))}
         </section>
       )}

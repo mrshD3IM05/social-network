@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { apiGet, apiPost } from '@/lib/api'
 import { LIMITS, checkText } from '@/lib/validate'
 import Modal from '@/components/Modal'
-import Avatar from '@/components/Avatar'
 import GroupCard from '@/components/GroupCard'
 import Icon from '@/components/Icon'
 import PageHeader from '@/components/PageHeader'
+import RequestRow from '@/components/RequestRow'
 import CharCount from '@/components/CharCount'
 
 // Groups hub: your invitations first, then the groups you belong to, then the
@@ -78,23 +78,16 @@ export default function GroupsPage() {
       {invitations.length > 0 && (
         <section className="card invitations">
           <h2>Group invitations</h2>
-          {invitations.map(inv => {
-            // every invitation comes with the name and photo of who sent it
-            const from = { first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }
-            return (
-              <div key={inv.id} className="list-item">
-                <Avatar user={from} size={40} />
-                <span className="list-text">
-                  <strong>You are invited to join “{inv.group_title}”</strong>
-                  <small>{from.first_name} {from.last_name} invited you</small>
-                </span>
-                <div className="invitation-actions">
-                  <button className="btn btn-sm" onClick={() => respondInvitation(inv.id, true)}>Accept</button>
-                  <button className="btn btn-light btn-sm" onClick={() => respondInvitation(inv.id, false)}>Decline</button>
-                </div>
-              </div>
-            )
-          })}
+          {invitations.map(inv => (
+            <RequestRow
+              key={inv.id}
+              person={{ first_name: inv.from_first_name, last_name: inv.from_last_name, avatar: inv.from_avatar }}
+              href={`/groups/${inv.group_id}`}
+              title={`You are invited to join “${inv.group_title}”`}
+              subtitle={`${inv.from_first_name} ${inv.from_last_name} invited you`}
+              onRespond={accept => respondInvitation(inv.id, accept)}
+            />
+          ))}
         </section>
       )}
 
