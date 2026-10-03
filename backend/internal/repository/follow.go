@@ -99,13 +99,29 @@ func (r *Repository) ListFollowing(viewerID, userID, lastID int64) ([]*model.Use
 // The rule is the one CanMessage applies before every message: at least one of
 // the two follows the other, with an accepted request — in either direction, so
 // a pending follow counts for nothing. Yourself is left out, like in /users.
-// Ordered by name so the Messages list reads like the people directory. The
+// Newest conversation first, then by name, 10 at a time after the contact
+// lastID. The
 // caller is the viewer, so the relation on each row is the one they have with
 // the person.
-func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
-	return r.listFollowUsers(userID,
-		`SELECT `+userColumns+viewerStateColumns+`
-		 FROM `+userTable+`
+func (r *Repository) ListMessageableUsers(userID, lastID int64) ([]*model.User, error) {
+	// last_message is the id of the newest private message between the viewer
+	// and person p (0 when none): ids only grow, so it orders like the time and
+	// can be compared exactly when resuming after the contact lastID.
+	lastMessage := func(p string) string {
+		return `COALESCE((
+			SELECT MAX(m.id) FROM messages m
+			WHERE (m.from_user_id = ? AND m.to_user_id = ` + p + `.id)
+			   OR (m.from_user_id = ` + p + `.id AND m.to_user_id = ?)
+		), 0)`
+	}
+	// The placeholders are bound in the order they appear in the statement.
+	rows, err := r.db.Query(
+		`WITH cursor AS (
+			SELECT `+lastMessage("u")+` AS k, u.first_name AS f, u.last_name AS l, u.id AS i
+			FROM users u WHERE u.id = ?
+		 )
+		 SELECT `+userColumns+viewerStateColumns+`
+		 FROM (SELECT uv.*, `+lastMessage("uv")+` AS last_message FROM user_view uv) v
 		 `+viewerStateJoins+`
 		 WHERE v.id != ?
 		   AND EXISTS (
@@ -118,27 +134,39 @@ func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
 				)
 				AND f.status = ?
 		   )
-		 ORDER BY (
-				SELECT MAX(m.created_at)
-				FROM messages m
-				WHERE
-					(m.from_user_id = ? AND m.to_user_id = v.id)
-					OR
-					(m.from_user_id = v.id AND m.to_user_id = ?)
-		   ) DESC,
+		   AND (? = 0
+				OR v.last_message < (SELECT k FROM cursor)
+				OR (v.last_message = (SELECT k FROM cursor)
+					AND (v.first_name COLLATE NOCASE, v.last_name COLLATE NOCASE, v.id) > (SELECT f, l, i FROM cursor)))
+		 ORDER BY v.last_message DESC,
 		   v.first_name COLLATE NOCASE,
 		   v.last_name COLLATE NOCASE,
-		   v.id`,
+		   v.id
+		 LIMIT ?`,
+		userID, userID, lastID, // cursor
+		userID, userID, // last_message
+		userID, userID, // viewerStateJoins
 		userID,
 		userID, userID, model.FollowAccepted,
-		userID, userID,
+		lastID,
+		PageSize,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*model.User{}
+	for rows.Next() {
+		user, err := scanUserForViewer(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, rows.Err()
 }
 
-// listFollowUsers runs one of the people queries above. The query has to be
-// written with viewerStateJoins and viewerStateColumns, and the viewer goes in
-// ahead of every argument it carries, because those two placeholders are the
-// first ones in the statement.
 // ListSuggestedUsers returns up to limit users the viewer has no accepted
 // follow with in either direction (the "People you may know" panel), so the
 // client does not have to fetch every user and every contact to filter them.
@@ -157,6 +185,10 @@ func (r *Repository) ListSuggestedUsers(userID int64, limit int) ([]*model.User,
 	)
 }
 
+// listFollowUsers runs one of the people queries above. The query has to be
+// written with viewerStateJoins and viewerStateColumns, and the viewer goes in
+// ahead of every argument it carries, because those two placeholders are the
+// first ones in the statement.
 func (r *Repository) listFollowUsers(viewerID int64, query string, args ...any) ([]*model.User, error) {
 	rows, err := r.db.Query(query, append([]any{viewerID, viewerID}, args...)...)
 	if err != nil {

@@ -16,7 +16,7 @@ func (h *Handler) Contacts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
-	users, err := h.Follow.Messageable(viewerID)
+	users, err := h.Follow.Messageable(viewerID, common.LastID(r))
 	if err != nil {
 		http.Error(w, "could not list contacts", http.StatusInternalServerError)
 		return

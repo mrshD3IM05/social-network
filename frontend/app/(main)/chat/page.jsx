@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fetchContacts } from '@/lib/people'
+import usePaged from '@/lib/usePaged'
 import { useMe } from '@/lib/useMe'
 import { getUnread, onUnreadChange } from '@/lib/unread'
 import { subscribe } from '@/lib/socket'
 import Icon from '@/components/Icon'
+import LoadMore from '@/components/LoadMore'
 import PageHeader from '@/components/PageHeader'
 import PersonRow from '@/components/PersonRow'
 
@@ -13,17 +14,12 @@ import PersonRow from '@/components/PersonRow'
 // Everyone else would only get "you cannot message them yet", so they are not
 // listed here — /people is where you go to find someone new to follow.
 export default function ChatListPage() {
-  const [people, setPeople] = useState(null)
+  const contacts = usePaged('/contacts') // newest conversation first, 10 at a time
+  const people = contacts.items
   const [unread, setUnread] = useState(getUnread())
   const { me } = useMe()
-  const peopleRef = useRef(people) // the socket handler reads the current list
-  peopleRef.current = people
-
-  useEffect(() => {
-    fetchContacts()
-      .then(setPeople)
-      .catch(() => setPeople([]))
-  }, [])
+  const contactsRef = useRef(contacts) // the socket handler reads the current list
+  contactsRef.current = contacts
 
   // a dot on every person whose message has not been opened yet
   useEffect(() => onUnreadChange(setUnread), [])
@@ -37,11 +33,12 @@ export default function ChatListPage() {
       // the list is newest conversation first: move that person to the top here
       // instead of asking for the whole list again on every message
       const otherId = msg.from_user_id === me.id ? msg.to_user_id : msg.from_user_id
-      const list = peopleRef.current
-      const person = list?.find(p => p.id === otherId)
-      if (person) setPeople([person, ...list.filter(p => p.id !== otherId)])
-      // someone not listed yet (followed after this page loaded): ask once
-      else fetchContacts().then(setPeople).catch(() => {})
+      const { items, setItems, reload } = contactsRef.current
+      const person = items?.find(p => p.id === otherId)
+      if (person) setItems([person, ...items.filter(p => p.id !== otherId)])
+      // not shown yet (on a later page, or followed after this page loaded):
+      // the first page now starts with them
+      else reload()
     })
     return unsub
   }, [me])
@@ -50,7 +47,8 @@ export default function ChatListPage() {
     <>
       <PageHeader title="Messages" subtitle="Pick someone you follow, or who follows you." />
 
-      {people === null && <p className="loading">Loading…</p>}
+      {contacts.error && <p className="error">{contacts.error.message}</p>}
+      {people === null && !contacts.error && <p className="loading">Loading…</p>}
 
       {people !== null && people.length === 0 && (
         <div className="empty">
@@ -67,6 +65,7 @@ export default function ChatListPage() {
           </PersonRow>
         ))}
       </div>
+      <LoadMore list={contacts} />
     </>
   )
 }

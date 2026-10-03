@@ -148,6 +148,6 @@ func (s *Service) Suggestions(userID int64) ([]*model.User, error) {
 	return s.repo.ListSuggestedUsers(userID, suggestionLimit)
 }
 
-func (s *Service) Messageable(userID int64) ([]*model.User, error) {
-	return s.repo.ListMessageableUsers(userID)
+func (s *Service) Messageable(userID, lastID int64) ([]*model.User, error) {
+	return s.repo.ListMessageableUsers(userID, lastID)
 }
