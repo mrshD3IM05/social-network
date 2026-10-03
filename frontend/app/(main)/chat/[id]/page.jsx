@@ -227,9 +227,13 @@ export default function ConversationPage() {
     <section className="card chat">
       <header className="chat-header">
         <Link href="/chat" className="icon-button" title="Back"><Icon name="back" /></Link>
-        <Avatar user={other} size={38} />
+        <Link href={`/profile/${otherId}`} aria-label="Open their profile">
+          <Avatar user={other} size={38} />
+        </Link>
         <div>
-          <strong>{other.first_name} {other.last_name}</strong>
+          <Link href={`/profile/${otherId}`} className="chat-name">
+            {other.first_name} {other.last_name}
+          </Link>
           <p className="meta">{typing ? 'typing…' : 'Live conversation'}</p>
         </div>
       </header>

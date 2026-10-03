@@ -605,9 +605,19 @@ function GroupChat({ groupId, me, members }) {
           const author = { first_name: msg.from_first_name, last_name: msg.from_last_name, avatar: msg.from_avatar }
           return (
             <div key={msg.id} className={mine ? 'chat-line mine' : 'chat-line'}>
-              {!mine && <Avatar user={author} size={28} />}
+              {!mine && (
+                <Link href={`/profile/${msg.from_user_id}`} aria-label={`${author.first_name}'s profile`}>
+                  <Avatar user={author} size={28} />
+                </Link>
+              )}
               <div>
-                {!mine && <small className="meta">{author.first_name}</small>}
+                {!mine && (
+                  <small className="meta">
+                    <Link href={`/profile/${msg.from_user_id}`} className="chat-name">
+                      {author.first_name}
+                    </Link>
+                  </small>
+                )}
                 <div className={mine ? 'bubble mine' : 'bubble'}>
                   {msg.content && <MessageContent content={msg.content} />}
                   {msg.images?.length > 0 && (
