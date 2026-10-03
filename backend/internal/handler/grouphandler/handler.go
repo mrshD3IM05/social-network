@@ -237,7 +237,7 @@ func (h *Handler) GetGroupMembers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	members, err := h.Service.Members(userID, groupID)
+	members, err := h.Service.Members(userID, groupID, common.LastID(r))
 	if err != nil {
 		if errors.Is(err, groupsvc.ErrNotGroupMember) {
 			http.Error(w, "only group members can view members", http.StatusForbidden)

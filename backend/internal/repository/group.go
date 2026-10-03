@@ -139,14 +139,19 @@ func scanGroupMember(s scanner) (*model.GroupMember, error) {
 	return member, nil
 }
 
-func (r *Repository) GetGroupMembers(groupID int64) ([]*model.GroupMember, error) {
+// GetGroupMembers returns one page of a group's members in joining order,
+// after the member whose user id is lastID (0 for the first page).
+func (r *Repository) GetGroupMembers(groupID, lastID int64) ([]*model.GroupMember, error) {
 	rows, err := r.db.Query(
 		`SELECT `+groupMemberColumns+`
 		 FROM group_members gm
 		 JOIN users u ON u.id = gm.user_id
 		 WHERE gm.group_id = ?
-		 ORDER BY gm.created_at, gm.user_id`,
-		groupID,
+		   AND (? = 0 OR (gm.created_at, gm.user_id) >
+				(SELECT created_at, user_id FROM group_members WHERE group_id = ? AND user_id = ?))
+		 ORDER BY gm.created_at, gm.user_id
+		 LIMIT ?`,
+		groupID, lastID, groupID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err
@@ -527,7 +532,9 @@ func (r *Repository) GroupDetailPayload(groupID, viewerID int64) (*model.GroupDe
 		return nil, err
 	}
 
-	members, err := r.GetGroupMembers(groupID)
+	// only the first page rides along (the avatar row on the group page); the
+	// whole list is GET /groups/{id}/members, 10 at a time
+	members, err := r.GetGroupMembers(groupID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +546,9 @@ func (r *Repository) GroupDetailPayload(groupID, viewerID int64) (*model.GroupDe
 	for _, member := range members {
 		detail.Members = append(detail.Members, *member)
 	}
-	detail.MemberCount = len(detail.Members)
+	if err := r.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ?`, groupID).Scan(&detail.MemberCount); err != nil {
+		return nil, err
+	}
 
 	detail.Creator, err = r.GetGroupCreator(group.CreatorID)
 	if err != nil {

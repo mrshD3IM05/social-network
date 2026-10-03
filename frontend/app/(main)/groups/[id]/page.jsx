@@ -57,6 +57,13 @@ export default function GroupDetailPage() {
 
   // The member-only lists. Posts come 10 at a time, and only for members.
   const posts = usePaged(isMember ? `/groups/${id}/posts` : null)
+  // members 10 at a time once their tab is opened (the group only carries the first page)
+  const [membersOpened, setMembersOpened] = useState(false)
+  const members = usePaged(isMember && (membersOpened || tab === 'members') ? `/groups/${id}/members` : null)
+  useEffect(() => {
+    if (tab === 'members') setMembersOpened(true)
+  }, [tab])
+
   // events too, once their tab was opened (the tab count comes with the group)
   const events = usePaged(isMember && (eventsOpened || tab === 'events') ? `/groups/${id}/events` : null)
   const loadRequests = useCallback(
@@ -100,6 +107,7 @@ export default function GroupDetailPage() {
       async () => {
         await apiPost(`/group-join-requests/${request.id}/${accept ? 'accept' : 'decline'}`)
         setRequests(list => list.filter(r => r.id !== request.id))
+        if (accept && members.items) members.reload() // the new member joins the list
       },
       accept ? `${request.first_name} is now a member.` : 'Request declined.',
     )
@@ -118,7 +126,10 @@ export default function GroupDetailPage() {
   function removeMember(member) {
     if (!confirm(`Remove ${member.first_name} ${member.last_name} from the group?`)) return
     return run(
-      () => apiDelete(`/groups/${id}/members/${member.user_id}`),
+      async () => {
+        await apiDelete(`/groups/${id}/members/${member.user_id}`)
+        members.setItems(list => list?.filter(m => m.user_id !== member.user_id))
+      },
       `${member.first_name} was removed from the group.`,
     )
   }
@@ -184,7 +195,7 @@ export default function GroupDetailPage() {
         <p className="group-hero-desc">{group.description || 'No description.'}</p>
 
         <div className="group-hero-actions">
-          <AvatarStack members={group.members} />
+          <AvatarStack members={group.members} total={group.member_count} />
           {isMember ? (
             <div className="group-hero-buttons">
               {group.is_creator && (
@@ -290,9 +301,11 @@ export default function GroupDetailPage() {
           {tab === 'chat' && <GroupChat groupId={Number(id)} me={me} members={group.members} />}
 
           {/* ----------------------------------------------- members */}
-          {tab === 'members' && (
+          {tab === 'members' && members.items === null && <p className="loading">Loading members…</p>}
+          {tab === 'members' && members.items !== null && (
+            <>
             <div className="card list">
-              {group.members.map(member => (
+              {members.items.map(member => (
                 <PersonRow key={member.user_id} person={member} href={`/profile/${member.user_id}`}>
                   {member.user_id === group.creator_id ? (
                     <span className="chip chip-accent">Creator</span>
@@ -313,6 +326,8 @@ export default function GroupDetailPage() {
                 </PersonRow>
               ))}
             </div>
+            <LoadMore list={members} />
+            </>
           )}
 
           {/* ---------------------------------------------- requests */}
@@ -342,7 +357,7 @@ export default function GroupDetailPage() {
       {showInvite && (
         <InviteModal
           groupId={id}
-          memberIds={new Set(group.members.map(m => m.user_id))}
+          memberIds={new Set(group.members.map(m => m.user_id))} // the first page; the API catches the rest
           onClose={() => setShowInvite(false)}
           onInvited={name => setNotice(`Invitation sent to ${name}.`)}
         />
@@ -392,8 +407,13 @@ function GroupChat({ groupId, me, members }) {
   const history = useMessageHistory(`/groups/${groupId}/messages`)
   const { messages, setMessages, hasMore, loadingMore, error: historyError, loadMore } = history
 
-  // user id → member, to put a name and a face on each message
+  // user id → person, for the "is typing" line: the members we have (the first
+  // page) plus everyone who wrote a loaded message. Each message carries its
+  // sender's name and photo itself.
   const people = Object.fromEntries(members.map(m => [m.user_id, m]))
+  for (const msg of messages || []) {
+    people[msg.from_user_id] ??= { first_name: msg.from_first_name, last_name: msg.from_last_name, avatar: msg.from_avatar }
+  }
 
   useEffect(() => {
     // The one app-wide connection lives in lib/socket; this page only listens.
@@ -549,12 +569,12 @@ function GroupChat({ groupId, me, members }) {
         {messages?.length === 0 && <p className="chat-note">No messages yet. Say hello!</p>}
         {messages?.map(msg => {
           const mine = msg.from_user_id === me.id
-          const author = people[msg.from_user_id]
+          const author = { first_name: msg.from_first_name, last_name: msg.from_last_name, avatar: msg.from_avatar }
           return (
             <div key={msg.id} className={mine ? 'chat-line mine' : 'chat-line'}>
               {!mine && <Avatar user={author} size={28} />}
               <div>
-                {!mine && <small className="meta">{author ? author.first_name : 'Former member'}</small>}
+                {!mine && <small className="meta">{author.first_name}</small>}
                 <div className={mine ? 'bubble mine' : 'bubble'}>
                   {msg.content && <MessageContent content={msg.content} />}
                   {msg.images?.length > 0 && (
@@ -709,8 +729,8 @@ function EditGroupModal({ group, onClose, onSaved }) {
 }
 
 // The faces of the group, so you see who is in it without opening anything.
-function AvatarStack({ members, shown = 5 }) {
-  const rest = members.length - shown
+function AvatarStack({ members, total, shown = 5 }) {
+  const rest = total - Math.min(shown, members.length)
   return (
     <div className="avatar-stack">
       {members.slice(0, shown).map(member => (
@@ -736,7 +756,7 @@ function Empty({ title, children }) {
 // for anyone already invited.
 function InviteModal({ groupId, memberIds, onClose, onInvited }) {
   const [search, setSearch] = useState('')
-  const [invited, setInvited] = useState({}) // person id → true once the API confirms
+  const [invited, setInvited] = useState({}) // person id → 'Invited' | 'Member' once the API answered
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
 
@@ -748,12 +768,15 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
     setBusyId(person.id)
     try {
       await apiPost(`/groups/${groupId}/invitations`, { user_id: person.id })
-      setInvited(state => ({ ...state, [person.id]: true }))
+      setInvited(state => ({ ...state, [person.id]: 'Invited' }))
       onInvited(person.first_name)
     } catch (err) {
-      // 409: already invited (members are not listed), so show it as done
-      if (err.status === 409) setInvited(state => ({ ...state, [person.id]: true }))
-      else setError(err.message)
+      // 409: already invited, or already a member (only the first members are
+      // known here to filter out) — show which instead of an error
+      if (err.status === 409) {
+        const status = /member/i.test(err.message) ? 'Member' : 'Invited'
+        setInvited(state => ({ ...state, [person.id]: status }))
+      } else setError(err.message)
     }
     setBusyId(null)
   }
@@ -787,7 +810,7 @@ function InviteModal({ groupId, memberIds, onClose, onInvited }) {
         {shown.map(person => (
           <PersonRow key={person.id} person={person} size={40}>
             {invited[person.id] ? (
-              <span className="chip">Invited</span>
+              <span className="chip">{invited[person.id]}</span>
             ) : (
               <button type="button" className="btn btn-light btn-sm" onClick={() => invite(person)} disabled={busyId === person.id}>
                 {busyId === person.id ? '…' : 'Invite'}

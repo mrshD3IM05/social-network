@@ -179,7 +179,7 @@ func (s *Service) Detail(viewerID, groupID int64) (*model.GroupDetail, error) {
 }
 
 // Members are visible to group members only.
-func (s *Service) Members(viewerID, groupID int64) ([]*model.GroupMember, error) {
+func (s *Service) Members(viewerID, groupID, lastID int64) ([]*model.GroupMember, error) {
 	member, err := s.repo.IsGroupMember(groupID, viewerID)
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ func (s *Service) Members(viewerID, groupID int64) ([]*model.GroupMember, error)
 	if !member {
 		return nil, ErrNotGroupMember
 	}
-	return s.repo.GetGroupMembers(groupID)
+	return s.repo.GetGroupMembers(groupID, lastID)
 }
 
 // Invite lets a current member invite an existing user. It rejects self

@@ -54,11 +54,11 @@ Post json includes `likes`, `dislikes` (aggregate counts) and `my_reaction` (`li
 |---|---|---|---|
 | POST | /groups | form: title, description | 201 + group json, creator joins the group automatically |
 | GET | /groups | query: joined (true = yours, false = the others, empty = all), last | 10 groups, newest first, with member_count, is_member, pending_join, is_creator for you |
-| GET | /groups/{id} | - | group (with avatar) + creator + members + your status; outsiders get the header with an empty member list |
+| GET | /groups/{id} | - | group (with avatar) + creator + the first 10 members + member_count, event_count + your status; outsiders get the header with an empty member list |
 | PUT | /groups/{id} | form: title, description | 200 + group json, creator only |
 | DELETE | /groups/{id} | - | 204, creator only; members, invitations, requests, posts, comments, events, messages and notifications are deleted by the database cascade |
 | POST | /groups/{id}/avatar | multipart: avatar | 200 + group json, creator only, same image rules as /avatar |
-| GET | /groups/{id}/members | - | member list, members only (403 otherwise) |
+| GET | /groups/{id}/members | query: last (a member's user_id) | 10 members in joining order, members only (403 otherwise) |
 | DELETE | /groups/{id}/members/{userID} | - | 204, creator only, the creator cannot be removed; the user can be invited again later |
 | GET | /groups/{id}/messages | optional `last` oldest loaded message id | 15 newest messages before `last`, each with from_first_name, from_last_name, from_avatar; members only (new ones arrive over /ws) |
 | POST | /groups/{id}/invitations | form: user_id | 201 + invitation json, members only; rejects self-invites, unknown users, existing members and duplicates (409) |
