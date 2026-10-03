@@ -32,6 +32,25 @@ func (r *Repository) SetPostViewers(postID int64, userIDs []int64) error {
 	return tx.Commit()
 }
 
+// ListPostViewers returns the ids of the users a "private" post was shared
+// with, so its author can see them already ticked when editing.
+func (r *Repository) ListPostViewers(postID int64) ([]int64, error) {
+	rows, err := r.db.Query(`SELECT user_id FROM post_visibility WHERE post_id = ?`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 const postColumns = `
 	p.id, p.author_id, p.content, p.privacy, p.group_id, p.created_at,
 	u.first_name, u.last_name, u.nickname, u.avatar`

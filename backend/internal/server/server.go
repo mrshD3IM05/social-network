@@ -45,6 +45,7 @@ func RegisterRoutes(mux *http.ServeMux, h *handlers.Handlers) {
 	mux.Handle("DELETE /posts/{id}", auth.Authorized(http.HandlerFunc(h.Post.DeletePost)))
 
 	// comment routes (visibility follows the post: privacy rules or group membership)
+	mux.Handle("GET /posts/{id}/viewers", auth.Authorized(http.HandlerFunc(h.Post.ListViewers)))
 	mux.Handle("GET /posts/{id}/comments", auth.Authorized(http.HandlerFunc(h.Comment.ListComments)))
 	mux.Handle("POST /posts/{id}/comments", auth.Authorized(http.HandlerFunc(h.Comment.CreateComment)))
 	mux.Handle("GET /posts/{id}", auth.Authorized(http.HandlerFunc(h.Post.GetPost)))

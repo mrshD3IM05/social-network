@@ -84,6 +84,19 @@ func (s *Service) checkViewers(authorID int64, viewers []int64) error {
 	return nil
 }
 
+// Viewers lists who a "private" post was shared with. Only its author may ask,
+// so the edit form can start with the right people ticked.
+func (s *Service) Viewers(ownerID, postID int64) ([]int64, error) {
+	post, err := s.repo.GetPost(postID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if post.AuthorID != ownerID {
+		return nil, ErrNotFound
+	}
+	return s.repo.ListPostViewers(postID)
+}
+
 // Update changes a post. Sending viewers replaces who sees a "private" post;
 // leaving it out keeps the ones chosen before.
 func (s *Service) Update(ownerID, postID int64, content, privacy string, viewers []int64) (*model.Post, error) {
@@ -132,6 +145,7 @@ func (s *Service) Delete(ownerID, postID int64) error {
 	}
 	return nil
 }
+
 // ListVisible is one page of the feed: every post viewerID may see.
 func (s *Service) ListVisible(viewerID, lastID int64) ([]*model.Post, error) {
 	return s.repo.ListVisiblePosts(viewerID, 0, lastID)

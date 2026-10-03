@@ -131,6 +131,28 @@ func writeReactionError(w http.ResponseWriter, err error, fallback string) {
 		http.Error(w, fallback, http.StatusInternalServerError)
 	}
 }
+
+// ListViewers handles GET /posts/{id}/viewers: the followers a private post was
+// shared with. Only the author gets an answer.
+func (h *Handler) ListViewers(w http.ResponseWriter, r *http.Request) {
+	userID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	id, err := common.PathID(r, "id")
+	if err != nil {
+		http.Error(w, "invalid post id", http.StatusBadRequest)
+		return
+	}
+	viewers, err := h.Service.Viewers(userID, id)
+	if err != nil {
+		http.Error(w, "post not found", http.StatusNotFound)
+		return
+	}
+	common.WriteJSON(w, http.StatusOK, viewers)
+}
+
 func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {
