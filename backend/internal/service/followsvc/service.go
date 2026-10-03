@@ -7,6 +7,9 @@ import (
 	ws "sn-backend/internal/websocket"
 )
 
+// how many people the "People you may know" panel shows
+const suggestionLimit = 4
+
 var (
 	ErrCannotFollowSelf = errors.New("follow: cannot follow yourself")
 	ErrExists           = errors.New("follow: relationship already exists")
@@ -140,6 +143,11 @@ func (s *Service) Following(viewerID, userID, lastID int64) ([]*model.User, erro
 // Messageable are the users userID can start a private chat with: at least one
 // of the two follows the other, accepted. It is the Messages list, and the same
 // rule CanMessage checks before a message goes through.
+// Suggestions are a few people the user is not connected to yet.
+func (s *Service) Suggestions(userID int64) ([]*model.User, error) {
+	return s.repo.ListSuggestedUsers(userID, suggestionLimit)
+}
+
 func (s *Service) Messageable(userID int64) ([]*model.User, error) {
 	return s.repo.ListMessageableUsers(userID)
 }

@@ -24,6 +24,7 @@ it creates a sqlite database (sn.db) in the working directory and runs the embed
 | GET | /contacts | - | users you can message: at least one of you follows the other (accepted), public shape, ordered by name |
 | GET | /user/{id} | - | profile with post_count, followers, following and your follow state (is_followed / is_following: 0 none, 1 accepted, 2 pending); a private profile you don't follow leaves out email and date_of_birth |
 | GET | /users/{id}/posts | query: last | 10 of their posts you may see, same privacy gate as the profile |
+| GET | /users/suggestions | - | up to 4 users you have no accepted follow with either way, for "People you may know" |
 | GET | /users/{id}/followers | query: last | 10 users following them, same privacy gate as the profile |
 | GET | /users/{id}/following | query: last | 10 users they follow, same privacy gate as the profile |
 | POST | /users/{id}/follow | - | follows the user, or creates a follow request if their profile is private |

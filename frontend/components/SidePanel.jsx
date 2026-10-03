@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiGet } from '@/lib/api'
-import { fetchContacts } from '@/lib/people'
 import Avatar from './Avatar'
 import Icon from './Icon'
 
@@ -16,12 +15,9 @@ export default function SidePanel() {
   const [events, setEvents] = useState(null)
 
   useEffect(() => {
-    // /users already leaves you out; /contacts are the people you are linked with
-    Promise.all([apiGet('/users'), fetchContacts().catch(() => [])])
-      .then(([users, contacts]) => {
-        const known = new Set((contacts || []).map(c => c.id))
-        setPeople((users || []).filter(u => !known.has(u.id)).slice(0, 4))
-      })
+    // a few people you have no follow with yet, already filtered by the API
+    apiGet('/users/suggestions')
+      .then(list => setPeople(list || []))
       .catch(() => setPeople([]))
 
     apiGet('/groups')

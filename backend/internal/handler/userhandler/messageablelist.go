@@ -23,3 +23,19 @@ func (h *Handler) Contacts(w http.ResponseWriter, r *http.Request) {
 	}
 	writePeople(w, users)
 }
+
+// Suggestions handles GET /users/suggestions: a few people the caller has no
+// accepted follow with either way, for the "People you may know" panel.
+func (h *Handler) Suggestions(w http.ResponseWriter, r *http.Request) {
+	viewerID, err := common.CurrentUserID(r, h.Session)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	users, err := h.Follow.Suggestions(viewerID)
+	if err != nil {
+		http.Error(w, "could not list suggestions", http.StatusInternalServerError)
+		return
+	}
+	writePeople(w, users)
+}

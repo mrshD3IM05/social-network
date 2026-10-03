@@ -139,6 +139,24 @@ func (r *Repository) ListMessageableUsers(userID int64) ([]*model.User, error) {
 // written with viewerStateJoins and viewerStateColumns, and the viewer goes in
 // ahead of every argument it carries, because those two placeholders are the
 // first ones in the statement.
+// ListSuggestedUsers returns up to limit users the viewer has no accepted
+// follow with in either direction (the "People you may know" panel), so the
+// client does not have to fetch every user and every contact to filter them.
+// Pending requests stay in, so the panel still shows who you asked.
+func (r *Repository) ListSuggestedUsers(userID int64, limit int) ([]*model.User, error) {
+	return r.listFollowUsers(userID,
+		`SELECT `+userColumns+viewerStateColumns+`
+		 FROM `+userTable+`
+		 `+viewerStateJoins+`
+		 WHERE v.id != ?
+		   AND COALESCE(outgoing.status, '') != ?
+		   AND COALESCE(incoming.status, '') != ?
+		 ORDER BY v.first_name COLLATE NOCASE, v.last_name COLLATE NOCASE, v.id
+		 LIMIT ?`,
+		userID, model.FollowAccepted, model.FollowAccepted, limit,
+	)
+}
+
 func (r *Repository) listFollowUsers(viewerID int64, query string, args ...any) ([]*model.User, error) {
 	rows, err := r.db.Query(query, append([]any{viewerID, viewerID}, args...)...)
 	if err != nil {
