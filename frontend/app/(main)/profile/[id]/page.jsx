@@ -18,11 +18,19 @@ export default function ProfilePage() {
   const { me } = useMe()
   const [user, setUser] = useState(null)
   const [followStatus, setFollowStatus] = useState('') // '' | 'pending' | 'accepted'
+  const [tab, setTab] = useState('posts') // 'posts' | 'followers' | 'following'
+  // tabs opened on this profile, as "id:tab": a list loads the first time its
+  // tab is opened (the counts come with the profile), then stays loaded
+  const [opened, setOpened] = useState([])
+  const wants = key => tab === key || opened.includes(`${id}:${key}`)
+  function openTab(key) {
+    setTab(key)
+    setOpened(list => (list.includes(`${id}:${key}`) ? list : [...list, `${id}:${key}`]))
+  }
   // the three lists come 10 at a time; a private profile answers 403 to them
   const posts = usePaged(`/users/${id}/posts`)
-  const followers = usePaged(`/users/${id}/followers`)
-  const following = usePaged(`/users/${id}/following`)
-  const [tab, setTab] = useState('posts') // 'posts' | 'followers' | 'following'
+  const followers = usePaged(wants('followers') ? `/users/${id}/followers` : null)
+  const following = usePaged(wants('following') ? `/users/${id}/following` : null)
   const [message, setMessage] = useState('')
   const [savingPrivacy, setSavingPrivacy] = useState(false)
 
@@ -158,10 +166,10 @@ export default function ProfilePage() {
             ) : (
               <>
                 {/* the counts open their list below */}
-                <button type="button" className="stat-link" onClick={() => setTab('followers')}>
+                <button type="button" className="stat-link" onClick={() => openTab('followers')}>
                   <strong>{user.followers}</strong> followers
                 </button>
-                <button type="button" className="stat-link" onClick={() => setTab('following')}>
+                <button type="button" className="stat-link" onClick={() => openTab('following')}>
                   <strong>{user.following}</strong> following
                 </button>
               </>
@@ -191,7 +199,7 @@ export default function ProfilePage() {
           <button
             key={key}
             className={tab === key ? 'profile-tab active' : 'profile-tab'}
-            onClick={() => setTab(key)}
+            onClick={() => openTab(key)}
           >
             {label} <span>{count}</span>
           </button>
