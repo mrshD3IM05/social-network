@@ -82,6 +82,7 @@ type GroupDetail struct {
 	Creator       *GroupCreator `json:"creator,omitempty"`
 	Members       []GroupMember `json:"members"`
 	MemberCount   int           `json:"member_count"`
+	EventCount    int           `json:"event_count"` // members only, 0 for outsiders
 	IsMember      bool          `json:"is_member"`
 	IsCreator     bool          `json:"is_creator"`
 	PendingInvite bool          `json:"pending_invite"`

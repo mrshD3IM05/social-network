@@ -80,7 +80,7 @@ func (s *Service) Create(creatorID, groupID int64, title, description string, da
 
 // List returns the events of a group with counts and the viewer's choice.
 // Members only.
-func (s *Service) List(viewerID, groupID int64) ([]*model.EventListItem, error) {
+func (s *Service) List(viewerID, groupID, lastID int64) ([]*model.EventListItem, error) {
 	member, err := s.repo.IsGroupMember(groupID, viewerID)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (s *Service) List(viewerID, groupID int64) ([]*model.EventListItem, error) 
 	if !member {
 		return nil, ErrNotGroupMember
 	}
-	return s.repo.ListGroupEvents(groupID, viewerID)
+	return s.repo.ListGroupEvents(groupID, viewerID, lastID)
 }
 
 // Upcoming returns the next few events across all of the viewer's groups.

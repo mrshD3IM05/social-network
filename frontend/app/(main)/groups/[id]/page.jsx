@@ -33,7 +33,7 @@ export default function GroupDetailPage() {
   const router = useRouter()
   const { me } = useMe()
   const [group, setGroup] = useState(null)
-  const [events, setEvents] = useState(null)
+  const [eventsOpened, setEventsOpened] = useState(false) // events load on first visit of their tab
   const [requests, setRequests] = useState([])
   const [tab, setTab] = useState('posts')
   const [notFound, setNotFound] = useState(false)
@@ -57,10 +57,8 @@ export default function GroupDetailPage() {
 
   // The member-only lists. Posts come 10 at a time, and only for members.
   const posts = usePaged(isMember ? `/groups/${id}/posts` : null)
-  const loadEvents = useCallback(
-    () => apiGet(`/groups/${id}/events`).then(setEvents).catch(() => setEvents([])),
-    [id],
-  )
+  // events too, once their tab was opened (the tab count comes with the group)
+  const events = usePaged(isMember && (eventsOpened || tab === 'events') ? `/groups/${id}/events` : null)
   const loadRequests = useCallback(
     () => apiGet(`/groups/${id}/join-requests`).then(setRequests).catch(() => setRequests([])),
     [id],
@@ -71,12 +69,8 @@ export default function GroupDetailPage() {
   }, [load])
 
   useEffect(() => {
-    if (!isMember) {
-      setEvents(null)
-      return
-    }
-    loadEvents()
-  }, [isMember, loadEvents])
+    if (tab === 'events') setEventsOpened(true)
+  }, [tab])
 
   useEffect(() => {
     if (group?.is_creator) loadRequests()
@@ -160,7 +154,7 @@ export default function GroupDetailPage() {
 
   const tabs = [
     { key: 'posts', label: 'Posts' },
-    { key: 'events', label: 'Events', count: events?.length },
+    { key: 'events', label: 'Events', count: group.event_count },
     { key: 'chat', label: 'Chat' },
     { key: 'members', label: 'Members', count: group.member_count },
     ...(group.is_creator ? [{ key: 'requests', label: 'Requests', count: requests.length }] : []),
@@ -278,15 +272,17 @@ export default function GroupDetailPage() {
                   <Icon name="plus" size={16} /> Create event
                 </button>
               </div>
-              {events === null && <p className="loading">Loading events…</p>}
-              {events?.length === 0 && (
+              {events.error && <p className="error">{events.error.message}</p>}
+              {events.items === null && !events.error && <p className="loading">Loading events…</p>}
+              {events.items?.length === 0 && (
                 <Empty title="No events scheduled">
                   Create one and every member gets notified.
                 </Empty>
               )}
-              {events?.map(event => (
-                <EventCard key={event.id} event={event} onChanged={loadEvents} />
+              {events.items?.map(event => (
+                <EventCard key={event.id} event={event} />
               ))}
+              <LoadMore list={events} />
             </>
           )}
 
@@ -370,7 +366,8 @@ export default function GroupDetailPage() {
           onClose={() => setShowEventForm(false)}
           onCreated={event => {
             setShowEventForm(false)
-            loadEvents() // the API returns events in date order, so re-read
+            events.reload() // the API returns events in date order, so re-read
+            load() // and the tab count
             setNotice(`Event "${event.title}" created. Members have been notified.`)
           }}
         />

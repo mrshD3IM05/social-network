@@ -168,6 +168,12 @@ func (s *Service) Detail(viewerID, groupID int64) (*model.GroupDetail, error) {
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return nil, err
 		}
+	} else {
+		// events are members only, and come 10 at a time: the tab count comes from here
+		detail.EventCount, err = s.repo.CountGroupEvents(groupID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return detail, nil
 }

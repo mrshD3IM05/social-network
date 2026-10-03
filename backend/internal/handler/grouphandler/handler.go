@@ -496,7 +496,7 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
-	events, err := h.Events.List(userID, groupID)
+	events, err := h.Events.List(userID, groupID, common.LastID(r))
 	if err != nil {
 		writeEventError(w, err)
 		return

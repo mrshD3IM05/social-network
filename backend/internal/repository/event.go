@@ -23,9 +23,9 @@ func (r *Repository) CreateEvent(event *model.GroupEvent) error {
 	return err
 }
 
-// ListGroupEvents returns the events of a group (soonest first) with going /
-// not-going counts and the viewer's own choice filled in.
-func (r *Repository) ListGroupEvents(groupID, viewerID int64) ([]*model.EventListItem, error) {
+// ListGroupEvents returns one page of a group's events (soonest first, after
+// the event lastID) with going / not-going counts and the viewer's own choice.
+func (r *Repository) ListGroupEvents(groupID, viewerID, lastID int64) ([]*model.EventListItem, error) {
 	rows, err := r.db.Query(
 		`SELECT `+eventColumns+`,
 			COALESCE(SUM(CASE WHEN er.choice = ? THEN 1 ELSE 0 END), 0),
@@ -35,9 +35,12 @@ func (r *Repository) ListGroupEvents(groupID, viewerID int64) ([]*model.EventLis
 		 JOIN users u ON u.id = e.creator_id
 		 LEFT JOIN event_responses er ON er.event_id = e.id
 		 WHERE e.group_id = ?
+		   AND (? = 0 OR (e.date_time, e.id) > (SELECT date_time, id FROM group_events WHERE id = ?))
 		 GROUP BY e.id
-		 ORDER BY e.date_time, e.id`,
+		 ORDER BY e.date_time, e.id
+		 LIMIT ?`,
 		model.EventChoiceGoing, model.EventChoiceNotGoing, viewerID, groupID,
+		lastID, lastID, PageSize,
 	)
 	if err != nil {
 		return nil, err
@@ -106,6 +109,13 @@ func (r *Repository) ListUpcomingEvents(viewerID int64, after time.Time, limit i
 		}
 	}
 	return events, rows.Err()
+}
+
+// CountGroupEvents is how many events a group has, for the tab on its page.
+func (r *Repository) CountGroupEvents(groupID int64) (int, error) {
+	var count int
+	err := r.QueryRow(`SELECT COUNT(*) FROM group_events WHERE group_id = ?`, groupID).Scan(&count)
+	return count, err
 }
 
 // SetEventResponse inserts or replaces the user's response to an event. The
