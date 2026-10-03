@@ -550,8 +550,8 @@ function GroupChat({ groupId, me, members }) {
         type: 'message',
         group_id: groupId,
         content: text.trim(),
-        has_images: files.length > 0,
-        client_id: clientId,
+        // only pictures need an id back, to upload them under
+        ...(files.length > 0 && { client_id: clientId }),
       })
       if (!sent) throw new Error('Chat connection is not ready. Please try again.')
       setText('')

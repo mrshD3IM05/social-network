@@ -25,7 +25,7 @@ const (
 
 type Notification struct {
 	ID             int64     `json:"id"`
-	UserID         int64     `json:"user_id"`
+	UserID         int64     `json:"-"` // the recipient, who is always the viewer
 	Type           string    `json:"type"`
 	ActorID        int64     `json:"actor_id"`
 	ActorFirstName string    `json:"actor_first_name"`

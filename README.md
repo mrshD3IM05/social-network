@@ -291,7 +291,7 @@ Connect to `GET /ws` with the session cookie. One socket carries chat, typing an
 ```json
 { "type": "message", "to_user_id": 2, "content": "hi" }
 { "type": "message", "group_id": 5,   "content": "hello group" }
-{ "type": "message", "to_user_id": 2, "content": "photo", "has_images": true, "client_id": "upload-1" }
+{ "type": "message", "to_user_id": 2, "content": "photo", "client_id": "upload-1" }
 { "type": "typing",  "to_user_id": 2 }
 { "type": "typing",  "group_id": 5 }
 ```
@@ -310,7 +310,7 @@ Set exactly one of `to_user_id` or `group_id`. Messages are saved. Typing events
 
 Private messages are sent to both the sender and the recipient. Group messages are sent to every member.
 
-Set `has_images` when pictures follow. The sender receives `message_created`, then uploads them to `POST /messages/{message_id}/images` as multipart HTTP. This keeps chat events real-time while images use streamed HTTP uploads. The connection has a 64 KB read limit and a 60-second read deadline that each pong resets.
+Set `client_id` only when pictures follow. The sender receives `message_created`, then uploads them to `POST /messages/{message_id}/images` as multipart HTTP. This keeps chat events real-time while images use streamed HTTP uploads. The connection has a 64 KB read limit and a 60-second read deadline that each pong resets.
 
 ---
 

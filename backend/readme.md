@@ -100,7 +100,7 @@ At least one of the two users must follow the other, otherwise the message is re
 |---|---|---|---|
 | GET | /ws | upgrade | chat + notifications over one socket (gorilla/websocket) |
 
-client sends {"type":"message", "to_user_id" or "group_id", "content", optional "has_images" and "client_id"} (exactly one target); when has_images is true the sender receives message_created with its id, then uploads multipart images to POST /messages/{id}/images
+client sends {"type":"message", "to_user_id" or "group_id", "content", optional "client_id"} (exactly one target); client_id is sent only when pictures follow, and then the sender receives message_created with its id, then uploads multipart images to POST /messages/{id}/images
 server sends back messages (echoed to the sender too), {"type":"notification", ...} events and {"type":"error", ...} for rejected input
 
 ## auth

@@ -141,8 +141,9 @@ type incomingMessage struct {
 	ToUser    *int64 `json:"to_user_id,omitempty"`
 	GroupID   *int64 `json:"group_id,omitempty"`
 	Content   string `json:"content"`
-	HasImages bool   `json:"has_images,omitempty"`
-	ClientID  string `json:"client_id,omitempty"`
+	// set only when pictures follow: the sender gets the new message id back
+	// under it, then uploads them over HTTP
+	ClientID string `json:"client_id,omitempty"`
 }
 
 func (c *Client) readPump() {
@@ -170,7 +171,7 @@ func (c *Client) readPump() {
 			continue
 		}
 		input.Content = strings.TrimSpace(input.Content)
-		if input.Type != "message" || (input.Content == "" && !input.HasImages) || utf8.RuneCountInString(input.Content) > maxContentLength || len(input.ClientID) > 64 || (input.ToUser == nil) == (input.GroupID == nil) {
+		if input.Type != "message" || (input.Content == "" && input.ClientID == "") || utf8.RuneCountInString(input.Content) > maxContentLength || len(input.ClientID) > 64 || (input.ToUser == nil) == (input.GroupID == nil) {
 			c.sendError(ErrInvalidMessage.Error())
 			continue
 		}
@@ -184,7 +185,7 @@ func (c *Client) readPump() {
 			c.sendError("could not save message")
 			continue
 		}
-		if input.HasImages {
+		if input.ClientID != "" {
 			payload, _ := json.Marshal(map[string]any{"type": "message_created", "client_id": input.ClientID, "message_id": message.ID})
 			select {
 			case c.send <- payload:
