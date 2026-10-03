@@ -26,7 +26,7 @@ type Service struct {
 	ttl  time.Duration
 }
 
-func New(repo *repository.Repository) *Service { return &Service{repo: repo, ttl: 15 * time.Second} }
+func New(repo *repository.Repository) *Service { return &Service{repo: repo, ttl: DefaultTTL} }
 
 func (s *Service) Create(userID int64) (*model.Session, error) {
 	id, err := uuid.NewV4()
