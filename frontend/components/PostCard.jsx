@@ -378,6 +378,23 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
                       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                     })}
                   </span>
+                  {editingComment !== comment.id && (comment.author_id === myId || post.author_id === myId) && (
+                    <div className="comment-actions">
+                      {comment.author_id === myId && (
+                        <button
+                          type="button"
+                          className="icon-button"
+                          onClick={() => { setEditingComment(comment.id); setCommentDraft(comment.content) }}
+                          title="Edit comment"
+                        >
+                          <Icon name="edit" size={16} />
+                        </button>
+                      )}
+                      <button type="button" className="icon-button" onClick={() => removeComment(comment.id)} title="Delete comment">
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {editingComment === comment.id ? (
                   <form
@@ -405,24 +422,6 @@ export default function PostCard({ post, myId, isGroupCreator = false, onDeleted
                 {comment.images?.length > 0 && (
                   <div className="comment-images">
                     {comment.images.map(id => <img key={id} src={imageUrl(id)} alt="" />)}
-                  </div>
-                )}
-
-                {editingComment !== comment.id && (comment.author_id === myId || post.author_id === myId) && (
-                  <div className="comment-actions">
-                    {comment.author_id === myId && (
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => { setEditingComment(comment.id); setCommentDraft(comment.content) }}
-                        title="Edit comment"
-                      >
-                        <Icon name="edit" size={16} />
-                      </button>
-                    )}
-                    <button type="button" className="icon-button" onClick={() => removeComment(comment.id)} title="Delete comment">
-                      <Icon name="trash" size={16} />
-                    </button>
                   </div>
                 )}
               </div>
