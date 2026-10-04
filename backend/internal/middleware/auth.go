@@ -21,6 +21,9 @@ func (a *Auth) Authorized(next http.Handler) http.Handler {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 			return
 		}
+		if rejectNullBytes(w, r) {
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -29,6 +32,9 @@ func (a *Auth) Guest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, err := a.sessionFromRequest(r); err == nil {
 			http.Error(w, "already authenticated", http.StatusForbidden)
+			return
+		}
+		if rejectNullBytes(w, r) {
 			return
 		}
 		next.ServeHTTP(w, r)
