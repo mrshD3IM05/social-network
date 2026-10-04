@@ -13,17 +13,32 @@ The full API reference and the sequence diagrams live in [backend/readme.md](bac
 
 ## Table of contents
 
-1. [Features](#features)
-2. [Project structure](#project-structure)
-3. [Getting started](#getting-started)
-4. [How the pieces talk to each other](#how-the-pieces-talk-to-each-other)
-5. [Backend](#backend)
-6. [Database](#database)
-7. [API overview](#api-overview)
-8. [WebSocket protocol](#websocket-protocol)
-9. [Frontend](#frontend)
-10. [Security notes](#security-notes)
-11. [Resetting data](#resetting-data)
+1. [Screenshots](#screenshots)
+2. [Features](#features)
+3. [Project structure](#project-structure)
+4. [Getting started](#getting-started)
+5. [How the pieces talk to each other](#how-the-pieces-talk-to-each-other)
+6. [Backend](#backend)
+7. [Database](#database)
+8. [API overview](#api-overview)
+9. [WebSocket protocol](#websocket-protocol)
+10. [Frontend](#frontend)
+11. [Security notes](#security-notes)
+12. [Resetting data](#resetting-data)
+
+---
+
+## Screenshots
+
+| Feed | Comments and reactions |
+|---|---|
+| ![Feed with the post composer, upcoming events and suggestions](docs/screenshots/home.png) | ![A post with its comments open, and edit / delete icons on your own comment](docs/screenshots/post.png) |
+| **Profile** | **Notifications** |
+| ![A private profile with its posts, followers and following](docs/screenshots/profile.png) | ![Follow requests and group invitations to answer, then the latest notifications](docs/screenshots/notifications.png) |
+| **Groups** | **Group page** |
+| ![Group invitations, your groups and groups to discover](docs/screenshots/groups.png) | ![A group with its posts, events, chat and members tabs](docs/screenshots/group.png) |
+| **Private chat** | **Log in** |
+| ![A real-time private conversation](docs/screenshots/chat.png) | ![The log in page](docs/screenshots/login.png) |
 
 ---
 
