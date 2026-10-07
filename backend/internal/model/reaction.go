@@ -8,8 +8,7 @@ const (
 )
 
 const (
-	ReactionTargetPost    = "post"
-	ReactionTargetComment = "comment"
+	ReactionTargetPost = "post"
 )
 
 type Reaction struct {

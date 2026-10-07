@@ -286,39 +286,8 @@ func (r *GroupRepository) GetPendingInvitationsForUser(userID, lastID int64) ([]
 	return invitations, rows.Err()
 }
 
-func (r *GroupRepository) GetPendingInvitationsForGroup(groupID int64) ([]*model.GroupInvitation, error) {
-	rows, err := r.db.Query(
-		`SELECT `+groupInvitationColumns+`
-		 FROM group_invitations gi
-		 JOIN groups g ON g.id = gi.group_id
-		 JOIN users fu ON fu.id = gi.from_user_id
-		 WHERE gi.group_id = ? AND gi.status = ?
-		 ORDER BY gi.created_at DESC, gi.id DESC`,
-		groupID, model.GroupInvitationPending,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	invitations := make([]*model.GroupInvitation, 0)
-	for rows.Next() {
-		invitation, err := scanGroupInvitation(rows)
-		if err != nil {
-			return nil, err
-		}
-		invitations = append(invitations, invitation)
-	}
-	return invitations, rows.Err()
-}
-
 func (r *GroupRepository) DeleteGroupInvitation(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM group_invitations WHERE id = ?`, id)
-	return err
-}
-
-func (r *GroupRepository) UpdateGroupInvitationStatus(id int64, status string) error {
-	_, err := r.db.Exec(`UPDATE group_invitations SET status = ? WHERE id = ?`, status, id)
 	return err
 }
 
@@ -456,11 +425,6 @@ func (r *GroupRepository) DeleteGroupJoinRequest(id int64) error {
 	return err
 }
 
-func (r *GroupRepository) UpdateGroupJoinRequestStatus(id int64, status string) error {
-	_, err := r.db.Exec(`UPDATE group_join_requests SET status = ? WHERE id = ?`, status, id)
-	return err
-}
-
 // GetGroupCreator loads a user and maps it to the public creator shape so
 // sensitive fields (password hash, email, date of birth) never reach clients.
 func (r *GroupRepository) GetGroupCreator(id int64) (*model.GroupCreator, error) {
@@ -477,13 +441,6 @@ func (r *GroupRepository) GetGroupCreator(id int64) (*model.GroupCreator, error)
 		AboutMe:   user.AboutMe,
 		Private:   user.Private,
 	}, nil
-}
-
-// GetGroupIDForEvent returns the group an event belongs to.
-func (r *GroupRepository) CountGroupMembers(groupID int64) (int, error) {
-	var count int
-	err := r.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ?`, groupID).Scan(&count)
-	return count, err
 }
 
 // --------------------------------------------------- detail and browsing
