@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
@@ -18,9 +17,6 @@ import (
 )
 
 var ErrInvalidMessage = errors.New("websocket: invalid message")
-
-// same limit as messagesvc.MaxContentLength (the HTTP send endpoint)
-const maxContentLength = 1000
 
 type Hub struct {
 	mu       sync.RWMutex
@@ -161,35 +157,14 @@ func (c *Client) readPump() {
 			c.closeWith(CloseSessionRevoked, "session expired")
 			return
 		}
-		// "someone is writing" is passed on and not stored
-		if input.Type == "typing" {
-			c.hub.relayTyping(c.userID, input.ToUser, input.GroupID)
-			continue
-		}
-		input.Content = strings.TrimSpace(input.Content)
-		if input.Type != "message" || input.Content == "" || utf8.RuneCountInString(input.Content) > maxContentLength || (input.ToUser == nil) == (input.GroupID == nil) {
+		// The socket only carries "someone is writing". Saved messages (with or
+		// without images) all go through POST /messages, which can carry files and
+		// broadcasts the stored message to the other side(s) through the hub.
+		if input.Type != "typing" {
 			c.sendError(ErrInvalidMessage.Error())
 			continue
 		}
-		allowed, err := c.hub.messages.CanMessage(c.userID, input.ToUser, input.GroupID)
-		if err != nil || !allowed {
-			c.sendError("message is not permitted")
-			continue
-		}
-		message := &model.Message{FromUserID: c.userID, ToUserID: input.ToUser, GroupID: input.GroupID, Content: input.Content, Images: []string{}}
-		if err := c.hub.messages.CreateMessage(message); err != nil {
-			c.sendError("could not save message")
-			continue
-		}
-		event := map[string]any{"type": "message", "message": message}
-		if input.ToUser != nil {
-			c.hub.publish(*input.ToUser, event)
-			c.hub.publish(c.userID, event)
-		} else if members, err := c.hub.groups.GroupMemberIDs(*input.GroupID); err == nil {
-			for _, memberID := range members {
-				c.hub.publish(memberID, event)
-			}
-		}
+		c.hub.relayTyping(c.userID, input.ToUser, input.GroupID)
 	}
 }
 

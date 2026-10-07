@@ -9,10 +9,6 @@ import { forgetMe } from './userStore'
 const MAX_ATTEMPTS = 10
 const MAX_DELAY = 30000
 
-// A connection that is gone for good will never carry what is typed into it, so
-// the queue is bounded rather than left to grow for as long as we are offline.
-const MAX_QUEUE = 100
-
 let socket = null
 let connecting = false
 let stopped = false // the app closed this on purpose (logout)
@@ -87,13 +83,6 @@ function bindOnline() {
   })
 }
 
-const queue = []
-
-function flushQueue() {
-  if (!socket || socket.readyState !== WebSocket.OPEN) return
-  while (queue.length) socket.send(queue.shift())
-}
-
 function connect() {
   if (stopped || revoked) return
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -128,7 +117,6 @@ function connect() {
     attempts = 0
     everOpened = true
     setStatus('online')
-    flushQueue()
   }
 
   connection.onmessage = (e) => {
@@ -153,7 +141,6 @@ function connect() {
       // The session behind this connection is gone. Reconnecting would only
       // present the same dead cookie, so stop and let the page say so.
       revoked = true
-      queue.length = 0
       setStatus('ended')
       forgetMe()
       return
@@ -179,27 +166,15 @@ export function ensureSocket() {
   connect()
 }
 
-// Sends one payload as JSON. Anything typed before the connection opened is
-// queued and goes out on open, so pages do not have to own a socket.
-// False means it did not go out, either because the session ended or because the
-// connection is not ready yet.
+// Sends one payload as JSON. The socket only carries "typing"; every chat
+// message goes over multipart HTTP. False means it did not go out, either
+// because the session ended or because the connection is not ready yet.
 export function sendWs(payload) {
   if (stopped || revoked) return false
   if (!socket || socket.readyState === WebSocket.CLOSED) connect()
   if (stopped || revoked) return false
-  if (!socket || socket.readyState === WebSocket.CLOSED) return false
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify(payload))
-    return true
-  }
-  // Typing means "right now" and means nothing late, so it is dropped rather
-  // than queued. Otherwise an open chat page piles up one of these per keystroke
-  // for as long as it stays offline, which is also most of the queue.
-  if (payload.type === 'typing') return true
-  // Reaching this drops the oldest waiting message, so it is a last resort for a
-  // page stuck sending into a connection that is never coming back.
-  if (queue.length >= MAX_QUEUE) queue.shift()
-  queue.push(JSON.stringify(payload))
+  if (!socket || socket.readyState !== WebSocket.OPEN) return false
+  socket.send(JSON.stringify(payload))
   return true
 }
 
@@ -210,7 +185,6 @@ export function subscribe(cb) {
 
 export function closeSocket() {
   stopped = true
-  queue.length = 0
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
     reconnectTimer = null

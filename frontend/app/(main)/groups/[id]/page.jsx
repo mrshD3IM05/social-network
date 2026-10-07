@@ -558,7 +558,8 @@ function GroupChat({ groupId, me, members }) {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  // Message records use the socket; selected image files use multipart HTTP.
+  // Every message goes through multipart HTTP, so text-only and image sends
+  // share one path; the saved message is also fanned out over the socket.
   async function send(e) {
     e.preventDefault()
 
@@ -576,20 +577,15 @@ function GroupChat({ groupId, me, members }) {
     setError('')
     setSending(true)
     try {
-      if (files.length > 0) {
-        const formData = new FormData()
-        formData.append('group_id', groupId)
-        formData.append('content', text.trim())
-        for (const file of files) formData.append('files', file)
-        const message = await apiUpload('/messages', formData)
-        setMessages(list => {
-          const current = list || []
-          return current.some(existing => existing.id === message.id) ? current : [...current, message]
-        })
-      } else {
-        const sent = sendWs({ type: 'message', group_id: groupId, content: text.trim() })
-        if (!sent) throw new Error('Chat connection is not ready. Please try again.')
-      }
+      const formData = new FormData()
+      formData.append('group_id', groupId)
+      formData.append('content', text.trim())
+      for (const file of files) formData.append('files', file)
+      const message = await apiUpload('/messages', formData)
+      setMessages(list => {
+        const current = list || []
+        return current.some(existing => existing.id === message.id) ? current : [...current, message]
+      })
       setText('')
       clearFiles()
     } catch (err) {
