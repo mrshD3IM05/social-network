@@ -2,10 +2,12 @@ package groupsvc
 
 import (
 	"errors"
+	"mime/multipart"
 	"strings"
 
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/notificationsvc"
 )
 
@@ -30,15 +32,25 @@ var (
 )
 
 type Service struct {
+	repos         *repository.Repositories
 	repo          *repository.GroupRepository
 	users         *repository.UserRepository
 	events        *repository.EventRepository
 	messages      *repository.MessageRepository
+	files         *filesvc.Service
 	notifications notificationsvc.Notifier
 }
 
-func New(repo *repository.GroupRepository, users *repository.UserRepository, events *repository.EventRepository, messages *repository.MessageRepository, notifications notificationsvc.Notifier) *Service {
-	return &Service{repo: repo, users: users, events: events, messages: messages, notifications: notifications}
+func New(repos *repository.Repositories, files *filesvc.Service, notifications notificationsvc.Notifier) *Service {
+	return &Service{
+		repos:         repos,
+		repo:          repos.Groups,
+		users:         repos.Users,
+		events:        repos.Events,
+		messages:      repos.Messages,
+		files:         files,
+		notifications: notifications,
+	}
 }
 
 func (s *Service) Create(creatorID int64, title, description string) (*model.Group, error) {
@@ -48,11 +60,14 @@ func (s *Service) Create(creatorID int64, title, description string) (*model.Gro
 	}
 
 	group := &model.Group{CreatorID: creatorID, Title: title, Description: description}
-	if err := s.repo.CreateGroup(group); err != nil {
-		return nil, err
-	}
-	// The creator is a member from the start.
-	if err := s.repo.AddGroupMember(group.ID, creatorID); err != nil {
+	err = s.repos.WithinTx(func(tx *repository.Repositories) error {
+		if err := tx.Groups.CreateGroup(group); err != nil {
+			return err
+		}
+		// The creator is a member from the start.
+		return tx.Groups.AddGroupMember(group.ID, creatorID)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return group, nil
@@ -74,14 +89,28 @@ func (s *Service) Update(creatorID, groupID int64, title, description string) (*
 	return group, nil
 }
 
-// SetAvatar stores an uploaded file id as the group picture (creator only).
-func (s *Service) SetAvatar(creatorID, groupID int64, fileID string) (*model.Group, error) {
+// SetAvatar stores an uploaded file id as the group picture (creator only). The
+// picture bytes are staged first, then recorded and pointed at in one
+// transaction.
+func (s *Service) SetAvatar(creatorID, groupID int64, header *multipart.FileHeader) (*model.Group, error) {
 	group, err := s.creatorGroup(creatorID, groupID)
 	if err != nil {
 		return nil, err
 	}
-	group.Avatar = fileID
-	if err := s.repo.UpdateGroup(group); err != nil {
+	staged, err := s.files.Stage(creatorID, []*multipart.FileHeader{header})
+	if err != nil {
+		return nil, err
+	}
+	file := staged[0]
+	err = s.repos.WithinTx(func(tx *repository.Repositories) error {
+		if err := tx.Files.CreateFile(file); err != nil {
+			return err
+		}
+		group.Avatar = file.ID
+		return tx.Groups.UpdateGroup(group)
+	})
+	if err != nil {
+		s.files.Discard(staged)
 		return nil, err
 	}
 	return group, nil

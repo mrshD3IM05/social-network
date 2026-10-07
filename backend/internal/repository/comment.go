@@ -1,13 +1,18 @@
 package repository
 
-import "sn-backend/internal/model"
+import (
+	"encoding/json"
 
-const commentColumns = `
+	"sn-backend/internal/model"
+)
+
+const commentViewColumns = `
 	c.id, c.post_id, c.author_id, c.content, c.created_at,
-	u.first_name, u.last_name, u.nickname, u.avatar`
+	c.first_name, c.last_name, c.nickname, c.avatar, c.images`
 
 func scanComment(s scanner) (*model.Comment, error) {
 	comment := new(model.Comment)
+	var images string
 	if err := s.Scan(
 		&comment.ID,
 		&comment.PostID,
@@ -18,7 +23,11 @@ func scanComment(s scanner) (*model.Comment, error) {
 		&comment.AuthorLastName,
 		&comment.AuthorNickname,
 		&comment.AuthorAvatar,
+		&images,
 	); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(images), &comment.Images); err != nil {
 		return nil, err
 	}
 	return comment, nil
@@ -36,12 +45,11 @@ func (r *CommentRepository) CreateComment(comment *model.Comment) error {
 	return err
 }
 
-// GetComment loads one comment with its author fields.
+// GetComment loads one comment with its author fields and image ids.
 func (r *CommentRepository) GetComment(id int64) (*model.Comment, error) {
 	comment, err := scanComment(r.QueryRow(
-		`SELECT `+commentColumns+`
-		 FROM comments c
-		 JOIN users u ON u.id = c.author_id
+		`SELECT `+commentViewColumns+`
+		 FROM comment_view c
 		 WHERE c.id = ?`,
 		id,
 	))
@@ -57,9 +65,8 @@ func (r *CommentRepository) GetComment(id int64) (*model.Comment, error) {
 // so a comment just written never shifts a page.
 func (r *CommentRepository) ListPostComments(postID, lastID int64) ([]*model.Comment, error) {
 	rows, err := r.db.Query(
-		`SELECT `+commentColumns+`
-		 FROM comments c
-		 JOIN users u ON u.id = c.author_id
+		`SELECT `+commentViewColumns+`
+		 FROM comment_view c
 		 WHERE c.post_id = ? AND (? = 0 OR c.id < ?)
 		 ORDER BY c.id DESC
 		 LIMIT ?`,
@@ -73,10 +80,6 @@ func (r *CommentRepository) ListPostComments(postID, lastID int64) ([]*model.Com
 	comments := make([]*model.Comment, 0)
 	for rows.Next() {
 		comment, err := scanComment(rows)
-		if err != nil {
-			return nil, err
-		}
-		comment.Images, err = r.ListCommentFileIDs(comment.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -116,23 +119,6 @@ func (r *CommentRepository) CountPostComments(postIDs []int64) (map[int64]int, e
 		counts[postID] = count
 	}
 	return counts, rows.Err()
-}
-
-func (r *CommentRepository) ListCommentFileIDs(commentID int64) ([]string, error) {
-	rows, err := r.db.Query(`SELECT id FROM files WHERE comment_id = ? ORDER BY created_at, id`, commentID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	ids := make([]string, 0)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
 }
 
 // UpdateCommentOwned changes a comment the caller wrote.

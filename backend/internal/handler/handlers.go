@@ -45,21 +45,21 @@ type Handlers struct {
 // methods. Each service is created a single time and shared.
 func New(repos *repository.Repositories) *Handlers {
 	session := sessionsvc.New(repos.Sessions)
-	postService := postsvc.New(repos.Posts, repos.Follows, repos.Groups)
-	fileService := filesvc.New(repos.Files, repos.Posts, repos.Comments, repos.Messages, repos.Users, "uploads")
+	fileService := filesvc.New(repos, "uploads")
+	postService := postsvc.New(repos, fileService)
 	webSocket := ws.NewHub(repos.Messages, repos.Groups, session)
 	notificationService := notificationsvc.New(repos.Notifications, webSocket)
 	followService := followsvc.New(repos.Follows, repos.Users, notificationService)
-	groupService := groupsvc.New(repos.Groups, repos.Users, repos.Events, repos.Messages, notificationService)
+	groupService := groupsvc.New(repos, fileService, notificationService)
 	return &Handlers{
 		Auth:         authhandler.New(authsvc.New(repos.Users), session, webSocket),
 		User:         userhandler.New(usersvc.New(repos.Users, repos.Follows), session, followService, postService),
-		Post:         posthandler.New(postService, postsvc.NewViewerService(repos.Posts), fileService, session),
+		Post:         posthandler.New(postService, postsvc.NewViewerService(repos.Posts), session),
 		Reaction:     reactionhandler.New(reactionsvc.New(repos.Reactions, repos.Posts), session),
-		Comment:      commenthandler.New(commentsvc.New(repos.Comments, repos.Posts, notificationService), fileService, session),
+		Comment:      commenthandler.New(commentsvc.New(repos, fileService, notificationService), session),
 		File:         filehandler.New(fileService, session),
-		Group:        grouphandler.New(groupService, eventsvc.New(repos.Events, repos.Groups, repos.Users, notificationService), fileService, session, notificationService),
-		Message:      messagehandler.New(messagesvc.New(repos.Messages), fileService, session, webSocket),
+		Group:        grouphandler.New(groupService, eventsvc.New(repos.Events, repos.Groups, repos.Users, notificationService), session, notificationService),
+		Message:      messagehandler.New(messagesvc.New(repos, fileService), session, webSocket),
 		Request:      requesthandler.New(followService, groupService, session),
 		Notification: notificationhandler.New(notificationService, session),
 		WebSocket:    webSocket,

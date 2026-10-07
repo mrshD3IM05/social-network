@@ -1,6 +1,39 @@
 package repository
 
-import "sn-backend/internal/model"
+import (
+	"encoding/json"
+
+	"sn-backend/internal/model"
+)
+
+const messageViewColumns = `
+	m.id, m.from_user_id, m.to_user_id, m.group_id, m.content, m.created_at,
+	m.first_name, m.last_name, m.avatar, m.images`
+
+// scanMessageView reads a message_view row (migration 000024): the message, the
+// sender's display fields and the images JSON array.
+func scanMessageView(s scanner) (*model.Message, error) {
+	message := new(model.Message)
+	var images string
+	if err := s.Scan(
+		&message.ID,
+		&message.FromUserID,
+		&message.ToUserID,
+		&message.GroupID,
+		&message.Content,
+		&message.CreatedAt,
+		&message.FromFirstName,
+		&message.FromLastName,
+		&message.FromAvatar,
+		&images,
+	); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(images), &message.Images); err != nil {
+		return nil, err
+	}
+	return message, nil
+}
 
 func (r *MessageRepository) CreateMessage(message *model.Message) error {
 	result, err := r.db.Exec(`
@@ -14,8 +47,8 @@ func (r *MessageRepository) CreateMessage(message *model.Message) error {
 		return err
 	}
 	return r.QueryRow(
-		`SELECT m.created_at, u.first_name, u.last_name, COALESCE(u.avatar, '')
-		 FROM messages m JOIN users u ON u.id = m.from_user_id WHERE m.id = ?`, message.ID,
+		`SELECT m.created_at, m.first_name, m.last_name, m.avatar
+		 FROM message_view m WHERE m.id = ?`, message.ID,
 	).Scan(&message.CreatedAt, &message.FromFirstName, &message.FromLastName, &message.FromAvatar)
 }
 
@@ -42,39 +75,28 @@ func (r *MessageRepository) CanMessage(fromUserID int64, toUserID, groupID *int6
 	return false, nil
 }
 
-// CanAttachToMessage: only the sender may add images to their own message.
-func (r *MessageRepository) CanAttachToMessage(messageID, userID int64) (bool, error) {
-	var allowed int
-	err := r.QueryRow(`SELECT EXISTS(
-		SELECT 1 FROM messages m WHERE m.id = ? AND m.from_user_id = ?
-	)`, messageID, userID).Scan(&allowed)
-	return allowed == 1, err
-}
-
 // ListGroupMessages returns one older-to-newer page of a group chat.
 func (r *MessageRepository) ListGroupMessages(groupID, lastID int64) ([]*model.Message, error) {
+	// the inner query keeps the newest messages, the outer one puts them back
+	// in reading order and reads the sender fields + images in one query.
 	rows, err := r.db.Query(`
-		SELECT m.id, m.from_user_id, m.group_id, m.content, m.created_at,
-			u.first_name, u.last_name, COALESCE(u.avatar, '')
+		SELECT `+messageViewColumns+`
 		FROM (
-			SELECT id, from_user_id, group_id, content, created_at
-			FROM messages WHERE group_id = ? AND (? = 0 OR id < ?)
+			SELECT id FROM messages
+			WHERE group_id = ? AND (? = 0 OR id < ?)
 			ORDER BY id DESC LIMIT ?
-		) m JOIN users u ON u.id = m.from_user_id
-		ORDER BY m.id`, groupID, lastID, lastID, MessagePageSize)
+		) page
+		JOIN message_view m ON m.id = page.id
+		ORDER BY m.id`,
+		groupID, lastID, lastID, MessagePageSize,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
-		message := new(model.Message)
-		if err := rows.Scan(&message.ID, &message.FromUserID, &message.GroupID, &message.Content, &message.CreatedAt,
-			&message.FromFirstName, &message.FromLastName, &message.FromAvatar); err != nil {
-			return nil, err
-		}
-		// a group message can carry pictures, like a private one
-		message.Images, err = r.ListMessageFileIDs(message.ID)
+		message, err := scanMessageView(rows)
 		if err != nil {
 			return nil, err
 		}

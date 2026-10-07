@@ -20,13 +20,12 @@ import (
 type Handler struct {
 	Service       *groupsvc.Service
 	Events        *eventsvc.Service
-	File          *filesvc.Service
 	Session       *sessionsvc.Service
 	Notifications *notificationsvc.Service
 }
 
-func New(service *groupsvc.Service, events *eventsvc.Service, file *filesvc.Service, session *sessionsvc.Service, notifications *notificationsvc.Service) *Handler {
-	return &Handler{Service: service, Events: events, File: file, Session: session, Notifications: notifications}
+func New(service *groupsvc.Service, events *eventsvc.Service, session *sessionsvc.Service, notifications *notificationsvc.Service) *Handler {
+	return &Handler{Service: service, Events: events, Session: session, Notifications: notifications}
 }
 
 func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -146,18 +145,13 @@ func (h *Handler) SetGroupAvatar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "exactly one image is required", http.StatusBadRequest)
 		return
 	}
-	file, err := h.File.Upload(userID, headers[0], nil, nil, nil)
+	group, err := h.Service.SetAvatar(userID, groupID, headers[0])
 	if err != nil {
 		if filesvc.IsBadImage(err) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
-			http.Error(w, "could not set group picture", http.StatusInternalServerError)
+			writeError(w, err, "could not set group picture")
 		}
-		return
-	}
-	group, err := h.Service.SetAvatar(userID, groupID, file.ID)
-	if err != nil {
-		writeError(w, err, "could not set group picture")
 		return
 	}
 	common.WriteJSON(w, http.StatusOK, group)

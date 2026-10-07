@@ -2,10 +2,12 @@ package commentsvc
 
 import (
 	"errors"
+	"mime/multipart"
 	"strings"
 
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+	"sn-backend/internal/service/filesvc"
 	"sn-backend/internal/service/notificationsvc"
 )
 
@@ -30,13 +32,15 @@ func checkContent(content string, hasAttachments bool) (string, error) {
 
 // Service uses the hub to notify a post's author of new comments.
 type Service struct {
+	repos         *repository.Repositories
 	repo          *repository.CommentRepository
 	posts         *repository.PostRepository
+	files         *filesvc.Service
 	notifications notificationsvc.Notifier
 }
 
-func New(repo *repository.CommentRepository, posts *repository.PostRepository, notifications notificationsvc.Notifier) *Service {
-	return &Service{repo: repo, posts: posts, notifications: notifications}
+func New(repos *repository.Repositories, files *filesvc.Service, notifications notificationsvc.Notifier) *Service {
+	return &Service{repos: repos, repo: repos.Comments, posts: repos.Posts, files: files, notifications: notifications}
 }
 
 // List returns the comments of a post the viewer can see.
@@ -54,8 +58,8 @@ func (s *Service) List(viewerID, postID, lastID int64) ([]*model.Comment, error)
 // Create adds a comment to a post the viewer can see. Authorization goes
 // through CanViewPost: post privacy for normal posts, group membership for
 // group posts — a non-member cannot comment on a group post.
-func (s *Service) Create(authorID, postID int64, content string, hasAttachments bool) (*model.Comment, error) {
-	content, err := checkContent(content, hasAttachments)
+func (s *Service) Create(authorID, postID int64, content string, headers []*multipart.FileHeader) (*model.Comment, error) {
+	content, err := checkContent(content, len(headers) > 0)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +71,29 @@ func (s *Service) Create(authorID, postID int64, content string, hasAttachments 
 		return nil, ErrNoAccess
 	}
 
+	var staged []*model.File
+	if len(headers) > 0 {
+		staged, err = s.files.Stage(authorID, headers)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	comment := &model.Comment{PostID: postID, AuthorID: authorID, Content: content}
-	if err := s.repo.CreateComment(comment); err != nil {
+	err = s.repos.WithinTx(func(tx *repository.Repositories) error {
+		if err := tx.Comments.CreateComment(comment); err != nil {
+			return err
+		}
+		for _, file := range staged {
+			file.CommentID = &comment.ID
+			if err := tx.Files.CreateFile(file); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		s.files.Discard(staged)
 		return nil, err
 	}
 
@@ -100,8 +125,7 @@ func (s *Service) reload(commentID, postID int64) (*model.Comment, error) {
 	if comment.PostID != postID {
 		return nil, repository.ErrNotFound
 	}
-	comment.Images, err = s.repo.ListCommentFileIDs(comment.ID)
-	return comment, err
+	return comment, nil
 }
 
 // Update changes the text of a comment the caller wrote.

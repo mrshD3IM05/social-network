@@ -20,11 +20,20 @@ const PageSize = 10
 // ones asked for with ?last=<id of the oldest message shown>.
 const MessagePageSize = PageSize
 
+// dbtx is what repository queries run against: the shared pool, or one
+// transaction bound to a call to Repositories.WithinTx.
+type dbtx interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 type dbStore struct {
-	db *sql.DB
+	db dbtx
 }
 
 type Repositories struct {
+	store         *dbStore
 	Users         *UserRepository
 	Follows       *FollowRepository
 	Posts         *PostRepository
@@ -58,11 +67,17 @@ type NotificationRepository struct{ *dbStore }
 type SessionRepository struct{ *dbStore }
 
 func New(db *sql.DB) *Repositories {
-	store := &dbStore{db: db}
+	return newRepositories(&dbStore{db: db})
+}
+
+// newRepositories binds a fresh set of repositories to one store, so the same
+// wiring serves the pool and a transaction.
+func newRepositories(store *dbStore) *Repositories {
 	users := &UserRepository{dbStore: store}
 	reactions := &ReactionRepository{dbStore: store}
 	comments := &CommentRepository{dbStore: store}
 	return &Repositories{
+		store:         store,
 		Users:         users,
 		Follows:       &FollowRepository{dbStore: store},
 		Posts:         &PostRepository{dbStore: store, comments: comments, reactions: reactions},
@@ -77,8 +92,45 @@ func New(db *sql.DB) *Repositories {
 	}
 }
 
+// WithinTx runs fn against repositories bound to a single transaction, so a
+// service can write across more than one repository atomically. Any error rolls
+// every write back.
+func (r *Repositories) WithinTx(fn func(tx *Repositories) error) error {
+	return r.store.transaction(func(tx *dbStore) error {
+		return fn(newRepositories(tx))
+	})
+}
+
 func (r *dbStore) QueryRow(query string, args ...any) *sql.Row {
 	return r.db.QueryRow(query, args...)
+}
+
+// begin starts a transaction on the underlying pool. A store already bound to a
+// transaction cannot nest one.
+func (r *dbStore) begin() (*sql.Tx, error) {
+	db, ok := r.db.(*sql.DB)
+	if !ok {
+		return nil, errors.New("repository: transaction already active")
+	}
+	return db.Begin()
+}
+
+// transaction runs fn inside a transaction. When the store is already bound to a
+// transaction (e.g. inside Repositories.WithinTx) it joins that transaction
+// instead of opening a new one, so repository operations can be composed.
+func (r *dbStore) transaction(fn func(tx *dbStore) error) error {
+	if tx, ok := r.db.(*sql.Tx); ok {
+		return fn(&dbStore{db: tx})
+	}
+	tx, err := r.begin()
+	if err != nil {
+		return err
+	}
+	if err := fn(&dbStore{db: tx}); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func notFound(err error) error {

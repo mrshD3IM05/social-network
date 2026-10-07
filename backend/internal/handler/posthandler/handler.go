@@ -15,12 +15,11 @@ import (
 type Handler struct {
 	Service *postsvc.Service
 	Viewers *postsvc.ViewerService
-	Files   *filesvc.Service
 	Session *sessionsvc.Service
 }
 
-func New(service *postsvc.Service, viewers *postsvc.ViewerService, files *filesvc.Service, session *sessionsvc.Service) *Handler {
-	return &Handler{Service: service, Viewers: viewers, Files: files, Session: session}
+func New(service *postsvc.Service, viewers *postsvc.ViewerService, session *sessionsvc.Service) *Handler {
+	return &Handler{Service: service, Viewers: viewers, Session: session}
 }
 func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	userID, err := common.CurrentUserID(r, h.Session)
@@ -31,10 +30,6 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 	headers, err := common.ReadFormWithFiles(w, r, filesvc.MaxRequestSize, filesvc.MaxMemory)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	if err := filesvc.CheckImages(headers); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	groupID, groupScoped, err := groupScope(r)
@@ -53,25 +48,10 @@ func (h *Handler) CreatePost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	post, err := h.Service.CreatePost(userID, groupID, r.FormValue("content"), privacy, viewers, len(headers) > 0)
+	post, err := h.Service.CreatePost(userID, groupID, r.FormValue("content"), privacy, viewers, headers)
 	if err != nil {
 		writePostError(w, err, "could not create post")
 		return
-	}
-	if len(headers) > 0 {
-		stored, err := h.Files.UploadMany(userID, headers, &post.ID, nil, nil)
-		if err != nil {
-			_ = h.Service.DeletePost(userID, post.ID, groupID)
-			status := http.StatusInternalServerError
-			if filesvc.IsBadImage(err) {
-				status = http.StatusBadRequest
-			}
-			http.Error(w, "could not store post images", status)
-			return
-		}
-		for _, file := range stored {
-			post.Images = append(post.Images, file.ID)
-		}
 	}
 	common.WriteJSON(w, http.StatusCreated, post)
 }
@@ -245,6 +225,8 @@ func updatePostPath(r *http.Request) (*int64, string, error) {
 func writePostError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case errors.Is(err, postsvc.ErrInvalidPrivacy), errors.Is(err, postsvc.ErrInvalidContent), errors.Is(err, postsvc.ErrInvalidViewers):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case filesvc.IsBadImage(err):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, postsvc.ErrNotFound):
 		http.Error(w, "post not found", http.StatusNotFound)

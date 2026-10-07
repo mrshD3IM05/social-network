@@ -721,7 +721,7 @@ func (r *GroupRepository) RefuseGroupJoinRequestTx(requestID, groupID int64) err
 
 // withTx runs fn inside a transaction, rolling back on error.
 func (r *GroupRepository) withTx(fn func(tx *sql.Tx) error) error {
-	tx, err := r.db.Begin()
+	tx, err := r.begin()
 	if err != nil {
 		return err
 	}

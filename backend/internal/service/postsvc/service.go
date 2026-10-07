@@ -2,8 +2,10 @@ package postsvc
 
 import (
 	"errors"
+	"mime/multipart"
 	"sn-backend/internal/model"
 	"sn-backend/internal/repository"
+	"sn-backend/internal/service/filesvc"
 	"strings"
 	"unicode/utf8"
 )
@@ -19,13 +21,21 @@ var (
 )
 
 type Service struct {
+	repos   *repository.Repositories
 	repo    *repository.PostRepository
 	follows *repository.FollowRepository
 	groups  *repository.GroupRepository
+	files   *filesvc.Service
 }
 
-func New(repo *repository.PostRepository, follows *repository.FollowRepository, groups *repository.GroupRepository) *Service {
-	return &Service{repo: repo, follows: follows, groups: groups}
+func New(repos *repository.Repositories, files *filesvc.Service) *Service {
+	return &Service{
+		repos:   repos,
+		repo:    repos.Posts,
+		follows: repos.Follows,
+		groups:  repos.Groups,
+		files:   files,
+	}
 }
 
 type ViewerService struct{ repo *repository.PostRepository }
@@ -71,7 +81,8 @@ func (s *Service) checkViewers(authorID int64, viewers []int64) error {
 	return nil
 }
 
-func (s *Service) CreatePost(userID int64, groupID *int64, content, privacy string, viewers []int64, hasAttachments bool) (*model.Post, error) {
+func (s *Service) CreatePost(userID int64, groupID *int64, content, privacy string, viewers []int64, headers []*multipart.FileHeader) (*model.Post, error) {
+	hasAttachments := len(headers) > 0
 	var err error
 	if groupID != nil {
 		member, err := s.groups.IsGroupMember(*groupID, userID)
@@ -101,14 +112,36 @@ func (s *Service) CreatePost(userID int64, groupID *int64, content, privacy stri
 			}
 		}
 	}
-	post := &model.Post{AuthorID: userID, Content: content, Privacy: privacy, GroupID: groupID}
-	if err := s.repo.CreatePost(post); err != nil {
-		return nil, err
-	}
-	if groupID == nil && privacy == model.PostSelected {
-		if err := s.repo.SetPostViewers(post.ID, viewers); err != nil {
+
+	var staged []*model.File
+	if hasAttachments {
+		staged, err = s.files.Stage(userID, headers)
+		if err != nil {
 			return nil, err
 		}
+	}
+
+	post := &model.Post{AuthorID: userID, Content: content, Privacy: privacy, GroupID: groupID}
+	err = s.repos.WithinTx(func(tx *repository.Repositories) error {
+		if err := tx.Posts.CreatePost(post); err != nil {
+			return err
+		}
+		if groupID == nil && privacy == model.PostSelected {
+			if err := tx.Posts.SetPostViewers(post.ID, viewers); err != nil {
+				return err
+			}
+		}
+		for _, file := range staged {
+			file.PostID = &post.ID
+			if err := tx.Files.CreateFile(file); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		s.files.Discard(staged)
+		return nil, err
 	}
 	return s.loadPost(post.ID, userID)
 }
@@ -193,13 +226,16 @@ func (s *Service) UpdatePost(userID, postID int64, groupID *int64, content, priv
 		}
 		post.Content = content
 		post.Privacy = privacy
-		if err := s.repo.UpdatePostOwned(post, userID, removedFileIDs); err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return nil, ErrNotFound
+		err = s.repos.WithinTx(func(tx *repository.Repositories) error {
+			if err := tx.Posts.UpdatePostOwned(post, userID, removedFileIDs); err != nil {
+				return err
 			}
-			return nil, err
+			return tx.Posts.SetPostViewers(postID, viewers)
+		})
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotFound
 		}
-		if err := s.repo.SetPostViewers(postID, viewers); err != nil {
+		if err != nil {
 			return nil, err
 		}
 		return s.loadPost(postID, userID)

@@ -13,12 +13,11 @@ import (
 
 type Handler struct {
 	Service *commentsvc.Service
-	Files   *filesvc.Service
 	Session *sessionsvc.Service
 }
 
-func New(service *commentsvc.Service, files *filesvc.Service, session *sessionsvc.Service) *Handler {
-	return &Handler{Service: service, Files: files, Session: session}
+func New(service *commentsvc.Service, session *sessionsvc.Service) *Handler {
+	return &Handler{Service: service, Session: session}
 }
 
 // ListComments handles GET /posts/{id}/comments. The viewer must be able to
@@ -60,29 +59,10 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if err := filesvc.CheckImages(headers); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	comment, err := h.Service.Create(userID, postID, r.FormValue("content"), len(headers) > 0)
+	comment, err := h.Service.Create(userID, postID, r.FormValue("content"), headers)
 	if err != nil {
 		writeError(w, err)
 		return
-	}
-	if len(headers) > 0 {
-		stored, err := h.Files.UploadMany(userID, headers, nil, nil, &comment.ID)
-		if err != nil {
-			_ = h.Service.Delete(userID, comment.ID)
-			status := http.StatusInternalServerError
-			if filesvc.IsBadImage(err) {
-				status = http.StatusBadRequest
-			}
-			http.Error(w, "could not store comment images", status)
-			return
-		}
-		for _, file := range stored {
-			comment.Images = append(comment.Images, file.ID)
-		}
 	}
 	h.Service.NotifyCreated(userID, postID, comment)
 	common.WriteJSON(w, http.StatusCreated, comment)
@@ -94,6 +74,8 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, commentsvc.ErrInvalidContent):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case filesvc.IsBadImage(err):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, commentsvc.ErrNoAccess),
 		errors.Is(err, commentsvc.ErrNotFound),

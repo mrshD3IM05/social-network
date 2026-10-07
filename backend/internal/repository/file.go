@@ -12,17 +12,6 @@ func (r *FileRepository) CreateFile(file *model.File) error {
 	return err
 }
 
-// CountAttachedFiles counts the images already on a post, message or comment
-// (a nil id matches nothing).
-func (r *FileRepository) CountAttachedFiles(postID, messageID, commentID *int64) (int, error) {
-	var count int
-	err := r.QueryRow(
-		`SELECT COUNT(*) FROM files WHERE post_id = ? OR message_id = ? OR comment_id = ?`,
-		postID, messageID, commentID,
-	).Scan(&count)
-	return count, err
-}
-
 func (r *FileRepository) GetFile(id string) (*model.File, error) {
 	file := new(model.File)
 	err := r.QueryRow(`

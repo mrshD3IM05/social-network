@@ -18,22 +18,20 @@ func (r *PostRepository) CreatePost(post *model.Post) error {
 	return err
 }
 
-// SetPostViewers replaces the users allowed to see a "private" post.
+// SetPostViewers replaces the users allowed to see a "private" post. It joins an
+// enclosing transaction when one is active.
 func (r *PostRepository) SetPostViewers(postID int64, userIDs []int64) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM post_visibility WHERE post_id = ?`, postID); err != nil {
-		return err
-	}
-	for _, userID := range userIDs {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO post_visibility (post_id, user_id) VALUES (?, ?)`, postID, userID); err != nil {
+	return r.transaction(func(tx *dbStore) error {
+		if _, err := tx.db.Exec(`DELETE FROM post_visibility WHERE post_id = ?`, postID); err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		for _, userID := range userIDs {
+			if _, err := tx.db.Exec(`INSERT OR IGNORE INTO post_visibility (post_id, user_id) VALUES (?, ?)`, postID, userID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // ListPostViewers returns the ids of the users a "private" post was shared
@@ -112,39 +110,37 @@ func (r *PostRepository) GetPost(postID int64) (*model.Post, error) {
 	return post, nil
 }
 
+// UpdatePostOwned changes a post's content and privacy, detaching any files the
+// author removed. It joins an enclosing transaction when one is active.
 func (r *PostRepository) UpdatePostOwned(post *model.Post, ownerID int64, removedFileIDs []string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	result, err := tx.Exec(
-		`UPDATE posts SET content = ?, privacy = ? WHERE id = ? AND author_id = ?`,
-		post.Content, post.Privacy, post.ID, ownerID,
-	)
-	if err != nil {
-		return err
-	}
-	if count, err := result.RowsAffected(); err != nil {
-		return err
-	} else if count == 0 {
-		return ErrNotFound
-	}
-	if len(removedFileIDs) > 0 {
-		args := make([]any, 0, len(removedFileIDs)+1)
-		args = append(args, post.ID)
-		for _, fileID := range removedFileIDs {
-			args = append(args, fileID)
-		}
-		if _, err := tx.Exec(
-			`UPDATE files SET post_id = NULL WHERE post_id = ? AND id IN (`+placeholders(len(removedFileIDs))+`)`,
-			args...,
-		); err != nil {
+	return r.transaction(func(tx *dbStore) error {
+		result, err := tx.db.Exec(
+			`UPDATE posts SET content = ?, privacy = ? WHERE id = ? AND author_id = ?`,
+			post.Content, post.Privacy, post.ID, ownerID,
+		)
+		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		if count, err := result.RowsAffected(); err != nil {
+			return err
+		} else if count == 0 {
+			return ErrNotFound
+		}
+		if len(removedFileIDs) > 0 {
+			args := make([]any, 0, len(removedFileIDs)+1)
+			args = append(args, post.ID)
+			for _, fileID := range removedFileIDs {
+				args = append(args, fileID)
+			}
+			if _, err := tx.db.Exec(
+				`UPDATE files SET post_id = NULL WHERE post_id = ? AND id IN (`+placeholders(len(removedFileIDs))+`)`,
+				args...,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *PostRepository) DeletePostOwned(postID, ownerID int64) error {

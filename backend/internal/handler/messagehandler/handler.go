@@ -14,13 +14,12 @@ import (
 
 type Handler struct {
 	Service   *messagesvc.Service
-	Files     *filesvc.Service
 	Session   *sessionsvc.Service
 	WebSocket *ws.Hub
 }
 
-func New(service *messagesvc.Service, files *filesvc.Service, session *sessionsvc.Service, webSocket *ws.Hub) *Handler {
-	return &Handler{Service: service, Files: files, Session: session, WebSocket: webSocket}
+func New(service *messagesvc.Service, session *sessionsvc.Service, webSocket *ws.Hub) *Handler {
+	return &Handler{Service: service, Session: session, WebSocket: webSocket}
 }
 
 // History answers with the stored conversation with one user.
@@ -48,8 +47,8 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 // Send saves a private message and pushes it to both users.
 //
 // Sending over HTTP (and not over the websocket) is what lets a message carry
-// images: the message row has to exist before an upload can point at it, and
-// both steps finish before anybody is told about the message.
+// images: the bytes are written first, then the message and its file rows are
+// committed together, before anybody is told about the message.
 func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	fromID, ok := h.caller(w, r)
 	if !ok {
@@ -59,11 +58,6 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	headers, err := common.ReadFormWithFiles(w, r, filesvc.MaxRequestSize, filesvc.MaxMemory)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	// check the images first, so a bad one never leaves an empty message behind
-	if err := filesvc.CheckImages(headers); err != nil {
-		http.Error(w, err.Error(), uploadStatus(err))
 		return
 	}
 
@@ -79,21 +73,10 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message, err := h.Service.Send(fromID, toUserID, groupID, r.FormValue("content"), len(headers) > 0)
+	message, err := h.Service.Send(fromID, toUserID, groupID, r.FormValue("content"), headers)
 	if err != nil {
 		writeError(w, err, "could not send the message")
 		return
-	}
-
-	if len(headers) > 0 {
-		if _, err := h.Files.UploadMany(fromID, headers, nil, &message.ID, nil); err != nil {
-			http.Error(w, err.Error(), uploadStatus(err))
-			return
-		}
-		if err := h.Service.LoadImages(message); err != nil {
-			http.Error(w, "could not load the images", http.StatusInternalServerError)
-			return
-		}
 	}
 
 	h.WebSocket.PublishMessage(message)
@@ -121,18 +104,11 @@ func optionalID(value string) (*int64, error) {
 	return &id, nil
 }
 
-func uploadStatus(err error) int {
-	if filesvc.IsBadImage(err) {
-		return http.StatusBadRequest
-	}
-	return http.StatusInternalServerError
-}
-
 func writeError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case errors.Is(err, messagesvc.ErrNotAllowed):
 		http.Error(w, err.Error(), http.StatusForbidden)
-	case errors.Is(err, messagesvc.ErrEmpty), errors.Is(err, messagesvc.ErrTooLong):
+	case errors.Is(err, messagesvc.ErrEmpty), errors.Is(err, messagesvc.ErrTooLong), filesvc.IsBadImage(err):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
 		http.Error(w, fallback, http.StatusInternalServerError)
