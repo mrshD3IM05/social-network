@@ -136,9 +136,6 @@ type incomingMessage struct {
 	ToUser  *int64 `json:"to_user_id,omitempty"`
 	GroupID *int64 `json:"group_id,omitempty"`
 	Content string `json:"content"`
-	// set only when pictures follow: the sender gets the new message id back
-	// under it, then uploads them over HTTP
-	ClientID string `json:"client_id,omitempty"`
 }
 
 func (c *Client) readPump() {
@@ -170,7 +167,7 @@ func (c *Client) readPump() {
 			continue
 		}
 		input.Content = strings.TrimSpace(input.Content)
-		if input.Type != "message" || (input.Content == "" && input.ClientID == "") || utf8.RuneCountInString(input.Content) > maxContentLength || len(input.ClientID) > 64 || (input.ToUser == nil) == (input.GroupID == nil) {
+		if input.Type != "message" || input.Content == "" || utf8.RuneCountInString(input.Content) > maxContentLength || (input.ToUser == nil) == (input.GroupID == nil) {
 			c.sendError(ErrInvalidMessage.Error())
 			continue
 		}
@@ -182,14 +179,6 @@ func (c *Client) readPump() {
 		message := &model.Message{FromUserID: c.userID, ToUserID: input.ToUser, GroupID: input.GroupID, Content: input.Content, Images: []string{}}
 		if err := c.hub.messages.CreateMessage(message); err != nil {
 			c.sendError("could not save message")
-			continue
-		}
-		if input.ClientID != "" {
-			payload, _ := json.Marshal(map[string]any{"type": "message_created", "client_id": input.ClientID, "message_id": message.ID})
-			select {
-			case c.send <- payload:
-			default:
-			}
 			continue
 		}
 		event := map[string]any{"type": "message", "message": message}
@@ -206,8 +195,7 @@ func (c *Client) readPump() {
 
 func incomingMessageHasNullByte(input incomingMessage) bool {
 	return strings.ContainsRune(input.Type, 0) ||
-		strings.ContainsRune(input.Content, 0) ||
-		strings.ContainsRune(input.ClientID, 0)
+		strings.ContainsRune(input.Content, 0)
 }
 
 func (c *Client) sendError(message string) {

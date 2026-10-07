@@ -100,44 +100,6 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	common.WriteJSON(w, http.StatusCreated, message)
 }
 
-// AttachImages uploads pictures for a message already created over the
-// WebSocket, then publishes the completed message to its recipients.
-func (h *Handler) AttachImages(w http.ResponseWriter, r *http.Request) {
-	fromID, ok := h.caller(w, r)
-	if !ok {
-		return
-	}
-	messageID, err := common.PathID(r, "id")
-	if err != nil {
-		http.Error(w, "invalid message id", http.StatusBadRequest)
-		return
-	}
-	headers, err := common.ReadFormWithFiles(w, r, filesvc.MaxRequestSize, filesvc.MaxMemory)
-	if err != nil || len(headers) == 0 {
-		http.Error(w, "at least one image is required", http.StatusBadRequest)
-		return
-	}
-	if err := filesvc.CheckImages(headers); err != nil {
-		http.Error(w, err.Error(), uploadStatus(err))
-		return
-	}
-	if _, err := h.Files.UploadMany(fromID, headers, nil, &messageID, nil); err != nil {
-		http.Error(w, err.Error(), uploadStatus(err))
-		return
-	}
-	message, err := h.Service.Message(messageID)
-	if err != nil {
-		http.Error(w, "could not load message", http.StatusInternalServerError)
-		return
-	}
-	if err := h.Service.LoadImages(message); err != nil {
-		http.Error(w, "could not load the images", http.StatusInternalServerError)
-		return
-	}
-	h.WebSocket.PublishMessage(message)
-	common.WriteJSON(w, http.StatusCreated, message)
-}
-
 func (h *Handler) caller(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	userID, err := common.CurrentUserID(r, h.Session)
 	if err != nil {

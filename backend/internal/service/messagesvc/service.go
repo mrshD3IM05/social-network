@@ -84,9 +84,3 @@ func (s *Service) LoadImages(message *model.Message) error {
 	message.Images = images
 	return nil
 }
-
-// Message loads one stored message so image uploads can publish its complete
-// chat event after the files have been attached.
-func (s *Service) Message(id int64) (*model.Message, error) {
-	return s.repo.GetMessage(id)
-}

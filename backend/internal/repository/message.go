@@ -19,22 +19,6 @@ func (r *MessageRepository) CreateMessage(message *model.Message) error {
 	).Scan(&message.CreatedAt, &message.FromFirstName, &message.FromLastName, &message.FromAvatar)
 }
 
-// GetMessage returns one chat message for publishing after its HTTP images are
-// attached to a message created through the WebSocket.
-func (r *MessageRepository) GetMessage(id int64) (*model.Message, error) {
-	message := new(model.Message)
-	err := r.QueryRow(`
-		SELECT m.id, m.from_user_id, m.to_user_id, m.group_id, m.content, m.created_at,
-			u.first_name, u.last_name, COALESCE(u.avatar, '')
-		FROM messages m JOIN users u ON u.id = m.from_user_id WHERE m.id = ?`, id,
-	).Scan(&message.ID, &message.FromUserID, &message.ToUserID, &message.GroupID, &message.Content, &message.CreatedAt,
-		&message.FromFirstName, &message.FromLastName, &message.FromAvatar)
-	if err != nil {
-		return nil, err
-	}
-	return message, nil
-}
-
 func (r *MessageRepository) CanMessage(fromUserID int64, toUserID, groupID *int64) (bool, error) {
 	if toUserID != nil {
 		var allowed int

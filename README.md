@@ -105,7 +105,33 @@ Files created at runtime (ignored by git):
 
 ### Option 1: Docker Compose (recommended)
 
+<<<<<<< Updated upstream
 Requirements: Docker with the Compose plugin.
+=======
+### Real-time
+
+The WebSocket at `/api/v1/ws` pushes these events to the client:
+
+| Event             | When                                              |
+| ----------------- | ------------------------------------------------- |
+| `message`         | a private or group message arrives                |
+| `typing`          | the other person is typing                        |
+| `notification`    | follow request, group invite, join request, event |
+| `error`           | a message could not be sent                       |
+
+### Images
+
+Posts, comments, messages and avatars accept JPEG, PNG or GIF images, up to 10 MB each and 3 per post, comment or message. Files are saved in `backend/uploads/` and served through `/api/v1/fs/{id}` with the same visibility rules as the thing they belong to.
+
+### Limits
+
+- 1000 requests per minute per IP overall
+- 10 login/register attempts per minute per IP
+
+## Run with Docker
+
+The easiest way: you only need Docker.
+>>>>>>> Stashed changes
 
 ```bash
 docker compose up --build

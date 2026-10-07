@@ -98,7 +98,6 @@ Groups notifications (group_invitation, group_join_request, group_invite_respons
 |---|---|---|---|
 | GET | /messages/{id} | optional `last` oldest loaded message id | 10 newest messages before `last` in your conversation, each with its sender's name and avatar |
 | POST | /messages | multipart: to_user_id or group_id, content (optional with files), files (optional; up to 3). Provide content or at least one file | 201 + message json, pushed to recipients over /ws |
-| POST | /messages/{id}/images | multipart: files[] (max 3 images, 10 MB each) | 201 + completed message json, pushed to recipients over /ws |
 
 At least one of the two users must follow the other, otherwise the message is rejected.
 
@@ -114,7 +113,7 @@ At least one of the two users must follow the other, otherwise the message is re
 |---|---|---|---|
 | GET | /ws | upgrade | chat + notifications over one socket (gorilla/websocket) |
 
-client sends {"type":"message", "to_user_id" or "group_id", "content", optional "client_id"} (exactly one target); client_id is sent only when pictures follow, and then the sender receives message_created with its id, then uploads multipart images to POST /messages/{id}/images
+client sends {"type":"message", "to_user_id" or "group_id", "content"} (exactly one target); text messages travel over the socket, while a message that carries images is sent as a single multipart POST /messages instead
 server sends back messages (echoed to the sender too), {"type":"notification", ...} events and {"type":"error", ...} for rejected input
 
 ## auth
@@ -274,7 +273,7 @@ sequenceDiagram
     H-->>C: 201 + created content with image IDs
 ```
 
-The app sends image-bearing messages through `POST /messages`; text-only chat messages can still use the WebSocket. `POST /messages/{id}/images` remains for clients that create a message over WebSocket first. `GET /fs/{id}` checks visibility before serving bytes.
+Text-only chat messages travel over the WebSocket; a message that carries images is sent as a single multipart `POST /messages`, which saves the message, attaches the files and pushes the completed message to its recipients. `GET /fs/{id}` checks visibility before serving bytes.
 
 ### follow request flow
 
@@ -346,11 +345,6 @@ sequenceDiagram
         C1->>WS: {"type":"message","to_user_id":2,"content":"hi"}
         WS->>R: CreateMessage(from, to, content)
         R->>DB: INSERT INTO messages
-        opt images
-            WS-->>C1: message_created(message_id)
-            C1->>S: POST /messages/{id}/images
-            S->>R: CreateFile(message_id)
-        end
         WS->>WS: find recipient session in hub
         WS->>C2: {"type":"message","from_user_id":1,"content":"hi"}
         WS->>C1: {"type":"message","from_user_id":1,"content":"hi"}
