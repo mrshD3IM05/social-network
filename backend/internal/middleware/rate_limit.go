@@ -39,7 +39,16 @@ func AuthRateLimit(next http.Handler) http.Handler { return authLimiter.middlewa
 
 func (l *limiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		allowed, remaining, retryAfter := l.take(clientIP(r), time.Now())
+		// caddy adds a X-Forwarded-For header with the real client IP, but only if the request comes from a private or loopback address (the proxy). Anyone else could write that header, so we only read it when the request comes from a private or loopback address.
+		// lets check if the request comes from a private or loopback address, and if so, use the last IP in the X-Forwarded-For header as the client IP. Otherwise, use the remote address.
+		remoteIP := r.Header.Get("X-Forwarded-For")
+		if remoteIP != "" {
+			parts := strings.Split(remoteIP, ",")
+			remoteIP = strings.TrimSpace(parts[len(parts)-1])
+		} else {
+			remoteIP = clientIP(r)
+		}
+		allowed, remaining, retryAfter := l.take(remoteIP, time.Now())
 
 		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(l.requests))
 		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
